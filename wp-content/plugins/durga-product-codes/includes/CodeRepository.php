@@ -12,8 +12,8 @@
  *
  * This class performs NO capability checks; callers (admin screens, REST
  * routes in later phases) must check Permissions::can_manage_codes() first.
- * It does not generate codes or validate WooCommerce product types either;
- * those belong to the code-generation phase.
+ * It does not generate codes or validate WooCommerce product types either:
+ * CodeGenerator produces codes and ProductCodeService decides eligibility.
  *
  * @package Durga\ProductCodes
  */
@@ -67,6 +67,28 @@ final class CodeRepository {
 		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE code = %s", $code ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
 
 		return is_array( $row ) ? $row : null;
+	}
+
+	/**
+	 * Whether a code string has ever been issued, active or retired. Retired
+	 * codes count, so a retired code is never handed out again.
+	 *
+	 * An invalid code string is reported as taken so callers never try to use it.
+	 *
+	 * @param string $code Code string.
+	 */
+	public static function code_exists( string $code ): bool {
+		global $wpdb;
+
+		$code = self::normalize_code( $code );
+
+		if ( '' === $code ) {
+			return true;
+		}
+
+		$table = Schema::codes_table();
+
+		return null !== $wpdb->get_var( $wpdb->prepare( "SELECT 1 FROM {$table} WHERE code = %s LIMIT 1", $code ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
 	}
 
 	/**

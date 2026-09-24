@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phase 2 (foundation and data layer)
+## Current scope: Phases 2–3 (foundation, data layer, code generation)
 
 Implemented:
 
@@ -15,10 +15,110 @@ Implemented:
 - the Seller role and DPC capabilities, with a central `Permissions` class
 - `CodeRepository`, which enforces one active code per item in the application layer
 - WooCommerce HPOS compatibility declaration
+- **Phase 3:** `CodeGenerator`, which produces secure random codes, and `ProductCodeService`, which checks product eligibility and assigns codes. See [Product codes](#product-codes).
 
-**Not implemented yet (later phases):** code generation, QR and barcode rendering, `/scan/` URLs and scan pages, login redirect flow, product screen, Mark-as-Sold, stock decrement, sales history and void UI, seller dashboard, label printing, CSV import/export, bulk tools, product admin UI and metaboxes, product lifecycle hooks, REST/AJAX endpoints, shortcodes and templates.
+**Not implemented yet (later phases):** QR and barcode rendering, `/scan/` URLs and scan pages, login redirect flow, product screen, Mark-as-Sold, stock decrement, sales history and void UI, seller dashboard, label printing, CSV import/export, bulk generation and bulk tools, product admin UI and metaboxes, product lifecycle hooks (automatic code assignment), code regeneration/replacement, REST/AJAX endpoints, shortcodes and templates.
 
-Phase 2 adds **no** public endpoints of any kind.
+The plugin adds **no** public endpoints of any kind. Phase 3 code is a PHP service layer only. No hook, screen or endpoint calls it yet.
+
+## Product codes
+
+### Format
+
+```
+DC-XXXX-XXXX-XXXX        e.g. DC-7K4M-9P2X-Q8RT
+```
+
+- The prefix `DC-` is fixed. It is followed by 3 groups of 4 characters separated by hyphens, 17 characters in total.
+- The alphabet is `CodeGenerator::ALPHABET`, which has 31 symbols:
+
+  ```
+  ABCDEFGHJKMNPQRSTUVWXYZ23456789
+  ```
+
+  That is A–Z without `I`, `L` and `O`, plus 2–9 without `0` and `1`. It is uppercase only and uses no punctuation other than the group hyphens. The excluded characters are easy to confuse when printed, scanned or typed by hand.
+- The strict format is `CodeGenerator::FORMAT_PATTERN` = `/^DC(-[A-HJKMNP-Z2-9]{4}){3}$/D`. Its character class matches the alphabet exactly. The `D` modifier rejects a trailing newline.
+- There are 31¹² ≈ 7.9 × 10¹⁷ possible codes (about 59 bits).
+
+`CodeRepository::CODE_PATTERN` is intentionally broader: 4–32 characters of `A-Z 0-9 -`. It is the storage-level sanity check. `CodeGenerator::is_valid_format()` is the check for the `DC-` format.
+
+### Randomness
+
+- Every character is picked with PHP's `random_int()`, a CSPRNG, as an index into the alphabet.
+- No product data (ID, SKU, name), timestamp, `rand()`/`mt_rand()`/`uniqid()`/`microtime()` or hash of predictable values is involved.
+- `generate()` takes no input, so a code can't be derived from the product it is assigned to.
+- If the random source fails, the result is a controlled `WP_Error` (`dpc_random_unavailable`), never a weaker fallback.
+
+### Product eligibility
+
+A code identifies the **purchasable item**.
+
+| WooCommerce object | Code | `parent_id` stored |
+|---|---|---|
+| Simple product | Yes | `0` |
+| Variation (parent is a variable product) | Yes, one per variation | the variable parent's ID |
+| Variable parent | **No**. It is only the container for its variations. | — |
+| Grouped product | No | — |
+| External/affiliate product | No | — |
+| Variation whose parent is missing or not variable | No | — |
+| Any other or custom product type | No. Nothing unsupported gets a code silently. | — |
+| ID that is not a WooCommerce product | No (`dpc_invalid_product`) | — |
+
+The product type is resolved through `wc_get_product()` and `WC_Product::is_type()`, not raw post data.
+
+**Product status** (draft, private, published and so on) is **not** checked. No status rule has been decided yet. It will be settled with admin code management (Phase 5).
+
+"Purchasable" means the sellable unit, not WooCommerce's `is_purchasable()`, which depends on price and status and changes over time.
+
+### Assigning a code
+
+```php
+use Durga\ProductCodes\ProductCodeService;
+
+$row = ( new ProductCodeService() )->get_or_create( $product_or_variation_id, get_current_user_id() );
+// array (the dpc_codes row) on success, WP_Error otherwise.
+```
+
+- **Authorization.** The acting `$user_id` must have `dpc_manage_codes` (Shop Manager, Administrator). Otherwise the call returns `dpc_forbidden`. The check uses the user passed in, not the current user.
+- **Idempotent.** If the item already has an active code, that row is returned unchanged. No new code is generated and no second active code is created.
+- **Eligibility** errors are `dpc_invalid_product` and `dpc_ineligible_product`. Nothing is written.
+- All persistence goes through `CodeRepository::create_active()`. The generator and service contain no SQL.
+- The code is stored only in `dpc_codes.code`, never in product meta, options or order data.
+
+Phase 3 registers **no hooks**. Codes are not created automatically on product save or creation. A caller (the Phase 5 admin screens, or bulk tools later) must request them explicitly.
+
+### Uniqueness and collision handling
+
+Codes are globally unique across the whole `dpc_codes` table, including retired codes. Three layers enforce this:
+
+1. **Random generation.** A single collision is extremely unlikely.
+2. **Pre-insert check.** `CodeGenerator::generate_unique()` asks `CodeRepository::code_exists()`, which counts both active and retired codes. On a collision it draws a new candidate. It stops after `CodeGenerator::MAX_ATTEMPTS = 10` and returns `dpc_code_generation_failed`.
+   - Why 10: even with a million stored codes, one candidate collides with probability about 1.3 × 10⁻¹². Ten collisions in a row means a broken random source or bad data. Failing loudly is safer than looping.
+3. **`UNIQUE(code)` in the database.** This is the final authority. The check-then-insert sequence can race with another request. If the insert hits the unique index, `create_active()` rolls back and returns `dpc_code_conflict`. The service then:
+   - uses the active code another request just assigned to the same item, if there is one
+   - otherwise retries with a fresh code, at most `ProductCodeService::MAX_SAVE_ATTEMPTS = 3` times
+   - if it still fails, returns `dpc_code_generation_failed`
+
+A failed generation writes no row, never reuses an existing code and never changes other records. It is logged to the WooCommerce logger (source `durga-product-codes`) with the error code only.
+
+The column collation (`utf8mb4_unicode_520_ci`) is case-insensitive, so a lowercase copy of an existing code is also rejected.
+
+### Lifecycle: active → retired
+
+- `active`: the item's current code. There is at most one per item.
+- `retired`: kept forever for history. It is **never reactivated** (there is no method for that) and **never reissued**, to the same item or any other, because `code_exists()` and `UNIQUE(code)` both still see it.
+- After `CodeRepository::retire()`, the next `get_or_create()` for that item generates a **new** code.
+- There is no `orphaned` status.
+
+**Regeneration is deferred.** An atomic "replace code" operation (retire the old code and create the new one in a single transaction, behind `dpc_manage_codes`) is not needed until codes can be managed in the admin area. It belongs to Phase 5. Until then, retire followed by `get_or_create()` is the only path.
+
+### Code map
+
+| Class | Responsibility |
+|---|---|
+| `CodeGenerator` | randomness, alphabet, format, collision retry. It never touches the database directly. |
+| `CodeRepository` | persistence and queries, the active/retired state, the one-active-code invariant |
+| `ProductCodeService` | authorization, WooCommerce eligibility, mapping an item to its row, retrying on database conflicts |
 
 ## Requirements
 
