@@ -33,6 +33,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 2 was committed as `50d7e0b` and Phase 3 as `a2e5643`; both are pushed to `origin/main`.
 - The plugin rename was committed as `5f301be` and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 - Phase 4 was committed as `3654086` ("Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build") and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
+- Phase 5 was committed as `ff7805c` ("Phase 5: admin code management (auto-assignment, lifecycle, atomic regeneration, product panel, downloads)") and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -46,6 +47,8 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `ff7805c` | Phase 5: admin code management (auto-assignment, lifecycle, atomic regeneration, product panel, downloads) |
+| `a3f654e` | Record Phase 4 commit and push in progress log |
 | `3654086` | Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build |
 | `5f301be` | Rename plugin to Product QR Code and Barcode Generator |
 | `a2e5643` | Phase 3: secure product code generation (CodeGenerator, ProductCodeService) |
@@ -103,7 +106,7 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **3** | **Secure product code generation** | **Done 2026-09-24. Committed `a2e5643`, pushed.** |
 | — | **Plugin rename** (no functional change) | **Done 2026-09-24. Committed `5f301be`, pushed.** |
 | **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Committed `3654086`, pushed.** |
-| **5** | **Admin code management** | **Done 2026-09-25. Not committed; waiting for approval.** |
+| **5** | **Admin code management** | **Done 2026-09-25. Committed `ff7805c`, pushed.** |
 | 6 | Scan/product screen | Next. Not started |
 | 7 → 12 | mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
@@ -609,7 +612,7 @@ _Recorded before Phase 4 and implemented in Phase 4 (see below)._
 
 ### Phase 5: Admin code management (2026-09-24 → 2026-09-25)
 
-**Status:** implemented and tested. The plugin stays active. **Not committed; waiting for the user's approval.**
+**Status:** implemented and tested. The plugin stays active. **Approved** by the user, then committed as a single commit, `ff7805c` ("Phase 5: admin code management (auto-assignment, lifecycle, atomic regeneration, product panel, downloads)") and pushed to `origin/main` with a normal push (no force).
 
 **Environment:** re-verified at the start with no differences from the notes above.
 - WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6, MariaDB 10.4.32
@@ -866,4 +869,4 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
   - Primed the variation caches in the panel. The HTTP overhead for 40 variations is now 85–115 ms, down from about 150 ms.
   - The test Quick Edit and Bulk Edit requests now send `post_view`/`change_stock` like the real forms. Without them, core and WooCommerce logged "undefined array key" warnings in the Apache log during testing; these were not from plugin code.
   - Final run: **542 passed, 0 failed, 0 skipped** (decoder installed in the scratchpad). All test data removed.
-  - Not committed; waiting for approval.
+  - Approved; committed as `ff7805c` and pushed to `origin/main`.
