@@ -51,8 +51,11 @@ wp-content/plugins/hello.php
 # Track custom themes and plugins by un-ignoring them here as they are added, e.g.:
 # !wp-content/themes/
 # !wp-content/themes/durga-collections/
-# !wp-content/plugins/
-# !wp-content/plugins/durga-custom/
+
+# Custom plugin: Durga Product Codes (every other plugin stays ignored)
+!wp-content/plugins/
+wp-content/plugins/*
+!wp-content/plugins/durga-product-codes/
 
 # ---- OS / editor cruft ----
 Thumbs.db
