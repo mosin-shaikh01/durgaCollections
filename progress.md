@@ -32,7 +32,7 @@ Branch `main`, tracking `origin/main`.
 
 - Phase 2 was committed as `50d7e0b` and Phase 3 as `a2e5643`; both are pushed to `origin/main`.
 - The plugin rename was committed as `5f301be` and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
-- Phase 4 was committed, with the user's approval, as a single commit "Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build" and pushed to `origin/main` (normal push, no force). A commit can't record its own hash; see `git log`.
+- Phase 4 was committed as `3654086` ("Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build") and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -46,6 +46,7 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `3654086` | Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build |
 | `5f301be` | Rename plugin to Product QR Code and Barcode Generator |
 | `a2e5643` | Phase 3: secure product code generation (CodeGenerator, ProductCodeService) |
 | `fd07308` | Record Phase 2 commit and push in progress log |
@@ -101,7 +102,7 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **2** | **Plugin foundation and data layer** | **Done 2026-09-24. Committed `50d7e0b`, pushed.** |
 | **3** | **Secure product code generation** | **Done 2026-09-24. Committed `a2e5643`, pushed.** |
 | — | **Plugin rename** (no functional change) | **Done 2026-09-24. Committed `5f301be`, pushed.** |
-| **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Approved, committed as one commit and pushed.** |
+| **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Committed `3654086`, pushed.** |
 | 5 | Admin code management | Next. Not started |
 | 6 → 12 | scan/product screen → mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
@@ -452,7 +453,7 @@ _Recorded before Phase 4 and implemented in Phase 4 (see below)._
 
 ### Phase 4: QR code + optional barcode rendering (2026-09-24)
 
-**Status:** implemented and tested. The plugin stays active. **Approved** by the user after two review rounds, then committed as a single commit ("Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build") and pushed to `origin/main` with a normal push (no force).
+**Status:** implemented and tested. The plugin stays active. **Approved** by the user after two review rounds, then committed as a single commit, `3654086` ("Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build") and pushed to `origin/main` with a normal push (no force).
 
 **Environment:** re-verified at the start with no differences from the notes above.
 - WP 7.1.2, WC 11.1.2, PHP 8.5.6, MariaDB 10.4.32
@@ -683,4 +684,4 @@ _Recorded before Phase 4 and implemented in Phase 4 (see below)._
     - `WP_ENVIRONMENT_TYPE=local` documented as the preferred test guard
     - dev-gap fatal log file deleted
   - Final run: 385/385.
-  - Approved; committed as one commit and pushed to `origin/main`.
+  - Approved; committed as `3654086` and pushed to `origin/main`.
