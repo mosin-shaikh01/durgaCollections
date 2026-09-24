@@ -28,6 +28,10 @@ final class Plugin {
 		add_action( 'init', array( __CLASS__, 'load_textdomain' ) );
 
 		Install::maybe_upgrade();
+
+		if ( is_admin() ) {
+			SettingsPage::register();
+		}
 	}
 
 	/**
@@ -39,12 +43,18 @@ final class Plugin {
 
 	/**
 	 * Default settings. Later phases add keys here; stored values for unknown keys are ignored.
+	 * New keys need no migration because stored settings are always merged over these defaults.
+	 *
+	 * - barcodes_enabled: render Code 128 barcodes for hardware scanners (QR codes are always on).
+	 * - scan_base_url:    absolute base for scan URLs; '' means use home_url(). See Settings.
 	 *
 	 * @return array<string, mixed>
 	 */
 	public static function default_settings(): array {
 		return array(
 			'settings_version' => 1,
+			'barcodes_enabled' => false,
+			'scan_base_url'    => '',
 		);
 	}
 

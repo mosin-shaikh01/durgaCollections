@@ -57,6 +57,14 @@ wp-content/plugins/hello.php
 wp-content/plugins/*
 !wp-content/plugins/product-qrcode-barcode-generator/
 
+# Its HTTP-denial files for tests/ and build/ (".htaccess" is ignored everywhere else)
+!wp-content/plugins/product-qrcode-barcode-generator/tests/.htaccess
+!wp-content/plugins/product-qrcode-barcode-generator/build/.htaccess
+
+# Its build tooling and scratch output (only vendor-prefixed/ is committed; vendor/ and node_modules/ are ignored below)
+wp-content/plugins/product-qrcode-barcode-generator/build/tools/
+wp-content/plugins/product-qrcode-barcode-generator/build/scoped/
+
 # ---- OS / editor cruft ----
 Thumbs.db
 ehthumbs.db

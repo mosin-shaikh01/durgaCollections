@@ -1,0 +1,11 @@
+{
+  "name": "pqbg-test-decoder",
+  "private": true,
+  "description": "Test tooling only: rasterises SVGs and decodes QR/Code 128 for the Phase 4 round-trip tests.",
+  "type": "module",
+  "license": "GPL-2.0-or-later",
+  "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "zxing-wasm": "3.1.4"
+  }
+}

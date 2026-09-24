@@ -1,0 +1,18 @@
+{
+    "name": "product-qrcode-barcode-generator/vendor-build",
+    "description": "Build-time only. Pins the third-party libraries that build.php scopes into ../vendor-prefixed/. Never installed on the server.",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "bacon/bacon-qr-code": "3.1.1",
+        "dasprid/enum": "1.0.7",
+        "picqer/php-barcode-generator": "3.3.0"
+    },
+    "config": {
+        "platform": {
+            "php": "8.2.0"
+        },
+        "allow-plugins": false,
+        "sort-packages": true
+    }
+}

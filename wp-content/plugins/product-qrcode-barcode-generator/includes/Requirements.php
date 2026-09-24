@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 class Requirements {
 
 	const MIN_WP  = '6.7';
-	const MIN_PHP = '8.1';
+	const MIN_PHP = '8.2';
 	const MIN_WC  = '9.0';
 
 	/**

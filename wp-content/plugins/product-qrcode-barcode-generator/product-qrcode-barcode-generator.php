@@ -1,13 +1,13 @@
 <?php
 /**
  * Plugin Name:          Product QR Code and Barcode Generator
- * Description:          Product QR/barcode inventory foundation for Durga Collections: product-code and sales tables, seller role and capabilities.
+ * Description:          Product QR/barcode inventory for Durga Collections: secure product codes, QR code and optional barcode rendering, seller role and capabilities.
  * Version:              0.1.0
  * Author:               Durga Collections
  * Text Domain:          product-qrcode-barcode-generator
  * Domain Path:          /languages
  * Requires at least:    6.7
- * Requires PHP:         8.1
+ * Requires PHP:         8.2
  * Requires Plugins:     woocommerce
  * WC requires at least: 9.0
  * WC tested up to:      11.1
@@ -39,13 +39,33 @@ spl_autoload_register(
 			return;
 		}
 
+		/*
+		 * Bundled libraries, scoped under ProductQrBarcode\Vendor\ by build/build.php.
+		 * PHP only autoloads a class when it is first used, so a library is never
+		 * loaded unless a renderer actually needs it.
+		 */
+		$vendor = array(
+			'Vendor\\BaconQrCode\\'     => 'vendor-prefixed/bacon/bacon-qr-code/src/',
+			'Vendor\\DASPRiD\\Enum\\'   => 'vendor-prefixed/dasprid/enum/src/',
+			'Vendor\\Picqer\\Barcode\\' => 'vendor-prefixed/picqer/php-barcode-generator/src/',
+		);
+
 		$relative = substr( $class_name, strlen( $prefix ) );
+		$base     = 'includes/';
+
+		foreach ( $vendor as $namespace => $dir ) {
+			if ( 0 === strncmp( $relative, $namespace, strlen( $namespace ) ) ) {
+				$relative = substr( $relative, strlen( $namespace ) );
+				$base     = $dir;
+				break;
+			}
+		}
 
 		if ( ! preg_match( '/^[A-Za-z0-9_]+(\\\\[A-Za-z0-9_]+)*$/', $relative ) ) {
 			return;
 		}
 
-		$file = PQBG_PLUGIN_DIR . 'includes/' . str_replace( '\\', '/', $relative ) . '.php';
+		$file = PQBG_PLUGIN_DIR . $base . str_replace( '\\', '/', $relative ) . '.php';
 
 		if ( is_readable( $file ) ) {
 			require_once $file;

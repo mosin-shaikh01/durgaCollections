@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–3 (foundation, data layer, code generation)
+## Current scope: Phases 2–4 (foundation, data layer, code generation, rendering)
 
 Implemented:
 
@@ -16,23 +16,166 @@ Implemented:
 - `CodeRepository`, which enforces one active code per item in the application layer
 - WooCommerce HPOS compatibility declaration
 - **Phase 3:** `CodeGenerator`, which produces secure random codes, and `ProductCodeService`, which checks product eligibility and assigns codes. See [Product codes](#product-codes).
+- **Phase 4:** `ScanUrl`, `QrRenderer` and the optional `BarcodeRenderer`, which turn a product code into SVG. Also `Settings` and an administrator-only settings page. See [QR codes and barcodes](#qr-codes-and-barcodes) and [Settings](#settings).
 
-**Not implemented yet (later phases):** QR and barcode rendering, `/scan/` URLs and scan pages, login redirect flow, product screen, Mark-as-Sold, stock decrement, sales history and void UI, seller dashboard, label printing, CSV import/export, bulk generation and bulk tools, product admin UI and metaboxes, product lifecycle hooks (automatic code assignment), code regeneration/replacement, REST/AJAX endpoints, shortcodes and templates.
+**Not implemented yet (later phases):**
+- the `/scan/` route and scan page (Phase 4 only *builds* scan URLs; they return 404), login redirect flow, product screen
+- Mark-as-Sold, stock decrement, sales history and void UI, seller dashboard
+- label printing, download/print buttons, CSV import/export, bulk generation and bulk tools
+- product admin UI and metaboxes, product lifecycle hooks (automatic code assignment), code regeneration/replacement
+- REST/AJAX endpoints, image endpoints, shortcodes and templates
 
-The plugin adds **no** public endpoints of any kind. Phase 3 code is a PHP service layer only. No hook, screen or endpoint calls it yet.
+The plugin adds **no** public endpoints of any kind. The only screen is the settings page. The code, QR and barcode classes are a PHP service layer: no hook, screen or endpoint calls them yet.
 
-## Locked decision for Phase 4: QR code and optional barcode
+## QR codes and barcodes
 
-_Recorded before Phase 4 starts. None of this is implemented yet._
+These are the locked decisions from before Phase 4, now implemented:
 
-- **QR code: always generated.** It is the primary scan method, using a phone camera.
-- **Barcode: optional and OFF by default.**
-  - It is controlled by one admin-only setting, "Enable barcodes (for hardware scanners)".
-  - Changing that setting requires `pqbg_manage_settings`.
-- **Both encode the same product code** (`DC-XXXX-XXXX-XXXX`), so turning barcodes on later needs no code regeneration.
-- **When barcodes are disabled:**
-  - no barcode is rendered anywhere
-  - no barcode library code runs
+- **QR code: always available.** It is the primary scan method, using a phone camera.
+- **Barcode (Code 128): optional and OFF by default.** One administrator-only setting controls it, "Enable barcodes (for hardware scanners)", which needs `pqbg_manage_settings`.
+- **Both carry the same product code**, so turning barcodes on later needs no code regeneration.
+- **While barcodes are disabled**, the barcode renderer refuses with `pqbg_barcode_disabled`, and no barcode library class is loaded or executed. The tests verify both.
+
+### Usage
+
+```php
+use ProductQrBarcode\{QrRenderer, BarcodeRenderer, ScanUrl};
+
+$svg = ( new QrRenderer() )->render( 'DC-7K4M-9P2X-Q8RT' );      // string (SVG) or WP_Error
+$svg = ( new BarcodeRenderer() )->render( 'DC-7K4M-9P2X-Q8RT' ); // string (SVG) or WP_Error
+$url = ScanUrl::for_code( 'DC-7K4M-9P2X-Q8RT' );                  // string or WP_Error
+```
+
+- **Input:** a code string that must match `CodeGenerator::FORMAT_PATTERN` exactly. Lowercase, whitespace, trailing newlines, ambiguous characters, lookalike Unicode and anything else is rejected with `pqbg_invalid_code` *before* any library is called. Nothing is normalised; trimming and uppercasing typed input is left to the caller (Phase 6).
+- **Database:** the renderers check the format only and never look the code up. They never write to the database, never generate codes and never write files. Code creation stays in `ProductCodeService`/`CodeRepository`.
+- **No caching:** SVGs are rendered on demand, with no cache and no file storage.
+  - Measured on the development machine (PHP 8.5.6 CLI, no JIT): about **50 ms per QR code** and **under 1 ms per barcode**.
+  - Almost all of the QR time is bacon's pure-PHP encoder, which scores all eight mask patterns.
+  - That is fine for one code at a time. **Bulk label printing (Phase 8) should revisit caching**; for example, 100 labels take about 5 s.
+- **Errors:**
+  - `pqbg_invalid_code`
+  - `pqbg_barcode_disabled`
+  - `pqbg_qr_unavailable`: PHP `iconv` extension missing
+  - `pqbg_render_failed`: a library exception. The exception class, never the code, is logged to the WooCommerce logger (source `product-qrcode-barcode-generator`).
+
+### QR code
+
+- **Payload: the scan URL only**, `{scan base URL}/scan/{CODE}/`, e.g. `https://example.com/scan/DC-7K4M-9P2X-Q8RT/`.
+  - It never contains the product name, SKU, price, stock or any other product data.
+  - `ScanUrl` is the **only** class that builds scan URLs, and a test enforces this.
+- Error correction **M**, quiet zone of **4 modules**.
+- Byte mode in ISO-8859-1. The URL is ASCII-only, so no ECI header is added; some older scanners misread one.
+- For a typical production URL this gives a version 4 symbol (33 × 33 modules, 41 × 41 with the quiet zone), displayed at 4 px per module by default.
+
+### Barcode
+
+- **Code 128**, whose content is the product code only (e.g. `DC-7K4M-9P2X-Q8RT`).
+- Quiet zone of **10 modules** left and right.
+- The code is printed beneath the bars. Displayed at 2 px per module by default.
+
+### SVG output
+
+The libraries only *encode*: the QR bit matrix and the Code 128 bars. `Svg` writes the markup itself, so the output is fully under the plugin's control:
+
+- Only `<svg>`, `<rect>`, `<path>` and `<text>` elements. Attribute values are integers or fixed constants. The only free text is the validated code, escaped for XML.
+- No XML prolog, DOCTYPE, `id`s, scripts, event handlers, styles, links or `url()` references. The SVG can therefore be inlined in HTML safely, and more than once per page.
+- `role="img"` and `aria-label="{CODE}"`.
+- A `viewBox` in module units, with `shape-rendering="crispEdges"`, so CSS or print styles can resize it without blurring.
+
+The libraries' own SVG writers are not used. picqer's has no quiet zone and no human-readable text, references an external DTD and hard-codes `id="bars"`. bacon's needs `XMLWriter`.
+
+## Settings
+
+**WooCommerce → QR & Barcodes** (`wp-admin/admin.php?page=pqbg-settings`) is visible only to users with `pqbg_manage_settings`, which means administrators.
+- Shop Managers get neither the menu item nor the page: the direct URL returns 403.
+- Store Sellers are kept out of wp-admin by WooCommerce.
+
+It uses the WordPress Settings API:
+- The form posts to `options.php`, which checks the `pqbg_settings-options` nonce and, through `option_page_capability_pqbg_settings`, the `pqbg_manage_settings` capability.
+- `Settings::sanitize()` cleans the values and changes only the fields on the form. Every other key in `pqbg_settings` is kept.
+- The option is not exposed over REST.
+
+| Field | Key in `pqbg_settings` | Default |
+|---|---|---|
+| Enable barcodes (for hardware scanners) | `barcodes_enabled` (bool) | `false`. Only a stored boolean `true` enables barcodes. |
+| Scan base URL | `scan_base_url` (string) | `''`, meaning use the site URL (`home_url()`). The effective URL and an example payload are shown on the page. |
+
+No new option was added, and no migration was needed: defaults are merged on read.
+
+### Scan base URL
+
+- **Accepted:** only absolute `http://` or `https://` URLs of at most 100 characters, with a valid host (DNS name, IPv4 or bracketed IPv6), made of printable ASCII.
+- **Rejected:**
+  - credentials (`user:pass@`), spaces and control characters
+  - path characters other than unreserved characters and `%XX`
+  - empty, `.` and `..` path segments
+- **Normalised:** the scheme and host are lowercased, and any trailing slash, query string and fragment are removed. The port and path are kept.
+- An invalid value shows an error and **keeps the previous value**.
+
+**Codes are stored, URLs are not.** Only the base URL is stored, never a full scan URL. Changing it never touches `pqbg_codes`, and the tests check this with a checksum of the table.
+
+### Local-address warning
+
+While the effective base URL points to an address phones outside the shop can't reach, users with `pqbg_manage_settings` see this notice on every admin screen:
+
+> QR codes currently point to a local address. Do not print labels until the production URL is set.
+
+"Local" means:
+- `localhost` and `*.localhost`, `*.local`, `*.test`
+- single-label hostnames such as `intranet`
+- any IP outside the global range: `127.0.0.0/8`, `::1`, `10/8`, `172.16/12`, `192.168/16`, `169.254/16`, `fc00::/7`, `fe80::/10`, `0.0.0.0` and other reserved ranges
+
+The development site (`http://localhost/sharayu`) shows it.
+
+### http:// warning
+
+When the effective base URL points to a **public** host over plain `http://`, the same users see a separate notice instead:
+
+> Labels should use an https:// scan URL in production.
+
+- This is a warning only. An `http://` URL is valid and is saved.
+- At most one of the two notices is shown, and the local-address warning takes priority. A local `http://` address, such as the development site, shows only the local-address warning.
+
+## Bundled libraries
+
+The libraries are bundled inside the plugin; no Composer is needed on the server.
+
+- Their namespaces are **prefixed** under `ProductQrBarcode\Vendor\` with PHP-Scoper, so another plugin bundling the same library can't conflict.
+- Each file got a `defined( 'ABSPATH' ) || exit;` guard, so a direct HTTP request returns empty output.
+- The prefixed runtime code lives in `vendor-prefixed/`. It is autoloaded only when a class is first used.
+- Details are in `vendor-prefixed/NOTICE.md`.
+
+| Package | Version | License | Used for | PHP | Last release (at bundling) |
+|---|---|---|---|---|---|
+| `bacon/bacon-qr-code` | 3.1.1 | BSD-2-Clause | QR encoding | `^8.1` | 2026-04-05 |
+| `dasprid/enum` | 1.0.7 | BSD-2-Clause | dependency of bacon | `>=7.1 <9.0` | 2025-09-16 |
+| `picqer/php-barcode-generator` | 3.3.0 | LGPL-3.0-or-later | Code 128 encoding | `^8.2` | 2026-08-22 |
+
+- **SVG only:** none of them needs GD or Imagick for the output used here. bacon needs `ext-iconv`.
+- **PHP 8.5.6:** all three were checked with every error reported, and raised no notices.
+- **Licenses:** BSD-2-Clause is compatible with the plugin's GPL-2.0-or-later.
+  - LGPL-3.0-or-later is compatible only through the "or later" clause (it isn't compatible with GPL-2.0-only), so the plugin as distributed is effectively under GPLv3 terms.
+  - Prefixing modifies the libraries. Each keeps its original license file next to its `src/`, and `NOTICE.md` records the modifications.
+- **PHP minimum raised to 8.2** in Phase 4, because picqer's maintained 3.x line requires it. PHP 8.1 has been end-of-life since 31 Dec 2025.
+
+**Rebuilding** `vendor-prefixed/` from the pinned `build/composer.lock` is described in [`build/README.md`](build/README.md). The build is reproducible, and the build tools are pinned by SHA-256.
+
+## Tests
+
+The CLI regression suites for Phases 2–4 are in [`tests/`](tests/README.md): a runner, round-trip QR/barcode decoding, and settings access checked over HTTP. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
+
+## Production deployment
+
+**Exclude `tests/` and `build/` from any production deployment.** Deploy only the runtime files:
+
+- `product-qrcode-barcode-generator.php`, `uninstall.php`, `index.php`
+- `includes/`, `languages/`, `vendor-prefixed/`
+- `README.md` (optional)
+
+`tests/` and `build/` are development tooling. They are kept in the repository so the vendor bundle can be rebuilt exactly and the regression suites can be rerun, but they must never reach a live server:
+- The test suites create and delete data, and one briefly deactivates the plugin.
+- The `.htaccess` denial only works on Apache.
+- `tests/decoder/node_modules/`, `build/vendor/` and `build/tools/` are never committed and must not be deployed either.
 
 ## Naming and the rename
 
@@ -165,7 +308,7 @@ The column collation (`utf8mb4_unicode_520_ci`) is case-insensitive, so a lowerc
 | | Minimum | Tested |
 |---|---|---|
 | WordPress | 6.7 | 7.1.2 |
-| PHP | 8.1 | 8.5.6 |
+| PHP | 8.2 (raised from 8.1 in Phase 4) | 8.5.6 |
 | WooCommerce | 9.0 | 11.1.2 (HPOS on) |
 | Database | MariaDB 10.2+ / MySQL 5.7+ | MariaDB 10.4.32 |
 
@@ -240,7 +383,7 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 | Option | Autoload | Purpose |
 |---|---|---|
 | `pqbg_db_version` | yes | integer schema version (currently `1`) |
-| `pqbg_settings` | no | settings array; read via `Plugin::settings()` (defaults merged with `wp_parse_args`, unknown keys dropped) |
+| `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 
 ## Migrations
@@ -300,7 +443,7 @@ It never reads or writes orders or the legacy order tables.
 
 ## Deactivation
 
-Deactivation is non-destructive. Tables, codes, sales, settings, the role and capabilities are all kept. Phase 2 adds no rewrite rules or cron events, so nothing needs flushing.
+Deactivation is non-destructive. Tables, codes, sales, settings, the role and capabilities are all kept. The plugin adds no rewrite rules or cron events (as of Phase 4), so nothing needs flushing.
 
 ## Uninstall
 
@@ -317,6 +460,6 @@ This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_v
 
 ## Operational notes
 
-- QR URLs will be built from `home_url()`. Do not print production labels until the production domain is final.
+- QR codes point to the scan base URL: `home_url()` unless it is overridden on the settings page. **Do not print labels until the production URL is set.** The admin warning stays visible while the URL is local, and a second warning appears while a public URL uses `http://`.
 - The site timezone is currently UTC. The plugin stores UTC regardless, but the store timezone (India) should be set deliberately.
 - WooCommerce "Coming Soon" mode is on for the whole site. The future `/scan/` route must work with it.

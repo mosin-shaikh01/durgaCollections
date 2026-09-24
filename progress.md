@@ -32,6 +32,7 @@ Branch `main`, tracking `origin/main`.
 
 - Phase 2 was committed as `50d7e0b` and Phase 3 as `a2e5643`; both are pushed to `origin/main`.
 - The plugin rename was committed as `5f301be` and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
+- Phase 4 was committed, with the user's approval, as a single commit "Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build" and pushed to `origin/main` (normal push, no force). A commit can't record its own hash; see `git log`.
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -100,8 +101,9 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **2** | **Plugin foundation and data layer** | **Done 2026-09-24. Committed `50d7e0b`, pushed.** |
 | **3** | **Secure product code generation** | **Done 2026-09-24. Committed `a2e5643`, pushed.** |
 | — | **Plugin rename** (no functional change) | **Done 2026-09-24. Committed `5f301be`, pushed.** |
-| 4 | QR code + optional barcode | Next. Not started; see the locked decision below |
-| 5 → 12 | admin code management → scan/product screen → mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
+| **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Approved, committed as one commit and pushed.** |
+| 5 | Admin code management | Next. Not started |
+| 6 → 12 | scan/product screen → mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
 > **Pre-rename records.**
 >
@@ -437,7 +439,7 @@ ProductCodeService::get_or_create( item, user )
 
 ### Locked decision for Phase 4: QR code + optional barcode
 
-_Recorded for Phase 4. It is not implemented yet, and it is not permission to start Phase 4._
+_Recorded before Phase 4 and implemented in Phase 4 (see below)._
 
 - **QR code: always generated.** It is the primary scan method, using a phone camera.
 - **Barcode: optional and OFF by default.**
@@ -448,7 +450,160 @@ _Recorded for Phase 4. It is not implemented yet, and it is not permission to st
   - no barcode is rendered anywhere
   - no barcode library code runs
 
-**Next phase (not started):** Phase 4, QR Code + Optional Barcode. **The production domain is still not final**, so labels must not be printed yet.
+### Phase 4: QR code + optional barcode rendering (2026-09-24)
+
+**Status:** implemented and tested. The plugin stays active. **Approved** by the user after two review rounds, then committed as a single commit ("Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build") and pushed to `origin/main` with a normal push (no force).
+
+**Environment:** re-verified at the start with no differences from the notes above.
+- WP 7.1.2, WC 11.1.2, PHP 8.5.6, MariaDB 10.4.32
+- `pqbg_*` tables at 0 rows, 0 products, 1 user
+- `/scan/` returned 404
+
+**Approved decisions (from the plan review):**
+- **PHP minimum raised from 8.1 to 8.2**, in the plugin header, `Requirements::MIN_PHP` and the READMEs.
+  - The only maintained Code 128 library that qualifies, picqer 3.x, requires PHP 8.2. The 2.x branch supports 8.1 but hasn't had a release since 2024-09.
+  - PHP 8.1 has been end-of-life since 2025-12-31.
+- The local-address check also covers `*.localhost` and single-label hostnames.
+- An ABSPATH guard is injected into every vendor file by a PHP-Scoper patcher.
+- Regression tests and the build config are **kept in the repo**, in `tests/` and `build/`. This supersedes "delete tests afterwards" for those files.
+
+**Libraries** (bundled, namespace-prefixed under `ProductQrBarcode\Vendor\` with PHP-Scoper 0.18.19, in `vendor-prefixed/`):
+
+| Package | Version | License | Why |
+|---|---|---|---|
+| `bacon/bacon-qr-code` | 3.1.1 (2026-04-05) | BSD-2-Clause | QR encoder. PHP `^8.1`, needs `ext-iconv`, no GD/Imagick. |
+| `dasprid/enum` | 1.0.7 | BSD-2-Clause | bacon's only dependency |
+| `picqer/php-barcode-generator` | 3.3.0 (2026-08-22) | LGPL-3.0-or-later | Code 128 encoder. PHP `^8.2`, no dependencies, no GD for SVG. |
+
+- chillerlan/php-qrcode was evaluated and not chosen. tc-lib-barcode was rejected because it requires `ext-gd`.
+- **License note:** LGPL-3.0 is compatible with the plugin's GPL-2.0-or-later only through "or later", so the bundle as distributed is effectively GPLv3.
+- **Why PHP-Scoper:** Strauss 0.30.0 fails on Windows.
+- **Build:** reproducible (two builds were byte-identical), with Composer 2.10.3 and PHP-Scoper pinned by SHA-256. The Composer checksum matches getcomposer.org's.
+
+**Design:**
+- **Encoders only.** The libraries produce the bit matrix and the bars; `Svg` writes the markup.
+  - Output is `<svg>`, `<rect>`, `<path>` and `<text>` only, with integer attributes and the escaped code as the only text.
+  - No prolog, DOCTYPE, ids, scripts, styles or links.
+  - picqer's own SVG was not used: no quiet zone, no text, an external DTD reference and a hard-coded `id`.
+- **QR:**
+  - payload is exactly `{base}/scan/{CODE}/`
+  - EC level M, 4-module quiet zone
+  - ISO-8859-1 byte mode, so no ECI header
+- **Code 128:** content is the code only, 10-module quiet zones, the code printed beneath.
+- **Renderers:**
+  - take a code string validated with `CodeGenerator::is_valid_format()`
+  - never touch the database, generate codes or write files
+  - render on demand with no cache
+- **Barcode setting checked first.** When barcodes are disabled, the result is `pqbg_barcode_disabled` and the library is never autoloaded.
+- **`ScanUrl` is the only place scan URLs are built.** The `/scan/` route is **not** registered and still returns 404.
+- **Settings:**
+  - New keys `barcodes_enabled` (default `false`) and `scan_base_url` (default `''`, meaning `home_url()`) inside `pqbg_settings`.
+  - No new option and no migration.
+  - `sanitize()` changes only the submitted keys.
+  - Base URL validation: strict absolute http(s), at most 100 characters, trailing slash, query string and fragment stripped, invalid input keeps the old value.
+- **Settings page:** WooCommerce → QR & Barcodes.
+  - Only users with `pqbg_manage_settings` can see it.
+  - Settings API through `options.php`, with the `option_page_capability_pqbg_settings` filter, a nonce and escaping.
+  - It calls `settings_errors()` without a filter, because "Settings saved." is filed under `general`. This was a bug caught by the HTTP test.
+- **Scan URL notices** for users with `pqbg_manage_settings` on every admin screen, at most one at a time:
+  - The local-address warning (exact approved wording) takes priority. The dev site shows it.
+  - Otherwise, a public host on plain `http://` gets "Labels should use an https:// scan URL in production." This is a warning only; `http://` URLs remain valid and are saved.
+  - Both are shown by `SettingsPage::scan_url_notice()`, using `Settings::is_local_url()` and `Settings::is_http_url()`.
+
+**Files created** (plugin-relative):
+- `includes/ScanUrl.php`, `includes/Settings.php`, `includes/Svg.php`, `includes/QrRenderer.php`, `includes/BarcodeRenderer.php`, `includes/SettingsPage.php`
+- `vendor-prefixed/`: 135 scoped library files, 3 LICENSE files, `NOTICE.md`, and 26 `index.php` stubs. Generated; don't edit.
+- `build/`: `composer.json`, `composer.lock`, `scoper.inc.php`, `patcher.php`, `build.php`, `README.md`, `.htaccess` (`Require all denied`), `index.php`
+- `tests/`:
+  - suites and runner: `bootstrap.php`, `run.php`, `phase2-main.php`, `phase2-lifecycle.php`, `phase2-no-woocommerce.php`, `phase3-codes.php` (a reconstruction), `phase4-rendering.php`
+  - `README.md`, `.htaccess`, `index.php`
+  - `decoder/`: `package.json`, `package-lock.json`, `decode.mjs`, `index.php`
+
+**Files modified:**
+- `product-qrcode-barcode-generator.php`: vendor prefix map in the autoloader, `Requires PHP: 8.2`, description
+- `includes/Plugin.php`: new default keys; `SettingsPage::register()` on admin requests
+- `includes/Requirements.php`: `MIN_PHP = '8.2'`
+- `README.md` (plugin)
+- `progress.md`
+- root `.gitignore`: un-ignores the two `.htaccess` files and ignores `build/tools/` and `build/scoped/`. `vendor/` and `node_modules/` were already ignored.
+
+**Tests.** They are committed now: `php tests/run.php`, run from the CLI outside the web root, with the production guard overridden via `PQBG_TESTS_ALLOW_PRODUCTION=1`, because `WP_ENVIRONMENT_TYPE` is not set in `wp-config.php` yet. **Final run: all passed, 385 checks, 0 failed, 0 skipped** (with the decoder installed).
+
+| Suite | Result | Notes |
+|---|---|---|
+| phase2-main | 83/83 | the original 80, plus 2 cleanup checks and a no-PHP-notices check |
+| phase2-lifecycle | 17/17 | the original 16, plus the notice check |
+| phase2-no-woocommerce | 12/12 | the original printouts turned into assertions |
+| phase3-codes | 109/109 | **a reconstruction** of the deleted 92-check suite; covers every category in the Phase 3 record |
+| phase4-rendering | 164/164 | see below; 5 of these are round-trip checks that SKIP (not fail) without Node.js or the decoder install |
+
+**Phase 4 coverage:**
+- **Lazy loading:** 0 library classes at start. QR renders while no Picqer class or file has been loaded. Only a stored boolean `true` enables barcodes.
+- **Payload:** exactly `{base}/scan/{CODE}/` for 8 codes × 5 bases. No class other than `ScanUrl` contains a scan path literal.
+- **Round-trip:** SVGs rasterised with resvg 2.6.2 and decoded with ZXing-C++ (zxing-wasm 3.1.4).
+  - QR: **12/12** decode to the exact URL, and the decoder reports EC level **M** (3 base URLs).
+  - Barcode: **8/8** decode to the exact code.
+  - Damaged QR and barcode negative controls do not decode.
+- **Geometry:** the quiet zones are exactly 4 and 10 modules, and the text sits below the bars.
+- **Invalid input:** 18 invalid-code cases rejected by both renderers.
+- **SVG safety:** checked with a DOM allowlist of elements and attributes, plus a regex for script, `on*`, `href`, `url()` and DOCTYPE.
+- **Base URLs:** 11 valid inputs normalised and 31 invalid inputs rejected. `sanitize()` merges correctly, keeps unrelated keys and handles errors. A checksum shows `pqbg_codes` untouched by base URL changes and renders. The renderers ran 0 queries.
+- **Local-address check:** 18 local and 8 public hosts classified correctly. The notice appears and disappears correctly and is admin-only.
+- **HTTP, logged in as temporary users:**
+  - admin: 200, both fields, effective URL, warning, menu item, nonce
+  - shop manager: direct URL 403, no menu item or warning on the Dashboard
+  - seller: kept out
+  - logged out: redirected to login
+- **HTTP saving:**
+  - A valid save is normalised, keeps unrelated keys and shows "Settings saved.".
+  - An invalid URL keeps the old value and the error is shown.
+  - A bad nonce gets 403.
+  - A shop manager **with a valid nonce** still gets 403.
+  - Seller and logged-out saves are refused.
+- **Vendor isolation:**
+  - all 135 files prefixed and guarded
+  - 0 unprefixed classes, 0 vendor global functions
+  - direct HTTP to vendor and new include files returns an empty 200
+  - `tests/` and `build/` return 403
+- **Scope:** no REST, AJAX, admin-post or shortcode additions and no rewrite rules. `/scan/` and `/scan/{CODE}/` return 404. Nothing is written to uploads.
+- **Performance:** QR about 44–50 ms, barcode under 1 ms.
+
+**Cleanup (verified):**
+- `pqbg_codes` and `pqbg_sales` at 0 rows, AUTO_INCREMENT reset
+- `pqbg_settings` restored byte-for-byte (`{"settings_version":1}`; the new keys come from defaults)
+- 0 products, 1 user
+- 22 Action Scheduler jobs from the Phase 3 test products removed
+- the temporary directory removed
+- no scratch files under the WordPress directory: the decoder's `node_modules` and the build tools/vendor were kept outside or deleted
+- HTTP: `/` 200, `/shop/` 200, `/wp-login.php` 200, `/wp-admin/` 302
+
+**Incident during development:**
+- One PHP fatal error on the dev site at 2026-09-24 18:18:57 (local time): `Class "ProductQrBarcode\SettingsPage" not found`.
+- It happened because `Plugin.php` was edited to call `SettingsPage::register()` about two minutes before `SettingsPage.php` was written, and one request arrived in that window.
+- It was recorded in `wp-content/uploads/wc-logs/fatal-errors-2026-09-24-*.log` and the Apache `error.log`. There has been no error since.
+- With the user's permission, the WooCommerce log file was deleted; it contained only that one entry. The line in Apache's `error.log` was left alone: it is a shared, live server log that Apache holds open, and rewriting it could break logging.
+- **Lesson:** on the live dev site, create a new class file before wiring it into boot code.
+
+**Known limitations:**
+- **QR rendering takes about 50 ms** because bacon's pure-PHP encoder scores 8 masks. Bulk label printing (Phase 8) should add caching or batching; 100 labels take about 5 s.
+- **The round-trip tests need Node.js** and `npm ci` in `tests/decoder` (documented in `tests/README.md`). Without them the 5 round-trip checks are **skipped** with a clear message, and the rest of the suite still runs; both cases (decoder not installed, Node not on `PATH`) were verified: 159 passed, 5 skipped. `node_modules/` is ignored by `.gitignore` and never committed. The decoder loads its wasm locally (zxing-wasm downloads it from jsDelivr by default); this was verified with `fetch` blocked.
+- **The HTTP tests need the site to be reachable** at `home_url()`. They were run on Apache/XAMPP, and the `.htaccess` denial is Apache-only; `index.php` stubs cover directory listing elsewhere.
+- **The Phase 3 suite is a reconstruction**, not the original script.
+- **The renderers check format, not existence.** A retired code still renders; Phase 5 decides what the admin UI shows.
+- **Human-readable barcode text uses a generic `monospace` font**, so its look depends on the viewer's fonts. The bars don't depend on fonts.
+- **The local-address warning checks the host name only.** It doesn't resolve DNS, so a public-looking name that points to a private IP isn't flagged.
+- **No PHPCS run**, because it isn't installed.
+
+**Open items carried to Phase 5 (admin code management):**
+- Generate codes on the first real save, including drafts, but **never for auto-drafts**.
+- Trashing a product keeps its code active; permanent deletion retires it.
+- Atomic regeneration: retire and create in one transaction, behind `pqbg_manage_codes`.
+- Decide what the admin UI shows for retired codes, since the renderers will render any well-formed code.
+
+**Open item carried to Phase 6 (scan/product screen):**
+- Normalise manually typed codes (trim + uppercase) before lookup. The renderers deliberately do not normalise.
+
+**Next phase (not started):** Phase 5, Admin Code Management. **The production domain is still not final**, so labels must not be printed yet. The admin warning says so until the scan base URL is public.
 
 ### Instructions for the next Claude session
 
@@ -462,7 +617,13 @@ _Recorded for Phase 4. It is not implemented yet, and it is not permission to st
 
   The `dpc_`/`DPC_`/`Durga\ProductCodes` names in the Phase 2 and Phase 3 sections are pre-rename history. Never reintroduce them.
 - Get codes only through `ProductCodeService::get_or_create()`. Don't call `CodeRepository::create_active()` with hand-made strings, and don't write to `pqbg_codes` directly.
-- Phase 4 must follow the locked QR/barcode decision above.
+- Phase 4 is done. Build scan URLs only through `ScanUrl`, and render only through `QrRenderer`/`BarcodeRenderer`. Never reference the barcode library outside `BarcodeRenderer`, and keep the "barcodes disabled means the library is not loaded" guarantee.
+- **Run `php tests/run.php` before and after every phase** (see `tests/README.md`). Preferred: `define( 'WP_ENVIRONMENT_TYPE', 'local' );` in the local `wp-config.php`, which the user will add themselves; never edit or commit `wp-config.php`. The fallback is `PQBG_TESTS_ALLOW_PRODUCTION=1`. The round-trip checks need `npm ci` in `tests/decoder`, or `PQBG_DECODER` pointing to a copy outside the web root. Add each new phase's suite to `tests/` and to `run.php`.
+- **Exclude `tests/` and `build/` from any production deployment** (see "Production deployment" in the plugin README).
+- **Never edit `vendor-prefixed/` by hand.** Change `build/` and run `php build/build.php` (see `build/README.md`).
+- The PHP minimum is now **8.2**.
+- On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
+- Phase 5 must handle the open items listed at the end of the Phase 4 section.
 - Don't add product-save hooks for automatic code generation without explicit approval.
 - Nothing in this file authorizes future work. Each phase needs explicit user approval.
 - **Never commit or push without explicit approval.** No reset, rebase, amend or force-push.
@@ -507,3 +668,19 @@ _Recorded for Phase 4. It is not implemented yet, and it is not permission to st
   - All suites pass under the new names: rename 25/25, Phase 2 80/80, lifecycle 16/16, WooCommerce-missing OK, Phase 3 92/92.
   - Recorded the locked Phase 4 QR/barcode decision.
   - With the user's approval, committed as `5f301be` and pushed to `origin/main`.
+- **Phase 4 (QR code + optional barcode rendering):**
+  - Re-verified the environment. There were no differences.
+  - Evaluated the libraries (Packagist metadata, license files, a spike on PHP 8.5.6) and chose bacon/bacon-qr-code 3.1.1 and picqer/php-barcode-generator 3.3.0. With approval, raised the PHP minimum to 8.2.
+  - Prefixed the libraries with PHP-Scoper (Strauss fails on Windows) into `vendor-prefixed/`, with ABSPATH guards and a reproducible, pinned build in `build/`.
+  - Added `ScanUrl`, `Settings`, `Svg`, `QrRenderer`, `BarcodeRenderer` and `SettingsPage` (WooCommerce → QR & Barcodes, administrators only), plus the local-address warning.
+  - Moved the regression tests into `tests/`: the ported Phase 2 suites, a reconstructed Phase 3 suite and a new Phase 4 suite, with a runner and an offline round-trip decoder. 379/379 checks passed at first review.
+  - The HTTP tests caught a real bug: "Settings saved." was not displayed. Fixed.
+  - One transient fatal error during development, caused by the order of edits; see the Phase 4 section.
+  - Review round 2 (user's requested changes):
+    - round-trip checks now SKIP without Node or the decoder, and the install is documented
+    - README states that `tests/` and `build/` must be excluded from production
+    - new `http://` public-host warning, with tests
+    - `WP_ENVIRONMENT_TYPE=local` documented as the preferred test guard
+    - dev-gap fatal log file deleted
+  - Final run: 385/385.
+  - Approved; committed as one commit and pushed to `origin/main`.
