@@ -34,6 +34,7 @@ Branch `main`, tracking `origin/main`.
 - The plugin rename was committed as `5f301be` and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 - Phase 4 was committed as `3654086` ("Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build") and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 - Phase 5 was committed as `ff7805c` ("Phase 5: admin code management (auto-assignment, lifecycle, atomic regeneration, product panel, downloads)") and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
+- Phase 6 was committed as `381a909` ("Phase 6: scan route and mobile product screen (access control, status matrix, entry box)") and pushed to `origin/main`, with the user's approval after their phone test (normal fast-forward, no force).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -47,6 +48,8 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `381a909` | Phase 6: scan route and mobile product screen (access control, status matrix, entry box) |
+| `7b9cc8f` | Record Phase 5 commit and push in progress log |
 | `ff7805c` | Phase 5: admin code management (auto-assignment, lifecycle, atomic regeneration, product panel, downloads) |
 | `a3f654e` | Record Phase 4 commit and push in progress log |
 | `3654086` | Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build |
@@ -107,7 +110,7 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | — | **Plugin rename** (no functional change) | **Done 2026-09-24. Committed `5f301be`, pushed.** |
 | **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Committed `3654086`, pushed.** |
 | **5** | **Admin code management** | **Done 2026-09-25. Committed `ff7805c`, pushed.** |
-| **6** | **Scan/product screen** | **Done 2026-09-25. Not committed; waiting for approval.** |
+| **6** | **Scan/product screen** | **Done 2026-09-25. Committed `381a909`, pushed.** |
 | 7 | Mark sold + sales | Next. Not started |
 | 8 → 12 | printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
@@ -777,7 +780,7 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
 
 ### Phase 6: Scan / product screen (2026-09-25)
 
-**Status:** implemented and tested. The plugin stays active. **Not committed**; this is waiting for the user's approval.
+**Status:** implemented and tested. The plugin stays active. The user ran the manual phone test (Cloudflare quick tunnel, see the plugin README) and it **passed**. **Approved**, then committed as a single commit, `381a909` ("Phase 6: scan route and mobile product screen (access control, status matrix, entry box)"), and pushed to `origin/main` with a normal push (no force).
 
 **Environment:** re-verified at the start. There were no differences from the notes above, apart from two facts recorded for the first time:
 - WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6, MariaDB 10.4.32, permalinks `/%postname%/`, Coming Soon on for the whole site
@@ -959,7 +962,9 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
   - The Phase 4 suite (the Shop Manager Dashboard check) had left one pair per run since Phase 4, which contradicts the earlier "clean state" notes. The Phase 6 suite did the same until fixed.
   - Both suites now permanently delete their temporary users' posts, and Phase 4 checks this.
   - This session's 3 pairs (IDs 1056/1057, 1248/1250, 1280/1282) were checked and deleted.
-  - **10 older trashed "Auto Draft" posts** (IDs 97, 111, 125, 127, 129, 143, 157, 171, 545, 881, each with a revision, authors are deleted test users) are **left in place, pending the user's decision**.
+  - **The 10 older pairs were then deleted with the user's approval** (post/revision IDs 97/98, 111/112, 125/126, 127/128, 129/130, 143/144, 157/158, 171/172, 545/546, 881/882). Before deleting, each post was verified to be a trashed `post` titled "Auto Draft", with no content or excerpt, trashed from `auto-draft`, and authored by a deleted test user. Each revision was verified to be an "Auto Draft" revision with no content, and the only metadata were the three trash keys.
+  - The only other link was WordPress's automatic default category ("Uncategorized"). That link went with each post; the term itself and its count (1) are unchanged.
+  - Removed in total: 20 post rows, 30 meta rows and 10 term relationships. No trashed "Auto Draft" posts or revisions remain. The real admin's Quick Draft auto-draft (post 5) was kept.
 - **The Phase 6 suite switched permalinks with `WP_Rewrite::init()`,** which also drops every registered endpoint. The later deactivation flush then wrote rules without WooCommerce's endpoints. The suite now sets only `$wp_rewrite->permalink_structure`, and the rule set after deactivation is checked exactly.
 - **An Apache `%2F` 404:** Apache rejects encoded slashes in paths itself (`AllowEncodedSlashes Off`), so that test URL was changed.
 
@@ -999,7 +1004,7 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
 - **Never edit `vendor-prefixed/` by hand.** Change `build/` and run `php build/build.php` (see `build/README.md`).
 - The PHP minimum is now **8.2**.
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
-- **Phase 7 (Mark Sold + Sales) is next.** Phase 6 is done but **not committed** until the user approves it. Build selling on top of the Phase 6 scan page (`ScanRoute`/`ScanScreen`): read-only today, with no placeholder "Mark as sold" buttons.
+- **Phase 7 (Mark Sold + Sales) is next.** Phases 2–6 are done, committed and pushed. Phase 6 is `381a909`. Build selling on top of the Phase 6 scan page (`ScanRoute`/`ScanScreen`): read-only today, with no placeholder "Mark as sold" buttons.
 - **The scan URL format `{base}/scan/{CODE}/` is permanent** (labels will be printed with it). Never change `ScanUrl::for_code()` or the two rewrite rules without a migration plan for printed labels. Bump `ScanRoute::RULES_VERSION` whenever `ScanUrl::rewrite_rules()` changes, so the rules are flushed once.
 - **Scan page rules:**
   - access is checked before any lookup: logged out → login redirect, no `pqbg_view_products` → a fixed 403
@@ -1011,7 +1016,6 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
   - Don't call `WP_Rewrite::init()`: it drops every registered endpoint. Set `$wp_rewrite->permalink_structure` instead.
   - Permanently delete temporary users' own posts before `wp_delete_user()`: opening the Dashboard creates a Quick Draft auto-draft that would otherwise be trashed and left behind.
   - Use a fresh HTTP connection per request (`CURLOPT_FORBID_REUSE`) when a suite keeps many cookie jars open. This XAMPP's `php8ts.dll` 8.5.6 crashes (0xC0000005) under the keep-alive pattern (see the Phase 6 section).
-- **10 old trashed "Auto Draft" posts** from earlier test runs are still in the database, pending the user's decision (see the Phase 6 section).
 - Product-save and delete hooks now exist, in `CodeLifecycle` only, on exactly the approved hooks (the four WooCommerce CRUD save hooks and `deleted_post`). Don't add others without explicit approval.
 - Regenerate only through `ProductCodeService::regenerate()` (atomic `CodeRepository::replace_active()`). Admin requests go through `AdminActions`: POST for anything that writes, a nonce bound to the item, and `pqbg_manage_codes`. Never add `nopriv` handlers.
 - Only the classic product editor is supported. Re-check `product_block_editor` before relying on the Phase 5 UI.
@@ -1095,7 +1099,8 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
   - Wrote the plan (routing, access flow, status matrix, screens, phone testing, tests). The user approved all 8 decisions.
   - Added `ScanRoute`, `ScanScreen`, the standalone template and stylesheet, the `ScanUrl` helpers, and activation/deactivation wiring. Class files were created before `Plugin.php` was wired.
   - Added `tests/phase6-scan.php` (212 checks) and updated the Phase 3/4/5 scope checks.
-  - Found and fixed a pre-existing test leak (trashed Dashboard auto-drafts) in the Phase 4 suite. Deleted this session's 3 leaked pairs; 10 older pairs await a decision.
+  - Found and fixed a pre-existing test leak (trashed Dashboard auto-drafts) in the Phase 4 suite. Deleted this session's 3 leaked pairs. The 10 older pairs were deleted later, with the user's approval, after each one was verified.
   - Traced intermittent empty HTTP responses to a pre-existing `php8ts.dll` crash on this XAMPP; a fresh connection per request avoids it.
   - Final run: **756 passed, 0 failed, 0 skipped**. The site is back to its clean state.
-  - Not committed; waiting for approval.
+  - The user ran the manual phone test, and it passed.
+  - Approved; committed as `381a909` and pushed to `origin/main`.
