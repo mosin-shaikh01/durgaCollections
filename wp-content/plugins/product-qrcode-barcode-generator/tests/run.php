@@ -21,6 +21,7 @@ $suites = array(
 	'phase2-no-woocommerce.php',
 	'phase3-codes.php',
 	'phase4-rendering.php',
+	'phase5-admin.php',
 );
 
 $filters = array_slice( $argv, 1 );

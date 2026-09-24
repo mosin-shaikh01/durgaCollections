@@ -29,8 +29,13 @@ final class Plugin {
 
 		Install::maybe_upgrade();
 
+		// Every request: products are also saved over REST, by the importer and by cron.
+		CodeLifecycle::register();
+
 		if ( is_admin() ) {
 			SettingsPage::register();
+			AdminProductPanel::register();
+			AdminActions::register();
 		}
 	}
 

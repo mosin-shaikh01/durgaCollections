@@ -7,12 +7,16 @@
  *   - variations whose parent is variable      parent_id = variable parent ID
  * Not eligible: variable parents (they only contain variations), grouped
  * and external products, orphaned variations, and any other or custom
- * product type. Product status is not checked; no status rule has been
- * decided yet.
+ * product type.
  *
- * This service is the authorization boundary for assigning codes: the
- * acting user must have Permissions::MANAGE_CODES. It is not called from
- * any hook, endpoint or screen yet.
+ * Status rule (Phase 5): auto-drafts never get a code, and neither do
+ * variations of an auto-draft parent. Drafts, pending, private and
+ * published items are eligible.
+ *
+ * This service is the authorization boundary for assigning and replacing
+ * codes: the acting user must have Permissions::MANAGE_CODES. The one
+ * exception is retire_for_item(), the lifecycle path used when WordPress
+ * deletes an item or it stops being eligible (see CodeLifecycle).
  *
  * @package ProductQrBarcode
  */
@@ -35,6 +39,9 @@ final class ProductCodeService {
 	 * between the uniqueness check and the insert.
 	 */
 	const MAX_SAVE_ATTEMPTS = 3;
+
+	/** Status of a product WordPress created for the "Add new" screen that has never been saved. */
+	const AUTO_DRAFT = 'auto-draft';
 
 	/**
 	 * Code source.
@@ -68,6 +75,10 @@ final class ProductCodeService {
 			return self::invalid_product();
 		}
 
+		if ( self::AUTO_DRAFT === $product->get_status() ) {
+			return self::auto_draft();
+		}
+
 		if ( $product->is_type( 'simple' ) ) {
 			return array(
 				'product_id' => $product_id,
@@ -80,6 +91,10 @@ final class ProductCodeService {
 			$parent    = $parent_id > 0 ? wc_get_product( $parent_id ) : false;
 
 			if ( $parent instanceof WC_Product && $parent->is_type( 'variable' ) ) {
+				if ( self::AUTO_DRAFT === $parent->get_status() ) {
+					return self::auto_draft();
+				}
+
 				return array(
 					'product_id' => $product_id,
 					'parent_id'  => $parent_id,
@@ -160,6 +175,94 @@ final class ProductCodeService {
 		self::log_failure( $error );
 
 		return $error;
+	}
+
+	/**
+	 * Replaces the item's active code with a newly generated one, atomically
+	 * (see CodeRepository::replace_active()). The old code is retired with
+	 * retired_at/retired_by and is never reused. Printed labels that carry the
+	 * old code stop working.
+	 *
+	 * @param int      $product_id  Simple product or variation ID.
+	 * @param int      $user_id     Acting user; must have the pqbg_manage_codes capability.
+	 * @param int|null $expected_id The active code row ID the caller saw; if the item's
+	 *                              code changed since, nothing happens (pqbg_code_changed).
+	 * @return array<string, string>|WP_Error The new active pqbg_codes row.
+	 */
+	public function regenerate( int $product_id, int $user_id, ?int $expected_id = null ) {
+		if ( ! Permissions::can_manage_codes( $user_id ) ) {
+			return new WP_Error( 'pqbg_forbidden', __( 'You are not allowed to manage product codes.', 'product-qrcode-barcode-generator' ) );
+		}
+
+		$item = self::eligibility( $product_id );
+
+		if ( is_wp_error( $item ) ) {
+			return $item;
+		}
+
+		for ( $attempt = 1; $attempt <= self::MAX_SAVE_ATTEMPTS; $attempt++ ) {
+			$code = $this->generator->generate_unique();
+
+			if ( is_wp_error( $code ) ) {
+				self::log_failure( $code );
+				return $code;
+			}
+
+			$result = CodeRepository::replace_active( $item['product_id'], $item['parent_id'], $code, $user_id, $expected_id );
+
+			if ( ! is_wp_error( $result ) ) {
+				$row = CodeRepository::find_by_code( $code );
+
+				return null !== $row ? $row : new WP_Error( 'pqbg_code_unavailable', __( 'The product code could not be loaded.', 'product-qrcode-barcode-generator' ) );
+			}
+
+			// Only a duplicate code string is worth retrying with a new code; the rollback kept the old code active.
+			if ( 'pqbg_code_conflict' !== $result->get_error_code() ) {
+				return $result;
+			}
+		}
+
+		$error = new WP_Error( 'pqbg_code_generation_failed', __( 'A unique product code could not be generated.', 'product-qrcode-barcode-generator' ) );
+		self::log_failure( $error );
+
+		return $error;
+	}
+
+	/**
+	 * Retires the item's active code, if it has one. Lifecycle path only: used
+	 * when WordPress permanently deletes the item or it stops being eligible
+	 * (type change). Deliberately NOT gated by pqbg_manage_codes: WordPress has
+	 * already authorised the delete/save, and a deleted or ineligible item must
+	 * never keep an active code. It never creates codes.
+	 *
+	 * @param int $product_id Product or variation ID (the item may no longer exist).
+	 * @param int $user_id    Acting user, or 0 when there is none (cron, CLI).
+	 * @return bool Whether a code was retired.
+	 */
+	public static function retire_for_item( int $product_id, int $user_id ): bool {
+		$row = CodeRepository::find_active_for_product( $product_id );
+
+		if ( null === $row ) {
+			return false;
+		}
+
+		return true === CodeRepository::retire( (int) $row['id'], max( 0, $user_id ) );
+	}
+
+	/**
+	 * Error for an item that has never been saved.
+	 */
+	private static function auto_draft(): WP_Error {
+		return new WP_Error( 'pqbg_ineligible_status', __( 'Save the product first; unsaved products do not get a product code.', 'product-qrcode-barcode-generator' ) );
+	}
+
+	/**
+	 * Logs a failure by error code only (public for CodeLifecycle).
+	 *
+	 * @param WP_Error $error Failure.
+	 */
+	public static function log_error( WP_Error $error ): void {
+		self::log_failure( $error );
 	}
 
 	/**

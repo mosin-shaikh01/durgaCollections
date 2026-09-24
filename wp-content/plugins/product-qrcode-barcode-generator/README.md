@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–4 (foundation, data layer, code generation, rendering)
+## Current scope: Phases 2–5 (foundation, data layer, code generation, rendering, admin code management)
 
 Implemented:
 
@@ -17,15 +17,16 @@ Implemented:
 - WooCommerce HPOS compatibility declaration
 - **Phase 3:** `CodeGenerator`, which produces secure random codes, and `ProductCodeService`, which checks product eligibility and assigns codes. See [Product codes](#product-codes).
 - **Phase 4:** `ScanUrl`, `QrRenderer` and the optional `BarcodeRenderer`, which turn a product code into SVG. Also `Settings` and an administrator-only settings page. See [QR codes and barcodes](#qr-codes-and-barcodes) and [Settings](#settings).
+- **Phase 5:** automatic code assignment on product save, lifecycle rules (trash, delete, type change), atomic regeneration, and the admin UI on the classic product screens: a "QR & Barcode" panel, codes in the variations panel, a "Code" column, SVG downloads. See [Admin code management](#admin-code-management).
 
 **Not implemented yet (later phases):**
-- the `/scan/` route and scan page (Phase 4 only *builds* scan URLs; they return 404), login redirect flow, product screen
+- the `/scan/` route and scan page (scan URLs still return 404), login redirect flow, product screen
 - Mark-as-Sold, stock decrement, sales history and void UI, seller dashboard
-- label printing, download/print buttons, CSV import/export, bulk generation and bulk tools
-- product admin UI and metaboxes, product lifecycle hooks (automatic code assignment), code regeneration/replacement
-- REST/AJAX endpoints, image endpoints, shortcodes and templates
+- label printing and layouts, CSV import/export of codes, bulk generation and bulk tools
+- caching of rendered images (planned for Phase 8)
+- REST/AJAX endpoints, shortcodes and templates, and support for WooCommerce's block-based product editor
 
-The plugin adds **no** public endpoints of any kind. The only screen is the settings page. The code, QR and barcode classes are a PHP service layer: no hook, screen or endpoint calls them yet.
+The plugin adds **no public endpoints** of any kind. Its only request handlers are the authenticated `admin-post.php` actions of Phase 5, reachable by users with `pqbg_manage_codes` (see [Admin handlers](#admin-handlers)).
 
 ## QR codes and barcodes
 
@@ -162,14 +163,14 @@ The libraries are bundled inside the plugin; no Composer is needed on the server
 
 ## Tests
 
-The CLI regression suites for Phases 2–4 are in [`tests/`](tests/README.md): a runner, round-trip QR/barcode decoding, and settings access checked over HTTP. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
+The CLI regression suites for Phases 2–5 are in [`tests/`](tests/README.md): a runner, round-trip QR/barcode decoding, and settings access checked over HTTP. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
 
 ## Production deployment
 
 **Exclude `tests/` and `build/` from any production deployment.** Deploy only the runtime files:
 
 - `product-qrcode-barcode-generator.php`, `uninstall.php`, `index.php`
-- `includes/`, `languages/`, `vendor-prefixed/`
+- `includes/`, `assets/`, `languages/`, `vendor-prefixed/`
 - `README.md` (optional)
 
 `tests/` and `build/` are development tooling. They are kept in the repository so the vendor bundle can be rebuilt exactly and the regression suites can be rerun, but they must never reach a live server:
@@ -249,7 +250,7 @@ A code identifies the **purchasable item**.
 
 The product type is resolved through `wc_get_product()` and `WC_Product::is_type()`, not raw post data.
 
-**Product status** (draft, private, published and so on) is **not** checked. No status rule has been decided yet. It will be settled with admin code management (Phase 5).
+**Product status** (Phase 5 rule): an **auto-draft** (the unsaved post WordPress creates for "Add new") never gets a code, and neither does a variation whose parent is an auto-draft (`pqbg_ineligible_status`). Drafts, pending, private and published items are eligible. Trashed items keep their codes (see [Lifecycle](#lifecycle)).
 
 "Purchasable" means the sellable unit, not WooCommerce's `is_purchasable()`, which depends on price and status and changes over time.
 
@@ -268,7 +269,7 @@ $row = ( new ProductCodeService() )->get_or_create( $product_or_variation_id, ge
 - All persistence goes through `CodeRepository::create_active()`. The generator and service contain no SQL.
 - The code is stored only in `pqbg_codes.code`, never in product meta, options or order data.
 
-Phase 3 registers **no hooks**. Codes are not created automatically on product save or creation. A caller (the Phase 5 admin screens, or bulk tools later) must request them explicitly.
+Since Phase 5, codes are also assigned automatically when products are saved; see [Automatic assignment](#automatic-assignment). That path calls the same `get_or_create()`.
 
 ### Uniqueness and collision handling
 
@@ -293,7 +294,7 @@ The column collation (`utf8mb4_unicode_520_ci`) is case-insensitive, so a lowerc
 - After `CodeRepository::retire()`, the next `get_or_create()` for that item generates a **new** code.
 - There is no `orphaned` status.
 
-**Regeneration is deferred.** An atomic "replace code" operation (retire the old code and create the new one in a single transaction, behind `pqbg_manage_codes`) is not needed until codes can be managed in the admin area. It belongs to Phase 5. Until then, retire followed by `get_or_create()` is the only path.
+**Regeneration** (Phase 5) replaces a code atomically: see [Regeneration](#regeneration).
 
 ### Code map
 
@@ -301,7 +302,159 @@ The column collation (`utf8mb4_unicode_520_ci`) is case-insensitive, so a lowerc
 |---|---|
 | `CodeGenerator` | randomness, alphabet, format, collision retry. It never touches the database directly. |
 | `CodeRepository` | persistence and queries, the active/retired state, the one-active-code invariant |
-| `ProductCodeService` | authorization, WooCommerce eligibility, mapping an item to its row, retrying on database conflicts |
+| `ProductCodeService` | authorization, WooCommerce eligibility (type and the auto-draft rule), mapping an item to its row, retrying on database conflicts, `regenerate()`, and `retire_for_item()` for the lifecycle |
+| `CodeLifecycle` | the save and delete hooks: automatic assignment, the parent sweep, retirement on delete and type change, the save-failure notice |
+| `AdminProductPanel` | the classic product screens: meta box, variation panel text, list column, regeneration confirmation page |
+| `AdminActions` | the authenticated `admin-post.php` handlers: generate, regenerate, QR/barcode SVG |
+
+## Admin code management
+
+Phase 5. Everything in this section needs `pqbg_manage_codes`, which Administrators and Shop Managers have. Store Sellers and logged-out users get nothing.
+
+### Supported editor
+
+**Only WooCommerce's classic product edit screen is supported.** The block-based product editor (the `product_block_editor` feature) is disabled on this site and was verified off. The panel, the variation text and the handlers were built and tested for the classic screens only.
+
+### Automatic assignment
+
+A code is generated on the **first real save** of an eligible item (a simple product or a variation). That includes drafts, pending and private items. Auto-drafts and revisions never get one.
+
+- **Acting user = the current user.** If they lack `pqbg_manage_codes`, or there is no user (cron, CLI), nothing is generated and nothing fails. The item stays without a code until someone permitted saves it or clicks **Generate code**.
+- **The save is never blocked or changed.**
+  - A generation failure is logged to the WooCommerce logger by error code only.
+  - The saving user sees a dismissible notice on their next admin page.
+- **Idempotent.** An item that has a code keeps it; repeated saves never create a second one.
+- **Parent sweep.** Every eligible save of a variable product also assigns any of its variations that still lack a code. This covers:
+  - a product's first save
+  - simple → variable
+  - duplicates
+  - variations added before the parent was saved
+
+**Hooks.** WooCommerce CRUD hooks, verified in WooCommerce 11.1.2:
+
+| Hook | Fired by |
+|---|---|
+| `woocommerce_new_product`, `woocommerce_update_product` | `WC_Product_Data_Store_CPT::create()`/`update()` |
+| `woocommerce_new_product_variation`, `woocommerce_update_product_variation` | `WC_Product_Variation_Data_Store_CPT::create()`/`update()` |
+
+- They fire after WooCommerce has saved the object, its type and its parent.
+- Every path that goes through `WC_Product::save()` reaches them:
+  - the classic edit screen
+  - **Add variation** and **Save changes** in the variations panel (AJAX)
+  - Quick Edit and Bulk Edit
+  - the CSV importer
+  - the REST API
+  - **Duplicate**
+- `save_post` was rejected for three reasons:
+  - it fires for the auto-draft WordPress creates on "Add new"
+  - it fires for revisions
+  - on the edit screen it fires before WooCommerce has written the product type
+- Code that writes products with `wp_insert_post()` directly, bypassing WooCommerce, is not covered. Such items get a code on their next WooCommerce save, or manually.
+
+**Skipped statuses:** `auto-draft`, `trash`, and `importing` (the CSV importer's placeholder). A variation is also skipped while its parent is in one of those states.
+
+**New variations added with "Add variation" get their code immediately**, provided the parent is already saved as a variable product.
+- A variation added to a product that has never been saved gets its code on the product's first real save, through the parent sweep.
+- The same applies to a product that is still `simple` in the database: WooCommerce's "Add variation" only forces the type to variable in memory.
+
+**CSV import:** WooCommerce 11.1.2 itself refuses a new variation whose parent row has not been imported yet, so variations always arrive after their parent.
+
+### Lifecycle
+
+| Event | Codes |
+|---|---|
+| Trash | Stay **active**, so a restored product keeps working labels. WooCommerce also trashes a variable product's variations; their codes stay active too. |
+| Untrash | The same code, unchanged. |
+| Permanent delete (post.php, Empty Trash, REST `force=true`, WooCommerce data stores, auto-draft cleanup) | The active code is **retired**. `retired_by` = the acting user, or 0 when there is none. Deleting a variable product deletes its variations, and every variation code is retired. |
+| simple → variable / grouped / external | The product's code is retired. For variable, its variations get codes (parent sweep). |
+| variable → simple | WooCommerce deletes the variations, and their codes are retired. The product becomes eligible and gets a **new** code. |
+| variable → grouped / external | Variation codes are retired as they are deleted. The product gets none. |
+| Duplicate | The copy, and each copied variation, gets its **own new code**. Codes live only in `pqbg_codes`, never in meta, so nothing is copied. |
+
+- Deletion is detected with WordPress core's `deleted_post`, which fires after the row is really gone. As a safety net, deleting a product also retires any code still active under it as `parent_id`.
+- **Retirement on delete or type change is not gated by `pqbg_manage_codes`.** WordPress has already authorised the delete or save, and a deleted or ineligible item must never keep an active code.
+- **Generation always is gated.**
+- Retired codes are never reactivated or reused.
+
+### Regeneration
+
+> **Printed labels with the old code will stop working.**
+
+`ProductCodeService::regenerate( $item, $user, $expected_code_id )` → `CodeRepository::replace_active()` does the following in **one transaction**:
+
+1. It locks the item's active row (`SELECT … FOR UPDATE`).
+2. It retires the row, setting `retired_at_gmt`/`retired_by`.
+3. It inserts a new active code.
+
+**Guarantees:**
+- never two active codes
+- never zero active codes after success
+- no partial state on failure: any failed step rolls back, and the original code stays active
+- concurrent regenerations of the same item serialise on the lock and end with exactly one active code
+- the old code stays in the history
+
+**Double submits.** The confirmation form carries the code ID it showed. If the item's code has changed since (a double click or a second tab), nothing is regenerated and the user is told (`pqbg_code_changed`).
+
+**UI.** **Regenerate…** opens a confirmation page (GET, no side effects) that states the warning above, the product and the current code. Its button POSTs with a nonce and needs `pqbg_manage_codes`.
+
+### Product edit screen: "QR & Barcode" panel
+
+| Product | Panel |
+|---|---|
+| Simple, with a code | The code, its QR code (inline SVG), the barcode if barcodes are enabled, **Download QR (SVG)**, **Download barcode (SVG)** (only if enabled), **Regenerate…** |
+| Simple, no code yet | "No code yet." and **Generate code** |
+| Not saved yet (auto-draft) | "Save the product to assign its product code." |
+| Variable | No code for the product itself. A table of its variations (attributes, SKU, code, status) with **View QR** (loaded on click), **Download QR**, **Download barcode** (if enabled), **Regenerate…** or **Generate code** per variation. |
+| Grouped, external | A short explanation, no buttons. |
+
+- **History:** a read-only list of retired codes, with the code, "Retired at" and "Retired by".
+  - For a variable product it covers all its variations, including deleted ones.
+  - Times are stored in GMT and **displayed in the site timezone** with `wp_date()` and the site's date and time formats. The column header names the timezone.
+  - "Retired by" shows the user's display name, **"System"** when `retired_by` is 0, or **"User #ID (deleted)"** when the user no longer exists.
+- Retired codes appear only as text. They are never rendered or served.
+- **Variations panel:** inside each variation, the code text with **View QR** and **Download QR** links. No image is rendered when the panel loads.
+- **Products list:** a **Code** column with the code text, or "—" (variable, grouped and external products, and items without a code). It uses one query per page and shows no images.
+- The Generate buttons sit inside the product form, and HTML forms can't be nested. They therefore submit small POST forms printed after it in the page footer, via the HTML `form` attribute.
+
+**Performance.** QR rendering takes about 45–50 ms per code, so the edit screen renders **at most one QR code** synchronously (a simple product's).
+- Variation QR codes load only when **View QR** is clicked, as an `<img>` pointing at the authenticated view handler. Without JavaScript the link opens the SVG in a new tab.
+- The variations table loads its variations with one post query and one meta query.
+- Measured for a product with 40 variations, on the dev machine:
+  - panel render about 20–55 ms in-process (median of 5; it varies between runs)
+  - edit page about 625 ms with the panel vs about 540 ms for the same page without it (medians of 5 HTTP requests, including WooCommerce's own screen). The overhead was 85–150 ms across runs.
+  - 0 QR codes rendered on load
+
+### Admin handlers
+
+Handled by `admin-post.php`. Only `admin_post_*` is hooked, never `admin_post_nopriv_*`.
+
+| Action | Method | Does |
+|---|---|---|
+| `pqbg_generate` | POST | Assigns a code to an item that has none (`get_or_create()`); redirects back with a message. |
+| `pqbg_regenerate` | POST | Atomic regeneration, with the expected code ID from the confirmation page. |
+| `pqbg_code_image` | GET | `type=qr` or `barcode`, `mode=view` or `download`. Serves the SVG of the item's **active** code. No side effects. |
+
+The confirmation page is a hidden admin page, `edit.php?post_type=product&page=pqbg-regenerate&item=ID&_pqbg_nonce=…`. It needs `pqbg_manage_codes` and a nonce, and it validates before any output.
+
+**Every handler:**
+- checks the method: **405** otherwise, so GET can never generate or regenerate
+- requires `pqbg_manage_codes` (**403**)
+- requires a nonce **bound to the item** (`pqbg_<verb>_<ID>`, field `_pqbg_nonce`); a missing, invalid or other item's nonce gets **403**
+- resolves the item server-side by ID: no handler accepts a code string, so a retired code can never be served. An unknown item or an item without an active code gets **404**.
+- Barcode requests while barcodes are disabled get **404**, checked before anything else, so the barcode library stays unloaded.
+
+**Image response headers:**
+- `Content-Type: image/svg+xml; charset=utf-8`
+- `X-Content-Type-Options: nosniff`
+- `Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private`
+- `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
+- `Content-Disposition: attachment; filename="{CODE}-qr.svg"` or `"{CODE}-barcode.svg"`. View mode uses `inline`.
+
+**Who gets refused:**
+- Store Sellers get **403**. WooCommerce's wp-admin redirect deliberately exempts `admin-post.php`, so the capability check is what refuses them.
+- Logged-out users get core's **400**, because there is no `nopriv` handler.
+
+**Barcodes disabled:** no barcode UI anywhere, and the barcode handler refuses. No barcode library class is loaded on any Phase 5 screen or path, and the tests verify this.
 
 ## Requirements
 
@@ -443,7 +596,7 @@ It never reads or writes orders or the legacy order tables.
 
 ## Deactivation
 
-Deactivation is non-destructive. Tables, codes, sales, settings, the role and capabilities are all kept. The plugin adds no rewrite rules or cron events (as of Phase 4), so nothing needs flushing.
+Deactivation is non-destructive. Tables, codes, sales, settings, the role and capabilities are all kept. The plugin adds no rewrite rules or cron events (as of Phase 5), so nothing needs flushing.
 
 ## Uninstall
 

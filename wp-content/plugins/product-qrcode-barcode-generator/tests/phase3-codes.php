@@ -389,8 +389,26 @@ try {
 		}
 		return false;
 	};
-	$save_hooks = array( 'save_post', 'save_post_product', 'save_post_product_variation', 'wp_insert_post', 'transition_post_status', 'woocommerce_new_product', 'woocommerce_update_product', 'woocommerce_new_product_variation', 'woocommerce_update_product_variation', 'woocommerce_before_product_object_save', 'woocommerce_after_product_object_save', 'before_delete_post', 'wp_trash_post' );
-	pqbg_t( 'no plugin callbacks on product save/create/delete hooks', ! array_filter( $save_hooks, $ours ) );
+	// Phase 5 (approved) added CodeLifecycle on exactly the WooCommerce CRUD save hooks and deleted_post.
+	$save_hooks = array( 'save_post', 'save_post_product', 'save_post_product_variation', 'wp_insert_post', 'transition_post_status', 'woocommerce_before_product_object_save', 'woocommerce_after_product_object_save', 'before_delete_post', 'wp_trash_post', 'untrashed_post' );
+	pqbg_t( 'no plugin callbacks on other product save/create/trash hooks (Phase 5 uses only the approved ones)', ! array_filter( $save_hooks, $ours ) );
+	$only_lifecycle = static function ( string $hook ): bool {
+		$found = false;
+		foreach ( $GLOBALS['wp_filter'][ $hook ]->callbacks ?? array() as $cbs ) {
+			foreach ( $cbs as $cb ) {
+				$f = $cb['function'];
+				$n = is_array( $f ) ? ( is_object( $f[0] ) ? get_class( $f[0] ) : (string) $f[0] ) : '';
+				if ( str_contains( $n, 'ProductQrBarcode' ) ) {
+					if ( 'ProductQrBarcode\\CodeLifecycle' !== ltrim( $n, '\\' ) ) {
+						return false;
+					}
+					$found = true;
+				}
+			}
+		}
+		return $found;
+	};
+	pqbg_t( 'approved Phase 5 hooks are served by CodeLifecycle only', 5 === count( array_filter( array( 'woocommerce_new_product', 'woocommerce_update_product', 'woocommerce_new_product_variation', 'woocommerce_update_product_variation', 'deleted_post' ), $only_lifecycle ) ) );
 } finally {
 	pqbg_section( 'cleanup' );
 	wp_set_current_user( 0 );

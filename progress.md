@@ -22,7 +22,7 @@ Repo: https://github.com/mosin-shaikh01/durgaCollections
 | Active plugins | classic-editor, woocommerce, product-qrcode-barcode-generator (Product QR Code and Barcode Generator; installed in Phase 2 under its former name) |
 | Admin user | Dev-admin |
 
-_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, and at the start of the plugin rename. There were no differences apart from the rename itself._
+_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5. There were no differences apart from the rename itself._
 
 ---
 
@@ -103,8 +103,9 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **3** | **Secure product code generation** | **Done 2026-09-24. Committed `a2e5643`, pushed.** |
 | — | **Plugin rename** (no functional change) | **Done 2026-09-24. Committed `5f301be`, pushed.** |
 | **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Committed `3654086`, pushed.** |
-| 5 | Admin code management | Next. Not started |
-| 6 → 12 | scan/product screen → mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
+| **5** | **Admin code management** | **Done 2026-09-25. Not committed; waiting for approval.** |
+| 6 | Scan/product screen | Next. Not started |
+| 7 → 12 | mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
 > **Pre-rename records.**
 >
@@ -595,7 +596,7 @@ _Recorded before Phase 4 and implemented in Phase 4 (see below)._
 - **The local-address warning checks the host name only.** It doesn't resolve DNS, so a public-looking name that points to a private IP isn't flagged.
 - **No PHPCS run**, because it isn't installed.
 
-**Open items carried to Phase 5 (admin code management):**
+**Open items carried to Phase 5 (admin code management):** _all handled in Phase 5; see below._
 - Generate codes on the first real save, including drafts, but **never for auto-drafts**.
 - Trashing a product keeps its code active; permanent deletion retires it.
 - Atomic regeneration: retire and create in one transaction, behind `pqbg_manage_codes`.
@@ -605,6 +606,170 @@ _Recorded before Phase 4 and implemented in Phase 4 (see below)._
 - Normalise manually typed codes (trim + uppercase) before lookup. The renderers deliberately do not normalise.
 
 **Next phase (not started):** Phase 5, Admin Code Management. **The production domain is still not final**, so labels must not be printed yet. The admin warning says so until the scan base URL is public.
+
+### Phase 5: Admin code management (2026-09-24 → 2026-09-25)
+
+**Status:** implemented and tested. The plugin stays active. **Not committed; waiting for the user's approval.**
+
+**Environment:** re-verified at the start with no differences from the notes above.
+- WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6, MariaDB 10.4.32
+- plugins: classic-editor, woocommerce, pqbg
+- `pqbg_*` tables at 0 rows, 0 products, 1 user, `pqbg_settings = {"settings_version":1}`
+- `/scan/` returned 404
+- WooCommerce's **block-based product editor is disabled** (`product_block_editor` off)
+- `WP_ENVIRONMENT_TYPE` is still not set, so tests use `PQBG_TESTS_ALLOW_PRODUCTION=1`
+
+**Baseline before any change:** `php tests/run.php` ALL PASSED, **380 passed, 0 failed, 5 skipped** (decoder not installed).
+
+**Approved decisions (plan review):**
+1. **Product-save hooks are approved.** This lifts the "no save hooks without approval" rule for Phase 5.
+2. **Retirement on delete or type change is not gated by `pqbg_manage_codes`.** WordPress has already authorised the action. `retired_by` = the current user, or 0. Generation is always gated.
+3. **Auto-drafts are refused in `ProductCodeService::eligibility()`** (`pqbg_ineligible_status`), and so are variations of an auto-draft parent. Drafts, pending and private items stay eligible.
+4. **Regeneration carries the expected code ID.** A stale ID changes nothing (`pqbg_code_changed`), which protects against double clicks and second tabs.
+5. **The confirmation step is a server-rendered hidden admin page** (GET, no side effects), not a JS `confirm()`.
+6. History times are stored in GMT and displayed in the **site timezone** with `wp_date()`.
+7. "Retired by" shows **"System"** for 0 and **"User #ID (deleted)"** for a user that no longer exists.
+8. The decoder is installed **outside the web root** (scratchpad) with `npm ci`, and `PQBG_DECODER` points to it, so no round-trip check is skipped.
+
+**Hook decisions (verified in the installed WooCommerce 11.1.2 source):**
+- **Saves: WooCommerce CRUD hooks.**
+  - `woocommerce_new_product` / `woocommerce_update_product` (`class-wc-product-data-store-cpt.php`)
+  - `woocommerce_new_product_variation` / `woocommerce_update_product_variation` (`class-wc-product-variation-data-store-cpt.php`)
+  - They fire after the object, its type term and its parent are saved, on every `WC_Product::save()` path: classic edit screen, Add variation (`WC_AJAX::add_variation`), Save changes (`save_variations`), Quick and Bulk Edit (`WC_Admin_Post_Types`), CSV importer, REST, Duplicate (`WC_Admin_Duplicate_Product`, copy saved as draft).
+  - `save_post` was rejected: it fires for core's auto-draft (`get_default_post_to_edit`) and revisions, and before WooCommerce writes the product type on the edit screen.
+- **Deletes: core `deleted_post`**, after the row is gone.
+  - WooCommerce deletes variations with `wp_delete_post()` both when the parent is deleted (`WC_Post_Data::delete_post_data` on `delete_post`) and when a product stops being variable (`update_version_and_type()` → `product_type_changed` → `delete_variations(…, true)`). The type change happens **before** `woocommerce_update_product` fires.
+  - Safety net: deleting a product also retires codes still active under it as `parent_id`.
+- **Trash and untrash: no hooks.** Codes stay active.
+- **No product save runs inside a DB transaction** in WC 11.1.2. Only the Fulfillments store uses `wc_transaction_query`. This matters because `START TRANSACTION` implicitly commits an outer one.
+- **New AJAX variations get their code immediately** if the parent is saved as variable.
+  - If the parent is an auto-draft, or still `simple` in the database (`add_variation` only forces the type to variable in memory), the variation gets its code on the parent's first real save, through the **parent sweep**.
+  - The sweep runs on every eligible variable-parent save and does one batched query.
+- **CSV:** WC 11.1.2 itself rejects a new variation whose parent is still an import placeholder (`woocommerce_product_importer_variation_parent_missing`), so variations always arrive after their parent.
+- **WooCommerce's `prevent_admin_access` exempts `admin-post.php` and `admin-ajax.php`**, so sellers do reach admin-post. The capability check refuses them with 403.
+
+**Files created** (plugin-relative):
+- `includes/CodeLifecycle.php`: save and delete hooks, parent sweep, retirement, save-failure notice (per-user transient `pqbg_save_failure_{user}`, shown once, dismissible). Registered on **every** request.
+- `includes/AdminProductPanel.php`: meta box "QR & Barcode", variation panel text, "Code" list column, hidden confirmation page (validated on `load-{hook}` before output), assets, result notices.
+- `includes/AdminActions.php`: `admin_post_pqbg_generate` (POST), `admin_post_pqbg_regenerate` (POST), `admin_post_pqbg_code_image` (GET view or download). Nonces are bound to the item, and there is no `nopriv`.
+- `assets/admin.js` (click-to-load QR as `<img>`, delegated), `assets/admin.css`, `assets/index.php`
+- `tests/phase5-admin.php`
+
+**Files modified:**
+- `includes/CodeRepository.php`: `replace_active()` (atomic: lock, retire, insert, one transaction, rollback on any failure), `find_active_for_products()`, `find_active_by_parent()`, `find_retired_for_product_or_parent()`
+- `includes/ProductCodeService.php`: `regenerate()`, `retire_for_item()`, the auto-draft rule, `log_error()`
+- `includes/Plugin.php`: wiring, done last, after the new class files existed
+- `tests/run.php`: registers the suite
+- `tests/phase3-codes.php`: the "no product save hooks" scope check was split for the approved hooks
+- `tests/README.md`, `README.md` (plugin), `progress.md`
+
+**No schema change:** `DB_VERSION` is still 1. `vendor-prefixed/`, the renderers, `ScanUrl` and the settings are unchanged.
+
+**Tests.** `php tests/run.php`, with `PQBG_TESTS_ALLOW_PRODUCTION=1` and `PQBG_DECODER` pointing at the scratchpad decoder. **Final run: ALL PASSED, 542 checks, 0 failed, 0 skipped.**
+
+| Suite | Result |
+|---|---|
+| phase2-main | 83/83 |
+| phase2-lifecycle | 17/17 |
+| phase2-no-woocommerce | 12/12 |
+| phase3-codes | 110/110 (scope check split) |
+| phase4-rendering | 164/164, **0 skipped** (the 5 round-trip checks ran) |
+| phase5-admin | 156/156, **0 skipped** |
+
+**Phase 5 coverage:**
+- **Auto-assignment over real HTTP:**
+  - auto-draft gets no code
+  - first save as draft, pending, private and publish, with `created_by` set
+  - idempotent repeated saves
+  - Add variation, both on a saved variable product (immediately) and on an auto-draft parent (on first save)
+  - Save changes
+  - Quick Edit and Bulk Edit
+  - REST: create, variation, update, force delete
+  - Duplicate: simple and variable, all codes new, nothing in meta
+- **CSV import** (in-process through `WC_Product_CSV_Importer`): codes assigned, re-import idempotent.
+- **Other save paths:**
+  - revisions get no code
+  - cron or user 0: no code, no error
+  - a shop manager without the capability: the save succeeds, with no code, notice, panel or column
+  - failure injection: save not blocked, error-code-only log line, notice shown once
+- **Lifecycle over HTTP:**
+  - trash, untrash (same code), delete (retired with `retired_by`)
+  - variable parent delete retires every variation code
+  - Empty Trash
+  - every type change
+- **Regeneration:**
+  - old code retired with its metadata, exactly one active code
+  - stale expected ID refused
+  - forbidden users refused
+  - a **mid-transaction failure** (the INSERT collides after the retire UPDATE) leaves the original active and the table checksum unchanged
+  - one collision then success
+- **Real concurrency:** 4 PHP processes at once.
+  - Without an expected ID: 4 successes, 5 rows, 1 active.
+  - With the same expected ID: 1 winner, 3 × `pqbg_code_changed`, 1 active.
+- **History:**
+  - `wp_date()` in the site timezone, checked with a filtered `Asia/Kolkata`: UTC 00:00 → 05:30
+  - "System"
+  - "User #ID (deleted)"
+  - "Variation #ID (deleted)"
+- **UI over HTTP:**
+  - the panel for simple (exactly 1 QR), barcode on and off, no code, variable (table, 0 QR), grouped, external
+  - the Generate form sits outside the post form
+  - click-to-load view
+  - variations panel (AJAX)
+  - list column
+  - the confirmation page has no side effects and isn't in the menu
+  - regenerate, and a replay returns `pqbg_code_changed`
+  - GET to generate or regenerate: 405
+- **Downloads:**
+  - exact headers and filenames
+  - the body equals the `QrRenderer` output
+  - **round-trip decoded:** the QR decodes to the exact scan URL at EC level M, and the barcode to the code
+  - a retired code is never served, after regeneration or after deletion
+  - an item without an active code: 404, never generated
+  - barcode handler: 404 while disabled
+- **Permissions:**
+  - seller, logged-out and nocap users refused on every handler and on the confirmation page, even with the admin's valid nonces
+  - missing, invalid and other-item nonces: 403 on all four
+  - shop manager allowed
+- **Barcodes disabled:** 0 Picqer classes loaded after every panel, the variation text, the column, the save hooks and regeneration.
+- **Scope:**
+  - no REST routes, shortcodes, rewrite rules, `nopriv` handlers or `wp_ajax_` in code tokens
+  - the barcode library is referenced only in `BarcodeRenderer`
+  - no `$wpdb` writes outside `CodeRepository`/`Install`/`Schema`
+  - `/scan/` and `/scan/{CODE}/` return 404
+  - direct HTTP to the new files returns empty output
+- **Cleanup:**
+  - tables at 0 rows, AUTO_INCREMENT reset
+  - 0 products
+  - settings restored byte-for-byte
+  - temporary users and transients removed
+  - Action Scheduler jobs for test products removed
+
+**40-variation performance** (dev machine, last full run). The edit screen renders **0 QR codes** for a variable product and exactly 1 for a simple one.
+
+| Measurement | Result |
+|---|---|
+| Panel render, in-process, median of 5 | about 34 ms (final run); 18–54 ms across runs |
+| Edit page as shop manager **with** the panel, HTTP median of 5 | about 624 ms (final run) |
+| The same page for a shop manager **without** `pqbg_manage_codes` (no panel) | about 539 ms (final run). The overhead was 85–150 ms across runs. |
+| Parent re-save with the sweep (40 codes already present) | about 60–80 ms |
+| Creating a product with 40 variations | 5.34 s with codes vs 4.81 s without (final run); WooCommerce's own save dominates |
+
+The variations table primes post and meta caches with one `get_posts()` call. Before that, the HTTP difference was about 150 ms.
+
+**Known limitations:**
+- **Classic product editor only.** The block-based product editor is unsupported, and it is disabled here.
+- Code that creates products with `wp_insert_post()` directly, bypassing WooCommerce CRUD, gets no code until the next WooCommerce save or a manual Generate.
+- The failure notice is per user and shows once on the next admin page. A failure during a REST or import save as a user who never opens wp-admin is only logged.
+- HTTP timings are noisy on XAMPP (they varied by ±30% between runs). Only the in-process panel budget is asserted.
+- `CodeLifecycle::set_service()` is a test seam, PHP-only and unreachable from requests, like the injectable `CodeGenerator` from Phase 3.
+- No PHPCS run, because it isn't installed.
+
+**Open items carried to Phase 6 (scan/product screen):**
+- Normalise manually typed codes (trim + uppercase) before lookup. The renderers deliberately do not normalise.
+- **Define what the scan page shows when the code's product or variation is in trash, draft, pending or private.** Codes stay active in all those states per Phase 5. Do not implement before it is decided.
+
+**Next phase (not started):** Phase 6, Scan/Product Screen. **The production domain is still not final**, so labels must not be printed yet.
 
 ### Instructions for the next Claude session
 
@@ -618,14 +783,17 @@ _Recorded before Phase 4 and implemented in Phase 4 (see below)._
 
   The `dpc_`/`DPC_`/`Durga\ProductCodes` names in the Phase 2 and Phase 3 sections are pre-rename history. Never reintroduce them.
 - Get codes only through `ProductCodeService::get_or_create()`. Don't call `CodeRepository::create_active()` with hand-made strings, and don't write to `pqbg_codes` directly.
-- Phase 4 is done. Build scan URLs only through `ScanUrl`, and render only through `QrRenderer`/`BarcodeRenderer`. Never reference the barcode library outside `BarcodeRenderer`, and keep the "barcodes disabled means the library is not loaded" guarantee.
+- Phases 4 and 5 are done. Build scan URLs only through `ScanUrl`, and render only through `QrRenderer`/`BarcodeRenderer`. Never reference the barcode library outside `BarcodeRenderer`, and keep the "barcodes disabled means the library is not loaded" guarantee.
 - **Run `php tests/run.php` before and after every phase** (see `tests/README.md`). Preferred: `define( 'WP_ENVIRONMENT_TYPE', 'local' );` in the local `wp-config.php`, which the user will add themselves; never edit or commit `wp-config.php`. The fallback is `PQBG_TESTS_ALLOW_PRODUCTION=1`. The round-trip checks need `npm ci` in `tests/decoder`, or `PQBG_DECODER` pointing to a copy outside the web root. Add each new phase's suite to `tests/` and to `run.php`.
 - **Exclude `tests/` and `build/` from any production deployment** (see "Production deployment" in the plugin README).
 - **Never edit `vendor-prefixed/` by hand.** Change `build/` and run `php build/build.php` (see `build/README.md`).
 - The PHP minimum is now **8.2**.
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
-- Phase 5 must handle the open items listed at the end of the Phase 4 section.
-- Don't add product-save hooks for automatic code generation without explicit approval.
+- **Phase 6 (Scan/Product Screen) is next.** It must handle the open items listed at the end of the Phase 5 section: code normalisation, and what the scan page shows for items in trash, draft, pending or private.
+- Product-save and delete hooks now exist, in `CodeLifecycle` only, on exactly the approved hooks (the four WooCommerce CRUD save hooks and `deleted_post`). Don't add others without explicit approval.
+- Regenerate only through `ProductCodeService::regenerate()` (atomic `CodeRepository::replace_active()`). Admin requests go through `AdminActions`: POST for anything that writes, a nonce bound to the item, and `pqbg_manage_codes`. Never add `nopriv` handlers.
+- Only the classic product editor is supported. Re-check `product_block_editor` before relying on the Phase 5 UI.
+- For the full test run, install the decoder outside the web root (copy `tests/decoder`, run `npm ci`, and set `PQBG_DECODER`) so that 0 checks are skipped.
 - Nothing in this file authorizes future work. Each phase needs explicit user approval.
 - **Never commit or push without explicit approval.** No reset, rebase, amend or force-push.
 - Schema changes go through a new migration (`Install::migrations()` plus a `DB_VERSION` bump). Never edit data by dropping or recreating tables.
@@ -685,3 +853,17 @@ _Recorded before Phase 4 and implemented in Phase 4 (see below)._
     - dev-gap fatal log file deleted
   - Final run: 385/385.
   - Approved; committed as `3654086` and pushed to `origin/main`.
+
+### 2026-09-25
+- **Phase 5 (admin code management):**
+  - Re-verified the environment; no differences. The block product editor is off.
+  - Baseline 380 passed, 5 skipped.
+  - Verified the WooCommerce 11.1.2 save, delete and type-change paths in source. Wrote the plan, and the user approved it with decisions 1–4, the decoder, and three additions (site-timezone display, "System"/"User #ID (deleted)" labels, a Phase 6 open item for non-published states).
+  - Added `CodeLifecycle`, `AdminProductPanel`, `AdminActions` and assets, `CodeRepository::replace_active()` and the batch queries, and `ProductCodeService::regenerate()`/`retire_for_item()`/the auto-draft rule. Class files were created before `Plugin.php` was wired.
+  - The new HTTP tests caught two bugs, both fixed:
+    - the confirmation page answered 200 on a bad nonce, because `wp_die()` ran after the admin header; validation moved to `load-{hook}`
+    - variation labels showed "Any"
+  - Primed the variation caches in the panel. The HTTP overhead for 40 variations is now 85–115 ms, down from about 150 ms.
+  - The test Quick Edit and Bulk Edit requests now send `post_view`/`change_stock` like the real forms. Without them, core and WooCommerce logged "undefined array key" warnings in the Apache log during testing; these were not from plugin code.
+  - Final run: **542 passed, 0 failed, 0 skipped** (decoder installed in the scratchpad). All test data removed.
+  - Not committed; waiting for approval.

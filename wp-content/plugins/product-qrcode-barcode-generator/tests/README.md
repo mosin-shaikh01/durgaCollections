@@ -1,6 +1,6 @@
 # Tests
 
-CLI regression suites for Product QR Code and Barcode Generator. They run against a real WordPress + WooCommerce site through `wp-load.php`; there is no PHPUnit.
+CLI regression suites for Product QR Code and Barcode Generator (Phases 2–5). They run against a real WordPress + WooCommerce site through `wp-load.php`; there is no PHPUnit.
 
 - **CLI only.** Every PHP file here exits unless `PHP_SAPI === 'cli'`. The `.htaccess` in this directory answers every HTTP request with 403 (Apache). `index.php` stubs stop directory listings on other servers.
 - **Never loaded by the plugin.** The autoloader only maps `includes/` and `vendor-prefixed/`.
@@ -16,10 +16,22 @@ CLI regression suites for Product QR Code and Barcode Generator. They run agains
 | `phase2-main.php` | Schema, options, repository invariant, sales table, migrations, install lock, roles and capabilities, HPOS, no endpoints | 83 |
 | `phase2-lifecycle.php` | Deactivation, the default (data-preserving) uninstall path, reactivation | 17 |
 | `phase2-no-woocommerce.php` | WooCommerce missing, simulated for this process only: no boot, admin notice | 12 |
-| `phase3-codes.php` | Code format and alphabet, randomness, collisions, eligibility, authorization, assignment, retirement, database races, batch, scope. **A reconstruction**, see below. | 109 |
+| `phase3-codes.php` | Code format and alphabet, randomness, collisions, eligibility, authorization, assignment, retirement, database races, batch, scope. **A reconstruction**, see below. Scope check updated for Phase 5. | 110 |
 | `phase4-rendering.php` | Scan URLs, QR and barcode rendering with round-trip decoding, lazy library loading, SVG safety, base URL validation, the local-address and http:// warnings, settings page access and saving over HTTP, vendor isolation, scope | 164 (5 of them need the decoder) |
+| `phase5-admin.php` | Automatic code assignment on every save path over real HTTP (classic edit screen, AJAX variations, Quick Edit, Bulk Edit, REST, Duplicate) and the CSV importer; users without the capability, cron, failure injection; trash, untrash, delete, Empty Trash, type changes; atomic regeneration including a mid-transaction failure and **4 concurrent PHP processes**; history timezone and "retired by" labels; the panel, variations panel, list column, confirmation page and handlers over HTTP; downloads with round-trip decoding; permissions and nonces for every handler; barcodes disabled; the 40-variation performance measurement; scope | 156 (2 of them need the decoder) |
 
 Each suite ends with a check that plugin code raised no PHP notices, warnings or deprecations. That check is included in the counts.
+
+**Phase 5 change to the Phase 3 suite.** Phase 3's scope check "no plugin callbacks on product save/create/delete hooks" was true until Phase 5, which was approved to add them. It is now two checks:
+- there are still no callbacks on `save_post`, `wp_insert_post`, `transition_post_status`, `before_delete_post`, `wp_trash_post` and similar hooks
+- the five approved hooks (the four WooCommerce CRUD save hooks and `deleted_post`) are served by `CodeLifecycle` only
+
+The suite now has 110 checks.
+
+**Phase 5 suite notes.**
+- It starts 4 child PHP processes of itself (`--worker`) to regenerate one item at the same moment.
+- It prints its performance timings, which are informational: only the in-process panel budget (< 500 ms) is asserted.
+- It creates about 140 products and variations and cleans them all up, including their Action Scheduler jobs.
 
 **Ported Phase 2 suites.** These are the original Phase 2 scripts with the renamed identifiers. The main suite has three intentional changes:
 - `settings merge drops unknown keys` now compares with `Plugin::default_settings()`, because Phase 4 added keys.
@@ -33,8 +45,8 @@ The original counts were 80 and 16; the notice check and two cleanup checks are 
 ## Requirements
 
 - PHP CLI with the `curl` extension, able to load the site's `wp-load.php`.
-- The site reachable over HTTP at `home_url()` from the same machine (Phase 4 logs in as temporary users).
-- **Optional: Node.js 18+ and the round-trip decoder**, for the 5 Phase 4 checks that rasterise the SVGs and decode them with a real decoder.
+- The site reachable over HTTP at `home_url()` from the same machine (Phases 4 and 5 log in as temporary users).
+- **Optional: Node.js 18+ and the round-trip decoder**, for the 5 Phase 4 and 2 Phase 5 checks that rasterise the SVGs and decode them with a real decoder.
 
 ### Installing the decoder
 
@@ -51,7 +63,7 @@ npm ci
   2. Run `npm ci` there.
   3. Point `PQBG_DECODER` at that copy's `decode.mjs`.
 
-**If Node.js or the decoder install is missing**, the 5 round-trip checks are **skipped, not failed**:
+**If Node.js or the decoder install is missing**, the round-trip checks are **skipped, not failed**:
 - Each prints a `SKIP` line saying what is missing and how to install it.
 - The suite's result line reports `N skipped`.
 - The rest of the suite still runs, and the runner can still pass.
