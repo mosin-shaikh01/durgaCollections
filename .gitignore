@@ -1,0 +1,70 @@
+# ---- Secrets & local config ----
+wp-config.php
+.htaccess
+
+# ---- Archives / installers ----
+*.zip
+*.tar
+*.tar.gz
+*.sql
+*.sql.gz
+
+# ---- WordPress core (managed by WP updates, not by git) ----
+/wp-admin/
+/wp-includes/
+/index.php
+/wp-activate.php
+/wp-blog-header.php
+/wp-comments-post.php
+/wp-config-sample.php
+/wp-cron.php
+/wp-links-opml.php
+/wp-load.php
+/wp-login.php
+/wp-mail.php
+/wp-settings.php
+/wp-signup.php
+/wp-trackback.php
+/xmlrpc.php
+/license.txt
+/readme.html
+/wordpress/
+
+# ---- wp-content: ignore everything, then un-ignore our own code ----
+wp-content/*
+
+# uploads, cache and upgrade artifacts never belong in git
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/upgrade-temp-backup/
+wp-content/cache/
+wp-content/backup*/
+wp-content/debug.log
+wp-content/advanced-cache.php
+wp-content/object-cache.php
+
+# bundled themes & plugins ship with WordPress
+wp-content/themes/twenty*
+wp-content/plugins/akismet/
+wp-content/plugins/hello.php
+
+# Track custom themes and plugins by un-ignoring them here as they are added, e.g.:
+# !wp-content/themes/
+# !wp-content/themes/durga-collections/
+# !wp-content/plugins/
+# !wp-content/plugins/durga-custom/
+
+# ---- OS / editor cruft ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# ---- Dependencies & build output ----
+node_modules/
+vendor/
