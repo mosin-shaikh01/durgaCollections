@@ -14,10 +14,10 @@
  * acting user must have Permissions::MANAGE_CODES. It is not called from
  * any hook, endpoint or screen yet.
  *
- * @package Durga\ProductCodes
+ * @package ProductQrBarcode
  */
 
-namespace Durga\ProductCodes;
+namespace ProductQrBarcode;
 
 use WC_Product;
 use WP_Error;
@@ -87,7 +87,7 @@ final class ProductCodeService {
 			}
 		}
 
-		return new WP_Error( 'dpc_ineligible_product', __( 'This product type cannot have a product code.', 'durga-product-codes' ) );
+		return new WP_Error( 'pqbg_ineligible_product', __( 'This product type cannot have a product code.', 'product-qrcode-barcode-generator' ) );
 	}
 
 	/**
@@ -107,12 +107,12 @@ final class ProductCodeService {
 	 * An item whose code was retired gets a newly generated code.
 	 *
 	 * @param int $product_id Simple product or variation ID.
-	 * @param int $user_id    Acting user; must have the dpc_manage_codes capability.
-	 * @return array<string, string>|WP_Error The active dpc_codes row.
+	 * @param int $user_id    Acting user; must have the pqbg_manage_codes capability.
+	 * @return array<string, string>|WP_Error The active pqbg_codes row.
 	 */
 	public function get_or_create( int $product_id, int $user_id ) {
 		if ( ! Permissions::can_manage_codes( $user_id ) ) {
-			return new WP_Error( 'dpc_forbidden', __( 'You are not allowed to manage product codes.', 'durga-product-codes' ) );
+			return new WP_Error( 'pqbg_forbidden', __( 'You are not allowed to manage product codes.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		$item = self::eligibility( $product_id );
@@ -140,7 +140,7 @@ final class ProductCodeService {
 			if ( ! is_wp_error( $result ) ) {
 				$row = CodeRepository::find_by_code( $code );
 
-				return null !== $row ? $row : new WP_Error( 'dpc_code_unavailable', __( 'The product code could not be loaded.', 'durga-product-codes' ) );
+				return null !== $row ? $row : new WP_Error( 'pqbg_code_unavailable', __( 'The product code could not be loaded.', 'product-qrcode-barcode-generator' ) );
 			}
 
 			// A concurrent request assigned this item a code first: use that one.
@@ -151,12 +151,12 @@ final class ProductCodeService {
 			}
 
 			// Only a duplicate code string is worth retrying with a new code.
-			if ( 'dpc_code_conflict' !== $result->get_error_code() ) {
+			if ( 'pqbg_code_conflict' !== $result->get_error_code() ) {
 				return $result;
 			}
 		}
 
-		$error = new WP_Error( 'dpc_code_generation_failed', __( 'A unique product code could not be generated.', 'durga-product-codes' ) );
+		$error = new WP_Error( 'pqbg_code_generation_failed', __( 'A unique product code could not be generated.', 'product-qrcode-barcode-generator' ) );
 		self::log_failure( $error );
 
 		return $error;
@@ -166,7 +166,7 @@ final class ProductCodeService {
 	 * Error for an ID that is not a WooCommerce product.
 	 */
 	private static function invalid_product(): WP_Error {
-		return new WP_Error( 'dpc_invalid_product', __( 'Product not found.', 'durga-product-codes' ) );
+		return new WP_Error( 'pqbg_invalid_product', __( 'Product not found.', 'product-qrcode-barcode-generator' ) );
 	}
 
 	/**
@@ -176,7 +176,7 @@ final class ProductCodeService {
 	 */
 	private static function log_failure( WP_Error $error ): void {
 		if ( function_exists( 'wc_get_logger' ) ) {
-			wc_get_logger()->error( 'Product code generation failed: ' . $error->get_error_code(), array( 'source' => 'durga-product-codes' ) );
+			wc_get_logger()->error( 'Product code generation failed: ' . $error->get_error_code(), array( 'source' => 'product-qrcode-barcode-generator' ) );
 		}
 	}
 }

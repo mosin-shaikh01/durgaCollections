@@ -11,15 +11,15 @@
  * Table names come only from $wpdb->prefix plus fixed suffixes; nothing
  * user-controlled ever reaches an identifier.
  *
- * @package Durga\ProductCodes
+ * @package ProductQrBarcode
  */
 
-namespace Durga\ProductCodes;
+namespace ProductQrBarcode;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Owns the dpc_codes and dpc_sales table definitions.
+ * Owns the pqbg_codes and pqbg_sales table definitions.
  */
 final class Schema {
 
@@ -35,7 +35,7 @@ final class Schema {
 	 */
 	public static function codes_table(): string {
 		global $wpdb;
-		return $wpdb->prefix . 'dpc_codes';
+		return $wpdb->prefix . 'pqbg_codes';
 	}
 
 	/**
@@ -45,15 +45,15 @@ final class Schema {
 	 */
 	public static function sales_table(): string {
 		global $wpdb;
-		return $wpdb->prefix . 'dpc_sales';
+		return $wpdb->prefix . 'pqbg_sales';
 	}
 
 	/**
-	 * Name of the optional CHECK constraint on dpc_codes (constraint names are schema-wide).
+	 * Name of the optional CHECK constraint on pqbg_codes (constraint names are schema-wide).
 	 */
 	public static function active_check_name(): string {
 		global $wpdb;
-		return $wpdb->prefix . 'dpc_codes_active_chk';
+		return $wpdb->prefix . 'pqbg_codes_active_chk';
 	}
 
 	/**
@@ -154,7 +154,7 @@ KEY order_id (order_id)
 	}
 
 	/**
-	 * Whether the active-code CHECK constraint is present on dpc_codes.
+	 * Whether the active-code CHECK constraint is present on pqbg_codes.
 	 */
 	public static function has_active_check(): bool {
 		global $wpdb;

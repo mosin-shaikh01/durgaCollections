@@ -19,16 +19,19 @@ Repo: https://github.com/mosin-shaikh01/durgaCollections
 | Permalinks | `/%postname%/` |
 | Timezone | UTC (`timezone_string` empty, offset 0) — **not yet changed; store is in India, change only with approval** |
 | Active theme | twentytwentyfive |
-| Active plugins | classic-editor, woocommerce, durga-product-codes (since Phase 2) |
+| Active plugins | classic-editor, woocommerce, product-qrcode-barcode-generator (Product QR Code and Barcode Generator; installed in Phase 2 under its former name) |
 | Admin user | Dev-admin |
 
-_Environment re-verified 2026-09-24 at the start of Phase 2, and again at the start of Phase 3 with no differences._
+_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, and at the start of the plugin rename. There were no differences apart from the rename itself._
 
 ---
 
 ## Repository
 
-Branch `main`, tracking `origin/main`. Phase 2 committed as `50d7e0b` and pushed to `origin/main`. **Phase 3 is implemented but not committed**; it is waiting for the user's approval.
+Branch `main`, tracking `origin/main`.
+
+- Phase 2 was committed as `50d7e0b` and Phase 3 as `a2e5643`; both are pushed to `origin/main`.
+- **The plugin rename is done but not committed.** It is waiting for the user's approval.
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -37,11 +40,13 @@ uploads and archives are excluded by `.gitignore`:
 .gitignore
 README.md
 progress.md
-wp-content/plugins/durga-product-codes/
+wp-content/plugins/product-qrcode-barcode-generator/
 ```
 
 | Commit | Message |
 |---|---|
+| `a2e5643` | Phase 3: secure product code generation (CodeGenerator, ProductCodeService) |
+| `fd07308` | Record Phase 2 commit and push in progress log |
 | `50d7e0b` | Add Durga Product Codes plugin foundation (Phase 2) |
 | `d9bb6a0` | Remove installer zip and empty extraction folder |
 | `11e07fb` | Record tracking audit in progress log |
@@ -50,8 +55,8 @@ wp-content/plugins/durga-product-codes/
 
 **Note:** `.gitignore` ignores `wp-content/*` wholesale, so a new
 custom theme or plugin will not appear in `git status` until it is
-un-ignored. Phase 2 un-ignored exactly one plugin
-(`!wp-content/plugins/` + `wp-content/plugins/*` + `!wp-content/plugins/durga-product-codes/`);
+un-ignored. Exactly one plugin is un-ignored
+(`!wp-content/plugins/` + `wp-content/plugins/*` + `!wp-content/plugins/product-qrcode-barcode-generator/`);
 every other plugin stays ignored. For a future custom theme the pattern is:
 
 ```
@@ -83,17 +88,26 @@ _To be filled in — site structure, pages, content, plugins._
 
 ---
 
-## Durga Product Codes plugin
+## Product QR Code and Barcode Generator plugin
 
 A custom WooCommerce plugin providing product QR/barcode inventory for our own shop staff.
-It lives in `wp-content/plugins/durga-product-codes/`. The full developer documentation is in that folder's `README.md`.
+It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was called "Durga Product Codes" until the rename; see below. The full developer documentation is in that folder's `README.md`.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Environment audit and architecture | Done (audit only, no code) |
 | **2** | **Plugin foundation and data layer** | **Done 2026-09-24. Committed `50d7e0b`, pushed.** |
-| **3** | **Secure product code generation** | **Done 2026-09-24. Not committed yet.** |
-| 4 → 12 | QR + barcode → admin code management → scan/product screen → mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
+| **3** | **Secure product code generation** | **Done 2026-09-24. Committed `a2e5643`, pushed.** |
+| — | **Plugin rename** (no functional change) | **Done 2026-09-24. Not committed yet.** |
+| 4 | QR code + optional barcode | Next. Not started; see the locked decision below |
+| 5 → 12 | admin code management → scan/product screen → mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
+
+> **Pre-rename records.**
+>
+> The Phase 2 and Phase 3 sections below are kept exactly as they were written, under the plugin's former name "Durga Product Codes".
+> - Their identifiers (`durga-product-codes`, `Durga\ProductCodes`, `DPC_*`, `dpc_*` tables, options, capabilities and role) are **historical**.
+> - For the current names, see [Plugin rename](#plugin-rename-2026-09-24) and the identifier map in the plugin README.
+> - Phase 3 has since been committed as `a2e5643`.
 
 ### Phase 2: Plugin foundation and data layer (2026-09-24)
 
@@ -352,10 +366,102 @@ ProductCodeService::get_or_create( item, user )
 
 **Next phase (not started):** Phase 4, QR and barcode. **The production domain is still not final**, so any URL encoded in a QR code must not be printed yet.
 
+### Plugin rename (2026-09-24)
+
+**Status:** done and tested. The renamed plugin is **active**. **Not committed**; this is waiting for the user's approval. Phase 3 was committed first, as a separate commit `a2e5643`, and pushed.
+
+**What changed:** "Durga Product Codes" became **"Product QR Code and Barcode Generator"**. This is a rename only; there are no functional changes.
+
+| Kind | Before | After |
+|---|---|---|
+| Folder / main file | `durga-product-codes/durga-product-codes.php` | `product-qrcode-barcode-generator/product-qrcode-barcode-generator.php` (moved with `git mv`, so history is kept) |
+| Text domain, log source | `durga-product-codes` | `product-qrcode-barcode-generator` |
+| Namespace | `Durga\ProductCodes` | `ProductQrBarcode` |
+| Constants | `DPC_*`, incl. `DPC_UNINSTALL_DELETE_ALL_DATA` | `PQBG_*`, incl. `PQBG_UNINSTALL_DELETE_ALL_DATA` |
+| Tables | `wp_dpc_codes`, `wp_dpc_sales` | `wp_pqbg_codes`, `wp_pqbg_sales` (identical structure) |
+| CHECK constraint | `wp_dpc_codes_active_chk` | `wp_pqbg_codes_active_chk` |
+| Options | `dpc_db_version`, `dpc_settings`, `dpc_install_lock` | `pqbg_db_version`, `pqbg_settings`, `pqbg_install_lock` |
+| Capabilities | 7 × `dpc_*` | 7 × `pqbg_*` (same role matrix) |
+| Role | `dpc_seller` "Seller" | `pqbg_seller` "Store Seller" |
+| Nonces | `dpc_<verb>`, `_dpc_nonce` | `pqbg_<verb>`, `_pqbg_nonce` |
+| `WP_Error` codes | `dpc_*` | `pqbg_*` |
+
+**Header:**
+- Added `Update URI: false`. The name is generic, and this stops WordPress from offering a same-slug wordpress.org plugin as an "update".
+- Requirements are unchanged: WordPress 6.7, PHP 8.1, `Requires Plugins: woocommerce`, WooCommerce 9.0, tested up to 11.1.
+- HPOS is still declared as `custom_order_tables`, through `PQBG_PLUGIN_FILE`.
+
+**Not changed:**
+- the `DC-XXXX-XXXX-XXXX` code format, the alphabet and the generator logic: "DC" is the store brand
+- every column, index and business rule, and `DB_VERSION` (still 1)
+- `Author: Durga Collections` and other references to the store
+
+**Files:**
+- `.gitignore`: the exception now points at the new folder. No other rule changed.
+- Every plugin PHP file (namespace, text domain and identifiers) except the three `index.php` stubs.
+- The plugin `README.md`.
+- `progress.md`.
+
+**Database and WordPress state:**
+1. Before cleanup, both `dpc_` tables were confirmed to have **0 rows**, and no user held `dpc_seller`.
+2. A one-time CLI script outside the web root, not committed, then:
+   - deactivated the old plugin
+   - dropped `wp_dpc_codes` and `wp_dpc_sales`
+   - deleted the three `dpc_` options
+   - removed the `dpc_*` capabilities from all roles and removed the `dpc_seller` role
+3. The renamed plugin was then activated normally, and its installer created the `pqbg_` schema, options and role.
+4. No legacy migration code is shipped.
+
+**Tests** (ported copies of every suite, run through PHP CLI from outside the web root, then deleted):
+- **Rename suite: 25 of 25.** It checked:
+  - the plugin is active under the new path, and the old folder is gone
+  - header values, including `Update URI: false`
+  - `PQBG_*` constants are defined and `DPC_*` constants are not
+  - the new namespace autoloads and the old one does not
+  - HPOS is compatible under the new path
+  - no `dpc` tables, options, CHECK constraint, capabilities or role remain, in roles or in user meta
+  - the exact role and capability matrix
+  - the nonce convention
+  - the `DC-` format constants are unchanged
+- **Phase 2 main suite: 80 of 80.** This includes the exact table columns, types and indexes, the CHECK constraint, and unrelated roles being unchanged against a snapshot taken before activation.
+- **Lifecycle: 16 of 16.**
+- **WooCommerce missing:** correct behaviour and admin notice. A positive-control check confirmed that the hook name it looks for is live.
+- **Phase 3: 92 of 92.**
+- **HTTP:**
+  - `/` 200, `/shop/` 200, `/wp-login.php` 200, `/wp-admin/` 302, `/scan/` 404
+  - direct requests to plugin files return empty output, and the old plugin path returns 404
+  - no PQBG REST namespace; `pqbg_seller` appears only in WooCommerce's customer-role enum
+- **Logs:** no PHP errors or notices; the Apache error log didn't grow, and neither `php_error_log` nor `debug.log` exists.
+- **Cleanup:** both tables have 0 rows with AUTO_INCREMENT at 1; 0 products; 1 user.
+
+### Locked decision for Phase 4: QR code + optional barcode
+
+_Recorded for Phase 4. It is not implemented yet, and it is not permission to start Phase 4._
+
+- **QR code: always generated.** It is the primary scan method, using a phone camera.
+- **Barcode: optional and OFF by default.**
+  - It is controlled by one admin-only setting, "Enable barcodes (for hardware scanners)".
+  - Changing that setting requires `pqbg_manage_settings`.
+- **Both encode the same product code**, so turning barcodes on later needs no regeneration.
+- **When barcodes are disabled:**
+  - no barcode is rendered anywhere
+  - no barcode library code runs
+
+**Next phase (not started):** Phase 4, QR Code + Optional Barcode. **The production domain is still not final**, so labels must not be printed yet.
+
 ### Instructions for the next Claude session
 
-- Read this file and `wp-content/plugins/durga-product-codes/README.md` first. Re-verify the environment; don't trust these notes blindly.
-- Get codes only through `ProductCodeService::get_or_create()`. Don't call `CodeRepository::create_active()` with hand-made strings, and don't write to `dpc_codes` directly.
+- Read this file and `wp-content/plugins/product-qrcode-barcode-generator/README.md` first. Re-verify the environment; don't trust these notes blindly.
+- **Current names:**
+  - plugin "Product QR Code and Barcode Generator"
+  - slug `product-qrcode-barcode-generator`
+  - namespace `ProductQrBarcode`
+  - prefix `pqbg_` / `PQBG_`
+  - role `pqbg_seller` "Store Seller"
+
+  The `dpc_`/`DPC_`/`Durga\ProductCodes` names in the Phase 2 and Phase 3 sections are pre-rename history. Never reintroduce them.
+- Get codes only through `ProductCodeService::get_or_create()`. Don't call `CodeRepository::create_active()` with hand-made strings, and don't write to `pqbg_codes` directly.
+- Phase 4 must follow the locked QR/barcode decision above.
 - Don't add product-save hooks for automatic code generation without explicit approval.
 - Nothing in this file authorizes future work. Each phase needs explicit user approval.
 - **Never commit or push without explicit approval.** No reset, rebase, amend or force-push.
@@ -392,4 +498,11 @@ ProductCodeService::get_or_create( item, user )
   - Added `CodeGenerator` and `ProductCodeService`, plus `CodeRepository::code_exists()`. No schema change and no hooks.
   - Phase 3 suite passed 92 of 92. The Phase 2 suites still pass: 80 of 80 main and 16 of 16 lifecycle.
   - Removed all test products, users, codes and Action Scheduler jobs.
+  - Not committed; waiting for approval.
+- **Plugin rename:**
+  - Committed and pushed Phase 3 as `a2e5643`, with approval.
+  - Renamed "Durga Product Codes" to "Product QR Code and Barcode Generator": `git mv` of the folder and main file, then the full identifier map (`pqbg_`/`PQBG_`, `ProductQrBarcode`, "Store Seller"). Added `Update URI: false`.
+  - Confirmed the old tables were empty, then removed the old `dpc_` state with a one-time CLI script and activated the renamed plugin.
+  - All suites pass under the new names: rename 25/25, Phase 2 80/80, lifecycle 16/16, WooCommerce-missing OK, Phase 3 92/92.
+  - Recorded the locked Phase 4 QR/barcode decision.
   - Not committed; waiting for approval.

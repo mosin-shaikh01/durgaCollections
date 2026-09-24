@@ -13,10 +13,10 @@
  * This class only produces a free code string. It never writes to the
  * database; ProductCodeService saves the code through CodeRepository.
  *
- * @package Durga\ProductCodes
+ * @package ProductQrBarcode
  */
 
-namespace Durga\ProductCodes;
+namespace ProductQrBarcode;
 
 use WP_Error;
 
@@ -134,7 +134,7 @@ final class CodeGenerator {
 			try {
 				$code = $this->generate();
 			} catch ( \Exception $e ) {
-				return new WP_Error( 'dpc_random_unavailable', __( 'A product code could not be generated.', 'durga-product-codes' ) );
+				return new WP_Error( 'pqbg_random_unavailable', __( 'A product code could not be generated.', 'product-qrcode-barcode-generator' ) );
 			}
 
 			if ( ! ( $this->is_taken )( $code ) ) {
@@ -142,6 +142,6 @@ final class CodeGenerator {
 			}
 		}
 
-		return new WP_Error( 'dpc_code_generation_failed', __( 'A unique product code could not be generated.', 'durga-product-codes' ) );
+		return new WP_Error( 'pqbg_code_generation_failed', __( 'A unique product code could not be generated.', 'product-qrcode-barcode-generator' ) );
 	}
 }

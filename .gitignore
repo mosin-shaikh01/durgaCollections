@@ -52,10 +52,10 @@ wp-content/plugins/hello.php
 # !wp-content/themes/
 # !wp-content/themes/durga-collections/
 
-# Custom plugin: Durga Product Codes (every other plugin stays ignored)
+# Custom plugin: Product QR Code and Barcode Generator (every other plugin stays ignored)
 !wp-content/plugins/
 wp-content/plugins/*
-!wp-content/plugins/durga-product-codes/
+!wp-content/plugins/product-qrcode-barcode-generator/
 
 # ---- OS / editor cruft ----
 Thumbs.db

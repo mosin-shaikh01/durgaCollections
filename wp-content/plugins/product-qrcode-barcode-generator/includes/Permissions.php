@@ -5,15 +5,15 @@
  * admin handlers, etc.). Never use __return_true for privileged endpoints.
  *
  * Nonce convention for later phases:
- *   action: self::nonce_action( 'void_sale' )  =>  "dpc_void_sale"
- *   field:  self::NONCE_FIELD                 =>  "_dpc_nonce"
+ *   action: self::nonce_action( 'void_sale' )  =>  "pqbg_void_sale"
+ *   field:  self::NONCE_FIELD                 =>  "_pqbg_nonce"
  *   verify with check_admin_referer()/wp_verify_nonce() AND a capability check.
  *   REST requests use the core `wp_rest` nonce plus a capability check.
  *
- * @package Durga\ProductCodes
+ * @package ProductQrBarcode
  */
 
-namespace Durga\ProductCodes;
+namespace ProductQrBarcode;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -22,17 +22,17 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Permissions {
 
-	const VIEW_PRODUCTS   = 'dpc_view_products';
-	const SELL            = 'dpc_sell';
-	const VIEW_OWN_SALES  = 'dpc_view_own_sales';
-	const VIEW_ALL_SALES  = 'dpc_view_all_sales';
-	const VOID_SALE       = 'dpc_void_sale';
-	const MANAGE_CODES    = 'dpc_manage_codes';
-	const MANAGE_SETTINGS = 'dpc_manage_settings';
+	const VIEW_PRODUCTS   = 'pqbg_view_products';
+	const SELL            = 'pqbg_sell';
+	const VIEW_OWN_SALES  = 'pqbg_view_own_sales';
+	const VIEW_ALL_SALES  = 'pqbg_view_all_sales';
+	const VOID_SALE       = 'pqbg_void_sale';
+	const MANAGE_CODES    = 'pqbg_manage_codes';
+	const MANAGE_SETTINGS = 'pqbg_manage_settings';
 
-	const SELLER_ROLE = 'dpc_seller';
+	const SELLER_ROLE = 'pqbg_seller';
 
-	const NONCE_FIELD = '_dpc_nonce';
+	const NONCE_FIELD = '_pqbg_nonce';
 
 	/**
 	 * Every capability this plugin owns.
@@ -52,7 +52,7 @@ final class Permissions {
 	}
 
 	/**
-	 * DPC capabilities granted per role. Roles not listed here are never touched.
+	 * PQBG capabilities granted per role. Roles not listed here are never touched.
 	 *
 	 * @return array<string, string[]>
 	 */
@@ -69,15 +69,15 @@ final class Permissions {
 	}
 
 	/**
-	 * Creates the Seller role if missing and reconciles DPC capabilities on the mapped roles.
+	 * Creates the Seller role if missing and reconciles PQBG capabilities on the mapped roles.
 	 *
-	 * Only dpc_* capabilities are added or removed; every other capability on
+	 * Only pqbg_* capabilities are added or removed; every other capability on
 	 * every role is left exactly as it is. Safe to run repeatedly.
 	 */
 	public static function sync_roles(): void {
 		if ( ! get_role( self::SELLER_ROLE ) ) {
-			// Seller gets `read` (log in / profile) and nothing else outside DPC.
-			add_role( self::SELLER_ROLE, 'Seller', array( 'read' => true ) );
+			// Seller gets `read` (log in / profile) and nothing else outside PQBG.
+			add_role( self::SELLER_ROLE, 'Store Seller', array( 'read' => true ) );
 		}
 
 		foreach ( self::role_map() as $role_name => $granted ) {
@@ -101,7 +101,7 @@ final class Permissions {
 	}
 
 	/**
-	 * Removes every dpc_* capability from all roles and deletes the Seller role.
+	 * Removes every pqbg_* capability from all roles and deletes the Seller role.
 	 * Only called from uninstall.php when data deletion is explicitly enabled.
 	 */
 	public static function remove_all(): void {
@@ -117,12 +117,12 @@ final class Permissions {
 	}
 
 	/**
-	 * Nonce action name for a future DPC operation, e.g. "dpc_void_sale".
+	 * Nonce action name for a future PQBG operation, e.g. "pqbg_void_sale".
 	 *
 	 * @param string $verb Operation name.
 	 */
 	public static function nonce_action( string $verb ): string {
-		return 'dpc_' . sanitize_key( $verb );
+		return 'pqbg_' . sanitize_key( $verb );
 	}
 
 	/**
@@ -189,7 +189,7 @@ final class Permissions {
 	/**
 	 * Capability check for the current user or a specific user. Logged-out users always fail.
 	 *
-	 * @param string   $cap     DPC capability.
+	 * @param string   $cap     PQBG capability.
 	 * @param int|null $user_id User ID, or null for the current user.
 	 */
 	private static function user_can( string $cap, ?int $user_id ): bool {

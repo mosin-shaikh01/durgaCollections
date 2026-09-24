@@ -2,10 +2,10 @@
 /**
  * Runtime bootstrap and settings access.
  *
- * @package Durga\ProductCodes
+ * @package ProductQrBarcode
  */
 
-namespace Durga\ProductCodes;
+namespace ProductQrBarcode;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Plugin {
 
-	const SETTINGS_OPTION = 'dpc_settings';
+	const SETTINGS_OPTION = 'pqbg_settings';
 
 	/**
 	 * Runs on `plugins_loaded`. Does nothing beyond an admin notice when requirements are unmet.
@@ -34,7 +34,7 @@ final class Plugin {
 	 * Loads translations from the plugin's languages directory.
 	 */
 	public static function load_textdomain(): void {
-		load_plugin_textdomain( 'durga-product-codes', false, dirname( plugin_basename( DPC_PLUGIN_FILE ) ) . '/languages' );
+		load_plugin_textdomain( 'product-qrcode-barcode-generator', false, dirname( plugin_basename( PQBG_PLUGIN_FILE ) ) . '/languages' );
 	}
 
 	/**

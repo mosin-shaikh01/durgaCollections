@@ -9,10 +9,10 @@
  *      additive changes, then any data transforms guarded so re-running is safe.
  * Migrations never drop tables or delete rows.
  *
- * @package Durga\ProductCodes
+ * @package ProductQrBarcode
  */
 
-namespace Durga\ProductCodes;
+namespace ProductQrBarcode;
 
 use WP_Error;
 
@@ -26,8 +26,8 @@ final class Install {
 	/** Current schema version. Must equal the highest key in migrations(). */
 	const DB_VERSION = 1;
 
-	const DB_VERSION_OPTION = 'dpc_db_version';
-	const LOCK_OPTION       = 'dpc_install_lock';
+	const DB_VERSION_OPTION = 'pqbg_db_version';
+	const LOCK_OPTION       = 'pqbg_install_lock';
 
 	/** Seconds after which an abandoned lock (crashed request) may be taken over. */
 	const LOCK_TTL = 300;
@@ -51,8 +51,8 @@ final class Install {
 	public static function activate( $network_wide = false ): void {
 		if ( is_multisite() && $network_wide ) {
 			wp_die(
-				esc_html__( 'Durga Product Codes cannot be network activated. Activate it on each site individually.', 'durga-product-codes' ),
-				esc_html__( 'Plugin activation failed', 'durga-product-codes' ),
+				esc_html__( 'Product QR Code and Barcode Generator cannot be network activated. Activate it on each site individually.', 'product-qrcode-barcode-generator' ),
+				esc_html__( 'Plugin activation failed', 'product-qrcode-barcode-generator' ),
 				array( 'back_link' => true )
 			);
 		}
@@ -62,7 +62,7 @@ final class Install {
 		if ( array() !== $errors ) {
 			wp_die(
 				'<p>' . implode( '</p><p>', array_map( 'esc_html', $errors ) ) . '</p>',
-				esc_html__( 'Plugin activation failed', 'durga-product-codes' ),
+				esc_html__( 'Plugin activation failed', 'product-qrcode-barcode-generator' ),
 				array( 'back_link' => true )
 			);
 		}
@@ -72,7 +72,7 @@ final class Install {
 		if ( is_wp_error( $result ) ) {
 			wp_die(
 				esc_html( $result->get_error_message() ),
-				esc_html__( 'Plugin activation failed', 'durga-product-codes' ),
+				esc_html__( 'Plugin activation failed', 'product-qrcode-barcode-generator' ),
 				array( 'back_link' => true )
 			);
 		}
@@ -98,8 +98,8 @@ final class Install {
 		$result = self::install();
 
 		// A held lock means another request is already upgrading; it is not an error.
-		if ( is_wp_error( $result ) && 'dpc_install_locked' !== $result->get_error_code() && function_exists( 'wc_get_logger' ) ) {
-			wc_get_logger()->error( 'Upgrade failed: ' . $result->get_error_message(), array( 'source' => 'durga-product-codes' ) );
+		if ( is_wp_error( $result ) && 'pqbg_install_locked' !== $result->get_error_code() && function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->error( 'Upgrade failed: ' . $result->get_error_message(), array( 'source' => 'product-qrcode-barcode-generator' ) );
 		}
 	}
 
@@ -112,7 +112,7 @@ final class Install {
 		$token = self::acquire_lock();
 
 		if ( false === $token ) {
-			return new WP_Error( 'dpc_install_locked', __( 'Another Durga Product Codes installation or upgrade is in progress. Try again in a few minutes.', 'durga-product-codes' ) );
+			return new WP_Error( 'pqbg_install_locked', __( 'Another Product QR Code and Barcode Generator installation or upgrade is in progress. Try again in a few minutes.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		try {
@@ -143,14 +143,14 @@ final class Install {
 
 			return true;
 		} catch ( \Throwable $e ) {
-			return new WP_Error( 'dpc_install_exception', $e->getMessage() );
+			return new WP_Error( 'pqbg_install_exception', $e->getMessage() );
 		} finally {
 			self::release_lock( $token );
 		}
 	}
 
 	/**
-	 * Schema version 1: initial dpc_codes and dpc_sales tables.
+	 * Schema version 1: initial pqbg_codes and pqbg_sales tables.
 	 *
 	 * @return true|WP_Error
 	 */
@@ -160,7 +160,7 @@ final class Install {
 		Schema::create_or_update();
 
 		if ( ! Schema::tables_exist() ) {
-			return new WP_Error( 'dpc_schema_failed', __( 'Durga Product Codes could not create its database tables.', 'durga-product-codes' ) . ' ' . $wpdb->last_error );
+			return new WP_Error( 'pqbg_schema_failed', __( 'Product QR Code and Barcode Generator could not create its database tables.', 'product-qrcode-barcode-generator' ) . ' ' . $wpdb->last_error );
 		}
 
 		// Defence in depth only; CodeRepository enforces the invariant on every server.

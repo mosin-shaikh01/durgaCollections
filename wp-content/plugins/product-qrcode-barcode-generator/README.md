@@ -1,4 +1,4 @@
-# Durga Product Codes
+# Product QR Code and Barcode Generator
 
 WooCommerce plugin for Durga Collections: product QR/barcode inventory for our own shop staff ("sellers").
 Staff scan a product's code, see live WooCommerce product information, and mark it sold. Stock updates automatically and every sale is logged.
@@ -11,8 +11,8 @@ Implemented:
 
 - plugin bootstrap, PSR-4-style autoloader, requirement checks with an admin notice
 - activation, deactivation and uninstall handling
-- `dpc_codes` and `dpc_sales` tables, versioned migrations and an install lock
-- the Seller role and DPC capabilities, with a central `Permissions` class
+- `pqbg_codes` and `pqbg_sales` tables, versioned migrations and an install lock
+- the Store Seller role (`pqbg_seller`) and PQBG capabilities, with a central `Permissions` class
 - `CodeRepository`, which enforces one active code per item in the application layer
 - WooCommerce HPOS compatibility declaration
 - **Phase 3:** `CodeGenerator`, which produces secure random codes, and `ProductCodeService`, which checks product eligibility and assigns codes. See [Product codes](#product-codes).
@@ -20,6 +20,46 @@ Implemented:
 **Not implemented yet (later phases):** QR and barcode rendering, `/scan/` URLs and scan pages, login redirect flow, product screen, Mark-as-Sold, stock decrement, sales history and void UI, seller dashboard, label printing, CSV import/export, bulk generation and bulk tools, product admin UI and metaboxes, product lifecycle hooks (automatic code assignment), code regeneration/replacement, REST/AJAX endpoints, shortcodes and templates.
 
 The plugin adds **no** public endpoints of any kind. Phase 3 code is a PHP service layer only. No hook, screen or endpoint calls it yet.
+
+## Locked decision for Phase 4: QR code and optional barcode
+
+_Recorded before Phase 4 starts. None of this is implemented yet._
+
+- **QR code: always generated.** It is the primary scan method, using a phone camera.
+- **Barcode: optional and OFF by default.**
+  - It is controlled by one admin-only setting, "Enable barcodes (for hardware scanners)".
+  - Changing that setting requires `pqbg_manage_settings`.
+- **Both encode the same product code** (`DC-XXXX-XXXX-XXXX`), so turning barcodes on later needs no code regeneration.
+- **When barcodes are disabled:**
+  - no barcode is rendered anywhere
+  - no barcode library code runs
+
+## Naming and the rename
+
+This plugin was developed as **"Durga Product Codes"** and was renamed before its first real use. The name is generic, so the header sets `Update URI: false`. That stops WordPress from ever offering a wordpress.org plugin with the same slug as an update that would overwrite this one.
+
+There is **no legacy migration code**. The old tables held no data, so they were removed with a one-time CLI script that was not committed, and the renamed plugin rebuilt its schema through the normal installer.
+
+| Kind | Before | After |
+|---|---|---|
+| Display name | Durga Product Codes | Product QR Code and Barcode Generator |
+| Folder / main file | `durga-product-codes/durga-product-codes.php` | `product-qrcode-barcode-generator/product-qrcode-barcode-generator.php` |
+| Text domain, log source | `durga-product-codes` | `product-qrcode-barcode-generator` |
+| PHP namespace | `Durga\ProductCodes` | `ProductQrBarcode` |
+| Constants | `DPC_VERSION`, `DPC_PLUGIN_FILE`, `DPC_PLUGIN_DIR`, `DPC_PLUGIN_URL`, `DPC_UNINSTALL_DELETE_ALL_DATA` | `PQBG_VERSION`, `PQBG_PLUGIN_FILE`, `PQBG_PLUGIN_DIR`, `PQBG_PLUGIN_URL`, `PQBG_UNINSTALL_DELETE_ALL_DATA` |
+| Tables | `{prefix}dpc_codes`, `{prefix}dpc_sales` | `{prefix}pqbg_codes`, `{prefix}pqbg_sales` (identical structure) |
+| CHECK constraint | `{prefix}dpc_codes_active_chk` | `{prefix}pqbg_codes_active_chk` |
+| Options | `dpc_db_version`, `dpc_settings`, `dpc_install_lock` | `pqbg_db_version`, `pqbg_settings`, `pqbg_install_lock` |
+| Capabilities | `dpc_view_products`, `dpc_sell`, `dpc_view_own_sales`, `dpc_view_all_sales`, `dpc_void_sale`, `dpc_manage_codes`, `dpc_manage_settings` | the same seven with the `pqbg_` prefix, and the same role matrix |
+| Role | `dpc_seller` ("Seller") | `pqbg_seller` ("Store Seller") |
+| Nonces | action `dpc_<verb>`, field `_dpc_nonce` | action `pqbg_<verb>`, field `_pqbg_nonce` |
+| `WP_Error` codes | `dpc_*` | `pqbg_*` |
+
+**Not renamed:**
+- the product code format `DC-XXXX-XXXX-XXXX`: "DC" is the store brand, Durga Collections
+- the alphabet and all generator logic
+- every column, index and business rule, and `DB_VERSION` (still 1)
+- `Author: Durga Collections` and other references to the store
 
 ## Product codes
 
@@ -47,7 +87,7 @@ DC-XXXX-XXXX-XXXX        e.g. DC-7K4M-9P2X-Q8RT
 - Every character is picked with PHP's `random_int()`, a CSPRNG, as an index into the alphabet.
 - No product data (ID, SKU, name), timestamp, `rand()`/`mt_rand()`/`uniqid()`/`microtime()` or hash of predictable values is involved.
 - `generate()` takes no input, so a code can't be derived from the product it is assigned to.
-- If the random source fails, the result is a controlled `WP_Error` (`dpc_random_unavailable`), never a weaker fallback.
+- If the random source fails, the result is a controlled `WP_Error` (`pqbg_random_unavailable`), never a weaker fallback.
 
 ### Product eligibility
 
@@ -62,7 +102,7 @@ A code identifies the **purchasable item**.
 | External/affiliate product | No | — |
 | Variation whose parent is missing or not variable | No | — |
 | Any other or custom product type | No. Nothing unsupported gets a code silently. | — |
-| ID that is not a WooCommerce product | No (`dpc_invalid_product`) | — |
+| ID that is not a WooCommerce product | No (`pqbg_invalid_product`) | — |
 
 The product type is resolved through `wc_get_product()` and `WC_Product::is_type()`, not raw post data.
 
@@ -73,33 +113,33 @@ The product type is resolved through `wc_get_product()` and `WC_Product::is_type
 ### Assigning a code
 
 ```php
-use Durga\ProductCodes\ProductCodeService;
+use ProductQrBarcode\ProductCodeService;
 
 $row = ( new ProductCodeService() )->get_or_create( $product_or_variation_id, get_current_user_id() );
-// array (the dpc_codes row) on success, WP_Error otherwise.
+// array (the pqbg_codes row) on success, WP_Error otherwise.
 ```
 
-- **Authorization.** The acting `$user_id` must have `dpc_manage_codes` (Shop Manager, Administrator). Otherwise the call returns `dpc_forbidden`. The check uses the user passed in, not the current user.
+- **Authorization.** The acting `$user_id` must have `pqbg_manage_codes` (Shop Manager, Administrator). Otherwise the call returns `pqbg_forbidden`. The check uses the user passed in, not the current user.
 - **Idempotent.** If the item already has an active code, that row is returned unchanged. No new code is generated and no second active code is created.
-- **Eligibility** errors are `dpc_invalid_product` and `dpc_ineligible_product`. Nothing is written.
+- **Eligibility** errors are `pqbg_invalid_product` and `pqbg_ineligible_product`. Nothing is written.
 - All persistence goes through `CodeRepository::create_active()`. The generator and service contain no SQL.
-- The code is stored only in `dpc_codes.code`, never in product meta, options or order data.
+- The code is stored only in `pqbg_codes.code`, never in product meta, options or order data.
 
 Phase 3 registers **no hooks**. Codes are not created automatically on product save or creation. A caller (the Phase 5 admin screens, or bulk tools later) must request them explicitly.
 
 ### Uniqueness and collision handling
 
-Codes are globally unique across the whole `dpc_codes` table, including retired codes. Three layers enforce this:
+Codes are globally unique across the whole `pqbg_codes` table, including retired codes. Three layers enforce this:
 
 1. **Random generation.** A single collision is extremely unlikely.
-2. **Pre-insert check.** `CodeGenerator::generate_unique()` asks `CodeRepository::code_exists()`, which counts both active and retired codes. On a collision it draws a new candidate. It stops after `CodeGenerator::MAX_ATTEMPTS = 10` and returns `dpc_code_generation_failed`.
+2. **Pre-insert check.** `CodeGenerator::generate_unique()` asks `CodeRepository::code_exists()`, which counts both active and retired codes. On a collision it draws a new candidate. It stops after `CodeGenerator::MAX_ATTEMPTS = 10` and returns `pqbg_code_generation_failed`.
    - Why 10: even with a million stored codes, one candidate collides with probability about 1.3 × 10⁻¹². Ten collisions in a row means a broken random source or bad data. Failing loudly is safer than looping.
-3. **`UNIQUE(code)` in the database.** This is the final authority. The check-then-insert sequence can race with another request. If the insert hits the unique index, `create_active()` rolls back and returns `dpc_code_conflict`. The service then:
+3. **`UNIQUE(code)` in the database.** This is the final authority. The check-then-insert sequence can race with another request. If the insert hits the unique index, `create_active()` rolls back and returns `pqbg_code_conflict`. The service then:
    - uses the active code another request just assigned to the same item, if there is one
    - otherwise retries with a fresh code, at most `ProductCodeService::MAX_SAVE_ATTEMPTS = 3` times
-   - if it still fails, returns `dpc_code_generation_failed`
+   - if it still fails, returns `pqbg_code_generation_failed`
 
-A failed generation writes no row, never reuses an existing code and never changes other records. It is logged to the WooCommerce logger (source `durga-product-codes`) with the error code only.
+A failed generation writes no row, never reuses an existing code and never changes other records. It is logged to the WooCommerce logger (source `product-qrcode-barcode-generator`) with the error code only.
 
 The column collation (`utf8mb4_unicode_520_ci`) is case-insensitive, so a lowercase copy of an existing code is also rejected.
 
@@ -110,7 +150,7 @@ The column collation (`utf8mb4_unicode_520_ci`) is case-insensitive, so a lowerc
 - After `CodeRepository::retire()`, the next `get_or_create()` for that item generates a **new** code.
 - There is no `orphaned` status.
 
-**Regeneration is deferred.** An atomic "replace code" operation (retire the old code and create the new one in a single transaction, behind `dpc_manage_codes`) is not needed until codes can be managed in the admin area. It belongs to Phase 5. Until then, retire followed by `get_or_create()` is the only path.
+**Regeneration is deferred.** An atomic "replace code" operation (retire the old code and create the new one in a single transaction, behind `pqbg_manage_codes`) is not needed until codes can be managed in the admin area. It belongs to Phase 5. Until then, retire followed by `get_or_create()` is the only path.
 
 ### Code map
 
@@ -134,16 +174,16 @@ If WooCommerce is later deactivated, this plugin does nothing except show an adm
 
 ## Installation
 
-1. Copy the plugin to `wp-content/plugins/durga-product-codes/`.
+1. Copy the plugin to `wp-content/plugins/product-qrcode-barcode-generator/`.
 2. Activate it under **Plugins**. Network activation on multisite is refused; activate it per site.
 
-Activation creates or updates the tables, runs pending migrations, creates `dpc_settings` and syncs roles and capabilities. It is safe to run repeatedly.
+Activation creates or updates the tables, runs pending migrations, creates `pqbg_settings` and syncs roles and capabilities. It is safe to run repeatedly.
 
 ## Database
 
 Tables use `$wpdb->prefix`. They are created with `dbDelta()` from `includes/Schema.php`, and all timestamps are UTC (`*_gmt`).
 
-### `{prefix}dpc_codes`
+### `{prefix}pqbg_codes`
 
 One row per code ever issued. Rows are retired, never deleted.
 
@@ -165,14 +205,14 @@ Indexes: `code` (unique), `active_product_id` (unique), `product_status (product
 
 1. **`CodeRepository`, in the application.** It rejects a second active code and retires by clearing `active_product_id` in the same UPDATE. It deliberately has no "reactivate", so a retired code can never become active again. Replacing a code means retiring it and creating a new one.
 2. **`UNIQUE(active_product_id)`.** InnoDB allows any number of NULLs, so this allows at most one active row per item.
-3. **CHECK constraint `{prefix}dpc_codes_active_chk`, where the server supports it** (MariaDB 10.2+, MySQL 8.0.16+). Active product rows must have `active_product_id = product_id`; all other rows must have NULL. It is added by migration 1 if missing and skipped quietly on servers that don't support it.
+3. **CHECK constraint `{prefix}pqbg_codes_active_chk`, where the server supports it** (MariaDB 10.2+, MySQL 8.0.16+). Active product rows must have `active_product_id = product_id`; all other rows must have NULL. It is added by migration 1 if missing and skipped quietly on servers that don't support it.
 
-### `{prefix}dpc_sales`
+### `{prefix}pqbg_sales`
 
 The future Mark-as-Sold ledger. It is empty in Phase 2.
 
 `product_id` and `variation_id` follow WooCommerce's order-item convention: `product_id` is the simple product or the variation's parent, and `variation_id` is the variation (`0` for simple products).
-Note that this differs from `dpc_codes.product_id`, which is the purchasable item itself.
+Note that this differs from `pqbg_codes.product_id`, which is the purchasable item itself.
 
 Main columns:
 
@@ -199,15 +239,15 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 
 | Option | Autoload | Purpose |
 |---|---|---|
-| `dpc_db_version` | yes | integer schema version (currently `1`) |
-| `dpc_settings` | no | settings array; read via `Plugin::settings()` (defaults merged with `wp_parse_args`, unknown keys dropped) |
-| `dpc_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
+| `pqbg_db_version` | yes | integer schema version (currently `1`) |
+| `pqbg_settings` | no | settings array; read via `Plugin::settings()` (defaults merged with `wp_parse_args`, unknown keys dropped) |
+| `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 
 ## Migrations
 
 `Install::migrations()` maps each target version to a callback.
 
-- On every boot, `Install::maybe_upgrade()` runs any migration newer than `dpc_db_version`, in order.
+- On every boot, `Install::maybe_upgrade()` runs any migration newer than `pqbg_db_version`, in order.
 - The stored version moves forward only after each migration succeeds.
 - If the stored version is newer than the code, nothing runs (no downgrade).
 - If the tables are missing but a version is stored, the schema is rebuilt from migration 1.
@@ -226,20 +266,20 @@ The lock is released in a `finally` block, using a compare-and-delete on its own
 
 ## Capabilities
 
-| Capability | Seller (`dpc_seller`) | Shop Manager | Administrator |
+| Capability | Store Seller (`pqbg_seller`) | Shop Manager | Administrator |
 |---|:-:|:-:|:-:|
-| `dpc_view_products` | ✔ | ✔ | ✔ |
-| `dpc_sell` | ✔ | ✔ | ✔ |
-| `dpc_view_own_sales` | ✔ | ✔ | ✔ |
-| `dpc_view_all_sales` | | ✔ | ✔ |
-| `dpc_void_sale` | | ✔ | ✔ |
-| `dpc_manage_codes` | | ✔ | ✔ |
-| `dpc_manage_settings` | | | ✔ |
+| `pqbg_view_products` | ✔ | ✔ | ✔ |
+| `pqbg_sell` | ✔ | ✔ | ✔ |
+| `pqbg_view_own_sales` | ✔ | ✔ | ✔ |
+| `pqbg_view_all_sales` | | ✔ | ✔ |
+| `pqbg_void_sale` | | ✔ | ✔ |
+| `pqbg_manage_codes` | | ✔ | ✔ |
+| `pqbg_manage_settings` | | | ✔ |
 
-The Seller role also has `read`. It has nothing else: no `edit_products`, `manage_woocommerce` or `edit_posts`.
+The Store Seller role also has `read`. It has nothing else: no `edit_products`, `manage_woocommerce` or `edit_posts`.
 
-Role sync (`Permissions::sync_roles()`) only adds or removes `dpc_*` capabilities, and only on these three roles. Every other capability is left untouched.
-WooCommerce only lets Shop Managers assign the `customer` role, so only Administrators can make someone a Seller.
+Role sync (`Permissions::sync_roles()`) only adds or removes `pqbg_*` capabilities, and only on these three roles. Every other capability is left untouched.
+WooCommerce only lets Shop Managers assign the `customer` role, so only Administrators can make someone a Store Seller.
 
 ### Rules for later phases
 
@@ -247,8 +287,8 @@ WooCommerce only lets Shop Managers assign the `customer` role, so only Administ
 - A REST `permission_callback` must use them. Never use `__return_true` for privileged routes.
 - Logged-out users must never receive product or sales data.
 - Nonces:
-  - action: `Permissions::nonce_action( 'verb_object' )`, which gives `dpc_verb_object`
-  - field: `_dpc_nonce`
+  - action: `Permissions::nonce_action( 'verb_object' )`, which gives `pqbg_verb_object`
+  - field: `_pqbg_nonce`
   - REST requests use the core `wp_rest` nonce
   - A nonce check is always paired with a capability check.
 - `CodeRepository` does not check capabilities itself. Callers must check `Permissions::can_manage_codes()` first.
@@ -264,15 +304,15 @@ Deactivation is non-destructive. Tables, codes, sales, settings, the role and ca
 
 ## Uninstall
 
-**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only the transient install lock. Tables, sales history, product codes, options, the Seller role and capabilities remain, and reinstalling picks them up again.
+**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only the transient install lock. Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
 
 To permanently delete all plugin data, add this to `wp-config.php` **before** deleting the plugin:
 
 ```php
-define( 'DPC_UNINSTALL_DELETE_ALL_DATA', true );
+define( 'PQBG_UNINSTALL_DELETE_ALL_DATA', true );
 ```
 
-This drops `dpc_codes` and `dpc_sales`, deletes `dpc_settings` and `dpc_db_version`, removes every `dpc_*` capability, and deletes the Seller role. Affected users keep their accounts.
+This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_version`, removes every `pqbg_*` capability, and deletes the Store Seller role. Affected users keep their accounts.
 **This cannot be undone. Back up the database first.** On multisite, only the site running the uninstall is affected.
 
 ## Operational notes

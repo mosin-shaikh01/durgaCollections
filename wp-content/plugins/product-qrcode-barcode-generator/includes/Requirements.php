@@ -5,10 +5,10 @@
  * Kept free of newer PHP syntax so it can still report a too-old PHP version
  * instead of failing to parse.
  *
- * @package Durga\ProductCodes
+ * @package ProductQrBarcode
  */
 
-namespace Durga\ProductCodes;
+namespace ProductQrBarcode;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,19 +33,19 @@ class Requirements {
 
 		if ( version_compare( PHP_VERSION, self::MIN_PHP, '<' ) ) {
 			/* translators: 1: required PHP version, 2: current PHP version. */
-			$errors[] = sprintf( __( 'Durga Product Codes requires PHP %1$s or newer. This site runs PHP %2$s.', 'durga-product-codes' ), self::MIN_PHP, PHP_VERSION );
+			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires PHP %1$s or newer. This site runs PHP %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_PHP, PHP_VERSION );
 		}
 
 		if ( version_compare( $wp_version, self::MIN_WP, '<' ) ) {
 			/* translators: 1: required WordPress version, 2: current WordPress version. */
-			$errors[] = sprintf( __( 'Durga Product Codes requires WordPress %1$s or newer. This site runs WordPress %2$s.', 'durga-product-codes' ), self::MIN_WP, $wp_version );
+			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires WordPress %1$s or newer. This site runs WordPress %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_WP, $wp_version );
 		}
 
 		if ( ! self::woocommerce_version() ) {
-			$errors[] = __( 'Durga Product Codes requires WooCommerce to be installed and active.', 'durga-product-codes' );
+			$errors[] = __( 'Product QR Code and Barcode Generator requires WooCommerce to be installed and active.', 'product-qrcode-barcode-generator' );
 		} elseif ( version_compare( self::woocommerce_version(), self::MIN_WC, '<' ) ) {
 			/* translators: 1: required WooCommerce version, 2: current WooCommerce version. */
-			$errors[] = sprintf( __( 'Durga Product Codes requires WooCommerce %1$s or newer. This site runs WooCommerce %2$s.', 'durga-product-codes' ), self::MIN_WC, self::woocommerce_version() );
+			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires WooCommerce %1$s or newer. This site runs WooCommerce %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_WC, self::woocommerce_version() );
 		}
 
 		return $errors;
@@ -90,7 +90,7 @@ class Requirements {
 			return;
 		}
 
-		echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Durga Product Codes is inactive.', 'durga-product-codes' ) . '</strong></p><ul>';
+		echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Product QR Code and Barcode Generator is inactive.', 'product-qrcode-barcode-generator' ) . '</strong></p><ul>';
 		foreach ( $errors as $error ) {
 			echo '<li>' . esc_html( $error ) . '</li>';
 		}

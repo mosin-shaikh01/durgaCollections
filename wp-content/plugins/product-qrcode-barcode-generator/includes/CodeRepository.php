@@ -1,6 +1,6 @@
 <?php
 /**
- * Data access for dpc_codes, enforcing the one-active-code-per-item invariant
+ * Data access for pqbg_codes, enforcing the one-active-code-per-item invariant
  * in the application layer. The UNIQUE(active_product_id) index and the
  * optional CHECK constraint are defence in depth behind these rules:
  *
@@ -15,10 +15,10 @@
  * It does not generate codes or validate WooCommerce product types either:
  * CodeGenerator produces codes and ProductCodeService decides eligibility.
  *
- * @package Durga\ProductCodes
+ * @package ProductQrBarcode
  */
 
-namespace Durga\ProductCodes;
+namespace ProductQrBarcode;
 
 use WP_Error;
 
@@ -128,11 +128,11 @@ final class CodeRepository {
 		$code = self::normalize_code( $code );
 
 		if ( '' === $code ) {
-			return new WP_Error( 'dpc_invalid_code', __( 'Invalid product code format.', 'durga-product-codes' ) );
+			return new WP_Error( 'pqbg_invalid_code', __( 'Invalid product code format.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		if ( $product_id <= 0 || $parent_id < 0 || $parent_id === $product_id || $user_id < 0 ) {
-			return new WP_Error( 'dpc_invalid_item', __( 'Invalid product reference.', 'durga-product-codes' ) );
+			return new WP_Error( 'pqbg_invalid_item', __( 'Invalid product reference.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		$table = Schema::codes_table();
@@ -144,7 +144,7 @@ final class CodeRepository {
 
 		if ( null !== $existing ) {
 			$wpdb->query( 'ROLLBACK' );
-			return new WP_Error( 'dpc_active_code_exists', __( 'This item already has an active product code.', 'durga-product-codes' ) );
+			return new WP_Error( 'pqbg_active_code_exists', __( 'This item already has an active product code.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		$suppress = $wpdb->suppress_errors( true );
@@ -167,7 +167,7 @@ final class CodeRepository {
 		if ( false === $inserted ) {
 			$wpdb->query( 'ROLLBACK' );
 			// Unique index on code or active_product_id caught a duplicate/race.
-			return new WP_Error( 'dpc_code_conflict', __( 'The product code could not be saved because it conflicts with an existing code.', 'durga-product-codes' ) );
+			return new WP_Error( 'pqbg_code_conflict', __( 'The product code could not be saved because it conflicts with an existing code.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		$id = (int) $wpdb->insert_id;
@@ -187,7 +187,7 @@ final class CodeRepository {
 		global $wpdb;
 
 		if ( $code_id <= 0 || $user_id < 0 ) {
-			return new WP_Error( 'dpc_invalid_code_id', __( 'Invalid product code reference.', 'durga-product-codes' ) );
+			return new WP_Error( 'pqbg_invalid_code_id', __( 'Invalid product code reference.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		$table   = Schema::codes_table();
@@ -203,7 +203,7 @@ final class CodeRepository {
 		);
 
 		if ( 1 !== $updated ) {
-			return new WP_Error( 'dpc_code_not_active', __( 'The product code is not active.', 'durga-product-codes' ) );
+			return new WP_Error( 'pqbg_code_not_active', __( 'The product code is not active.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		return true;
