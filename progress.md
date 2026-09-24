@@ -28,7 +28,7 @@ _Environment re-verified 2026-09-24 at the start of Phase 2._
 
 ## Repository
 
-Branch `main`, tracking `origin/main`. Last commit `d9bb6a0`. **Phase 2 changes are uncommitted** (see Phase 2 below).
+Branch `main`, tracking `origin/main`. Phase 2 committed as `50d7e0b` and pushed to `origin/main`.
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -37,11 +37,12 @@ uploads and archives are excluded by `.gitignore`:
 .gitignore
 README.md
 progress.md
-wp-content/plugins/durga-product-codes/   (untracked until the Phase 2 commit is approved)
+wp-content/plugins/durga-product-codes/
 ```
 
 | Commit | Message |
 |---|---|
+| `50d7e0b` | Add Durga Product Codes plugin foundation (Phase 2) |
 | `d9bb6a0` | Remove installer zip and empty extraction folder |
 | `11e07fb` | Record tracking audit in progress log |
 | `094e737` | Add .gitignore and progress tracker |
@@ -90,12 +91,12 @@ It lives in `wp-content/plugins/durga-product-codes/`. The full developer docume
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Environment audit and architecture | Done (audit only, no code) |
-| **2** | **Plugin foundation and data layer** | **Implemented and tested 2026-09-24. NOT committed, NOT pushed.** |
+| **2** | **Plugin foundation and data layer** | **Done 2026-09-24. Committed `50d7e0b`, pushed.** |
 | 3 → 12 | code generation → QR/barcode → admin management → scan flow → product screen → mark sold → sales history → printing → seller dashboard → bulk tools → hardening → final QA | Not started |
 
 ### Phase 2: Plugin foundation and data layer (2026-09-24)
 
-**Status:** implemented and tested. The plugin is **active**. **Commit: not committed. Push: not pushed.** Both wait for explicit approval.
+**Status:** implemented and tested. The plugin is **active**. Committed as `50d7e0b` and pushed to `origin/main` with the user's approval (normal fast-forward, no force).
 
 **Files created** (all under `wp-content/plugins/durga-product-codes/`):
 
@@ -237,4 +238,4 @@ It lives in `wp-content/plugins/durga-product-codes/`. The full developer docume
   - Re-verified the environment. Differences from the older notes: Classic Editor and WooCommerce are active, and permalinks are already `/%postname%/`.
   - Built the plugin foundation and data layer, activated it, and ran 80 automated checks plus lifecycle, WooCommerce-missing and HTTP tests. All passed.
   - Removed all test data.
-  - Left uncommitted pending approval.
+  - With the user's approval, committed as `50d7e0b` and pushed to `origin/main`.
