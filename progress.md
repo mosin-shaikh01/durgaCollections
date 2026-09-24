@@ -31,7 +31,7 @@ _Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Pha
 Branch `main`, tracking `origin/main`.
 
 - Phase 2 was committed as `50d7e0b` and Phase 3 as `a2e5643`; both are pushed to `origin/main`.
-- **The plugin rename is done but not committed.** It is waiting for the user's approval.
+- The plugin rename was committed as `5f301be` and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -45,6 +45,7 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `5f301be` | Rename plugin to Product QR Code and Barcode Generator |
 | `a2e5643` | Phase 3: secure product code generation (CodeGenerator, ProductCodeService) |
 | `fd07308` | Record Phase 2 commit and push in progress log |
 | `50d7e0b` | Add Durga Product Codes plugin foundation (Phase 2) |
@@ -98,7 +99,7 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | 1 | Environment audit and architecture | Done (audit only, no code) |
 | **2** | **Plugin foundation and data layer** | **Done 2026-09-24. Committed `50d7e0b`, pushed.** |
 | **3** | **Secure product code generation** | **Done 2026-09-24. Committed `a2e5643`, pushed.** |
-| — | **Plugin rename** (no functional change) | **Done 2026-09-24. Not committed yet.** |
+| — | **Plugin rename** (no functional change) | **Done 2026-09-24. Committed `5f301be`, pushed.** |
 | 4 | QR code + optional barcode | Next. Not started; see the locked decision below |
 | 5 → 12 | admin code management → scan/product screen → mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
@@ -368,7 +369,7 @@ ProductCodeService::get_or_create( item, user )
 
 ### Plugin rename (2026-09-24)
 
-**Status:** done and tested. The renamed plugin is **active**. **Not committed**; this is waiting for the user's approval. Phase 3 was committed first, as a separate commit `a2e5643`, and pushed.
+**Status:** done and tested. The renamed plugin is **active**. Committed as `5f301be` and pushed to `origin/main` with the user's approval (normal fast-forward, no force). Phase 3 was committed first, as a separate commit `a2e5643`, and pushed.
 
 **What changed:** "Durga Product Codes" became **"Product QR Code and Barcode Generator"**. This is a rename only; there are no functional changes.
 
@@ -505,4 +506,4 @@ _Recorded for Phase 4. It is not implemented yet, and it is not permission to st
   - Confirmed the old tables were empty, then removed the old `dpc_` state with a one-time CLI script and activated the renamed plugin.
   - All suites pass under the new names: rename 25/25, Phase 2 80/80, lifecycle 16/16, WooCommerce-missing OK, Phase 3 92/92.
   - Recorded the locked Phase 4 QR/barcode decision.
-  - Not committed; waiting for approval.
+  - With the user's approval, committed as `5f301be` and pushed to `origin/main`.
