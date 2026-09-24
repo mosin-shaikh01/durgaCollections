@@ -36,6 +36,7 @@ progress.md
 
 | Commit | Message |
 |---|---|
+| `11e07fb` | Record tracking audit in progress log |
 | `094e737` | Add .gitignore and progress tracker |
 | `252e2d0` | first commit |
 
@@ -60,11 +61,11 @@ of `.gitignore`:
 - [x] `.gitignore` added — excludes `wp-config.php`, `.htaccess`, `*.zip`/`*.sql`, WP core, `wp-content` uploads/cache, bundled themes and plugins, OS/editor cruft, `node_modules/`, `vendor/`
 - [x] Exclusions verified with `git check-ignore` — confirmed `wp-config.php`, `wordpress-7.1.zip`, `wp-content/uploads`, `wp-admin` and `wp-includes` are genuinely ignored
 - [x] `progress.md` created and committed
+- [x] Deleted `wordpress-7.1.zip` (37 MB) from the web root — now returns 404 over HTTP
+- [x] Removed the empty leftover `wordpress/` folder
 - [x] Full tracking audit passed — `git add -A` dry run stages only intended files, recursive untracked scan returns 0, and no sensitive path appears anywhere in history
 
 ### Open items
-- [ ] Delete `wordpress-7.1.zip` (37 MB) from the web root — downloadable over HTTP (already git-ignored, but still served by Apache)
-- [ ] Remove the empty `wordpress/` folder left over from extracting the zip
 - [ ] Set permalinks (currently plain `?p=123`; `.htaccess` has an empty WordPress block, mod_rewrite is loaded)
 - [ ] Decide on theme approach — customize twentytwentyfive, use a child theme, or build custom
 
@@ -85,4 +86,5 @@ _To be filled in — site structure, pages, content, plugins._
 - Committed `.gitignore` and `progress.md`, pushed to `origin/main` (`094e737`).
 - Audited tracking before the next push: verified the tracked set, ran `git add -A --dry-run`, scanned recursively for untracked-and-unignored files (0 found), and checked the full commit history for sensitive paths (none). No corrections were needed.
 - Noted that `git check-ignore wp-content` reports the directory as unignored because the rule is `wp-content/*`, which matches contents rather than the folder — expected git behaviour, no effect on what gets staged.
-
+- Confirmed `wordpress/` was genuinely empty (0 entries including hidden files) and that `wordpress-7.1.zip` was referenced by no code or config, then deleted both.
+- Re-checked site health after deletion: homepage and login still return 200, and the zip URL now returns 404. The installer remains re-downloadable from wordpress.org if ever needed.
