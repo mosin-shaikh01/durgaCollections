@@ -572,10 +572,12 @@ try {
 	pqbg_t( 'no pqbg or /scan REST routes', ! array_filter( rest_get_server()->get_namespaces(), $hit ) && ! array_filter( array_keys( rest_get_server()->get_routes() ), fn( $r ) => $hit( $r ) || str_starts_with( $r, '/scan' ) ) );
 	pqbg_t( 'no pqbg AJAX or admin-post actions', ! array_filter( array_keys( $GLOBALS['wp_filter'] ), fn( $h ) => ( str_starts_with( $h, 'wp_ajax' ) || str_starts_with( $h, 'admin_post' ) ) && $hit( $h ) ) );
 	pqbg_t( 'no pqbg shortcodes', ! array_filter( array_keys( $GLOBALS['shortcode_tags'] ), $hit ) );
-	pqbg_t( 'no scan rewrite rules', ! array_filter( array_keys( (array) get_option( 'rewrite_rules' ) ), fn( $k ) => str_contains( $k, 'scan' ) || $hit( $k ) ) );
+	// Phase 6 added the scan route (tests/phase6-scan.php): exactly its two rules, and logged-out requests go to the login page.
+	$scan_rules = array_keys( ScanUrl::rewrite_rules( ProductQrBarcode\ScanRoute::ROUTE_VAR, ProductQrBarcode\ScanRoute::CODE_VAR ) );
+	pqbg_t( 'no scan rewrite rules other than the two Phase 6 scan rules', array() === array_diff( array_filter( array_keys( (array) get_option( 'rewrite_rules' ) ), fn( $k ) => str_contains( $k, 'scan' ) || $hit( $k ) ), $scan_rules ) );
 	$r1 = $http( 'anon', 'GET', $home . '/scan/' );
 	$r2 = $http( 'anon', 'GET', $home . '/scan/' . $codes[0] . '/' );
-	pqbg_t( '/scan/ and /scan/{CODE}/ still return 404', 404 === $r1['code'] && 404 === $r2['code'], $r1['code'] . ' ' . $r2['code'] );
+	pqbg_t( 'logged out: /scan/ and /scan/{CODE}/ redirect to the login page (Phase 6)', 302 === $r1['code'] && 302 === $r2['code'] && str_starts_with( $r2['location'], wp_login_url() ) && '' === trim( $r2['body'] ), $r1['code'] . ' ' . $r2['code'] );
 	$writes = array();
 	foreach ( array( 'QrRenderer', 'BarcodeRenderer', 'ScanUrl', 'Svg', 'Settings' ) as $class ) {
 		foreach ( token_get_all( (string) file_get_contents( PQBG_PLUGIN_DIR . "includes/{$class}.php" ) ) as $tok ) {
@@ -613,8 +615,15 @@ try {
 	pqbg_section( 'cleanup' );
 	wp_set_current_user( 0 );
 	$handles = array(); // curl handles are freed when unset (curl_close() is a deprecated no-op since PHP 8.5).
+	// Opening the Dashboard as a user who can edit posts creates a Quick Draft auto-draft owned by that
+	// user; wp_delete_user() would move it to the trash (with a revision) instead of deleting it.
+	$authored = array();
 	foreach ( $user_ids as $uid ) {
 		if ( is_int( $uid ) ) {
+			foreach ( $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_author = %d", $uid ) ) as $pid ) {
+				$authored[] = (int) $pid;
+				wp_delete_post( (int) $pid, true );
+			}
 			wp_delete_user( $uid );
 		}
 	}
@@ -630,6 +639,7 @@ try {
 	pqbg_t( 'settings restored to the exact stored value', $original === $raw_setting() );
 	pqbg_t( 'codes table back to its starting row count', $base_c === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" ) );
 	pqbg_t( 'temporary users removed', $base_user === (int) count_users()['total_users'] && ! get_user_by( 'login', 'pqbg_p4_admin' ) );
+	pqbg_t( 'no posts left by the temporary users (Dashboard auto-drafts, their revisions)', array() === $authored || 0 === (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . $wpdb->posts . ' WHERE ID IN (' . implode( ',', $authored ) . ') OR post_parent IN (' . implode( ',', $authored ) . ')' ) );
 	pqbg_t( 'temporary directory removed', ! file_exists( $tmp ) );
 	$stray = array_filter( iterator_to_array( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( dirname( __DIR__ ), FilesystemIterator::SKIP_DOTS ) ) ), fn( $f ) => in_array( strtolower( $f->getExtension() ), array( 'svg', 'png' ), true ) && ! str_contains( str_replace( '\\', '/', $f->getPathname() ), '/node_modules/' ) );
 	pqbg_t( 'no SVG/PNG files left in the plugin directory', array() === $stray );

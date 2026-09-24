@@ -354,7 +354,8 @@ try {
 	pqbg_section( 'scope' );
 	pqbg_t( 'no pqbg post meta', 0 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key LIKE '%pqbg%'" ) );
 	$opts = $wpdb->get_col( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE '%pqbg%' ORDER BY option_name" );
-	pqbg_t( 'only the two pqbg options exist', array( 'pqbg_db_version', 'pqbg_settings' ) === $opts, implode( ',', $opts ) );
+	// Phase 6 added pqbg_rewrite_version, the scan route's rewrite-rules flag. It holds no data.
+	pqbg_t( 'only the pqbg options exist: db version, settings and the Phase 6 rewrite-rules flag', array( 'pqbg_db_version', 'pqbg_rewrite_version', 'pqbg_settings' ) === $opts, implode( ',', $opts ) );
 	$forbidden = array( 'add_action', 'add_filter', 'register_rest_route', 'add_shortcode', 'wpdb', '_get', '_post', '_request', '_server', '_cookie', 'home_url', 'site_url', 'admin_url' );
 	$scan      = static function ( string $file ) use ( $forbidden ): array {
 		$found = array();
@@ -376,7 +377,9 @@ try {
 	pqbg_t( 'no pqbg or /scan/ REST routes', ! array_filter( rest_get_server()->get_namespaces(), $hit ) && ! array_filter( array_keys( rest_get_server()->get_routes() ), fn( $r ) => str_contains( $r, 'pqbg' ) || str_starts_with( $r, '/scan' ) ) );
 	pqbg_t( 'no pqbg shortcodes', ! array_filter( array_keys( $GLOBALS['shortcode_tags'] ), $hit ) );
 	pqbg_t( 'no pqbg AJAX actions', ! array_filter( array_keys( $GLOBALS['wp_filter'] ), fn( $h ) => str_starts_with( $h, 'wp_ajax' ) && $hit( $h ) ) );
-	pqbg_t( 'no pqbg or scan rewrite rules', ! array_filter( array_keys( (array) get_option( 'rewrite_rules' ) ), fn( $k ) => str_contains( $k, 'scan' ) || str_contains( $k, 'pqbg' ) ) );
+	// Phase 6 added the scan route: exactly its two rules, and no other pqbg or scan rule.
+	$scan_rules = array_keys( ProductQrBarcode\ScanUrl::rewrite_rules( ProductQrBarcode\ScanRoute::ROUTE_VAR, ProductQrBarcode\ScanRoute::CODE_VAR ) );
+	pqbg_t( 'no pqbg or scan rewrite rules other than the two Phase 6 scan rules', array() === array_diff( array_filter( array_keys( (array) get_option( 'rewrite_rules' ) ), fn( $k ) => str_contains( $k, 'scan' ) || str_contains( $k, 'pqbg' ) ), $scan_rules ) );
 	$ours = static function ( string $hook ): bool {
 		foreach ( $GLOBALS['wp_filter'][ $hook ]->callbacks ?? array() as $cbs ) {
 			foreach ( $cbs as $cb ) {

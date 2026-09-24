@@ -22,7 +22,7 @@ Repo: https://github.com/mosin-shaikh01/durgaCollections
 | Active plugins | classic-editor, woocommerce, product-qrcode-barcode-generator (Product QR Code and Barcode Generator; installed in Phase 2 under its former name) |
 | Admin user | Dev-admin |
 
-_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5. There were no differences apart from the rename itself._
+_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, and on 2026-09-25 at the start of Phase 6. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
 
 ---
 
@@ -107,8 +107,9 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | — | **Plugin rename** (no functional change) | **Done 2026-09-24. Committed `5f301be`, pushed.** |
 | **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Committed `3654086`, pushed.** |
 | **5** | **Admin code management** | **Done 2026-09-25. Committed `ff7805c`, pushed.** |
-| 6 | Scan/product screen | Next. Not started |
-| 7 → 12 | mark sold + sales → printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
+| **6** | **Scan/product screen** | **Done 2026-09-25. Not committed; waiting for approval.** |
+| 7 | Mark sold + sales | Next. Not started |
+| 8 → 12 | printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
 > **Pre-rename records.**
 >
@@ -768,11 +769,217 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
 - `CodeLifecycle::set_service()` is a test seam, PHP-only and unreachable from requests, like the injectable `CodeGenerator` from Phase 3.
 - No PHPCS run, because it isn't installed.
 
-**Open items carried to Phase 6 (scan/product screen):**
+**Open items carried to Phase 6 (scan/product screen):** _both handled in Phase 6; see below._
 - Normalise manually typed codes (trim + uppercase) before lookup. The renderers deliberately do not normalise.
 - **Define what the scan page shows when the code's product or variation is in trash, draft, pending or private.** Codes stay active in all those states per Phase 5. Do not implement before it is decided.
 
 **Next phase (not started):** Phase 6, Scan/Product Screen. **The production domain is still not final**, so labels must not be printed yet.
+
+### Phase 6: Scan / product screen (2026-09-25)
+
+**Status:** implemented and tested. The plugin stays active. **Not committed**; this is waiting for the user's approval.
+
+**Environment:** re-verified at the start. There were no differences from the notes above, apart from two facts recorded for the first time:
+- WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6, MariaDB 10.4.32, permalinks `/%postname%/`, Coming Soon on for the whole site
+- `pqbg_*` tables at 0 rows, 0 products, 1 user, `/scan/` 404
+- `blog_public = 0`, so core sitemaps are disabled
+- logged-out visitors to `/my-account/` get the Coming Soon page, not the login form; `wp-login.php` still works
+
+**Baseline before any change:** `php tests/run.php` ALL PASSED, **542 passed, 0 failed, 0 skipped**. The decoder was freshly `npm ci`'d into this session's scratchpad and used through `PQBG_DECODER`.
+
+**Approved decisions (plan review, all 8 as proposed):**
+1. **Logged-out scans go to `wp-login.php`.** Coming Soon hides the My Account form from logged-out visitors. The My Account form is supported when it is opened with `?redirect_to=<scan URL>`.
+2. **Store Sellers who log in without a destination** land on `/scan/`. This covers both `wp-login.php` and My Account.
+3. **HTTP statuses:** 200 for screens, 404 unknown code, 400 invalid, 403 no capability, 405 method.
+4. **Catch-all under `/scan/`.** The route is **inactive** under Plain or `index.php` permalinks, with only an admin notice.
+5. **Strict CSP**, and `Referrer-Policy: same-origin`.
+6. **All whitespace is removed** from typed codes, not just trimmed.
+7. **An active code whose product is missing** shows "This label is no longer valid."
+8. **The Phase 3/4/5 scope checks** that Phase 6 makes false by design are updated, following the Phase 5 precedent.
+
+**Design:**
+- **Routes:** `{home}/scan/` (entry box) and `{home}/scan/{CODE}/`, via two top rewrite rules `^scan/?$` and `^scan/(.+?)/?$`. The patterns are built in `ScanUrl::rewrite_rules()` from `ScanUrl::PATH`.
+- **Query vars:** `pqbg_scan` and `pqbg_code`.
+- **Flushing:** once on activation, and again when `PQBG_VERSION:RULES_VERSION` changes. The flag option is `pqbg_rewrite_version` (autoloaded, holds no data). The flush is soft. Deactivation removes the rules and the flag.
+- **Answered on `parse_request`**, which is before the main query, `redirect_canonical`, `template_redirect`, the theme and Coming Soon (`template_include`).
+- **Order of checks:** route available → GET/HEAD (else 405) → logged in (else 302 to `wp_login_url(canonical URL)`) → `pqbg_view_products` (else a fixed 403, no lookup) → canonical path (else 301) → entry box or status matrix.
+- **Canonical URLs** are built on this site's `home_url()` (`ScanUrl::site_url()`), not on the scan base URL setting. The label payload `ScanUrl::for_code()` is **unchanged**.
+- **Status → screen matrix:** implemented exactly as approved, in `ScanScreen::resolve()`. It reads `CodeRepository::find_by_code()`, which already returned retired rows, so no repository method was added.
+- **Standalone template** `templates/pqbg-scan.php`:
+  - no theme, no `wp_head`/`wp_footer`, no JavaScript
+  - only `assets/pqbg-scan.css`, printed with `wp_print_styles()` on scan pages
+  - the box at the top of every staff screen, with `autofocus`
+  - a Log out link on every screen
+- **Headers on every scan response** (including redirects): `Cache-Control: no-store…private`, `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a CSP with `default-src 'none'` and `frame-ancestors 'none'`. HTML pages also carry meta robots.
+- **Login filters:**
+  - `login_redirect` sends Store Sellers without a destination to `/scan/`
+  - `woocommerce_login_redirect` honours a same-host scan `redirect_to` carried on the My Account URL (the referer), and sends Store Sellers without a destination to `/scan/`
+  - Both do nothing for users without `pqbg_view_products`, or while the route is unavailable.
+- **Admin notices** (only for `pqbg_manage_settings`):
+  - Plain or `index.php` permalinks.
+  - Content whose permalink is at or below `/scan/`. The check uses the real permalink path, so `/product-category/scan/` is not flagged.
+- **File names avoid "/scan":** the stylesheet and template are named `pqbg-scan.*` because the Phase 4 guard "no scan path literal outside `ScanUrl`" matches `/scan\b` in any string.
+
+**Files created** (plugin-relative):
+- `includes/ScanRoute.php`, `includes/ScanScreen.php`
+- `templates/pqbg-scan.php`, `templates/index.php`
+- `assets/pqbg-scan.css`
+- `tests/phase6-scan.php`
+
+**Files modified:**
+- `includes/ScanUrl.php`: `site_url()`, `site_path()`, `is_site_scan_url()`, `extract_code()`, `rewrite_rules()`, and the class docblock. `for_code()` is unchanged.
+- `includes/Install.php`: `activate()`/`deactivate()` call `ScanRoute`.
+- `includes/Plugin.php`: wiring, done last, after the class files existed.
+- `uninstall.php`: always deletes `pqbg_rewrite_version`, since it is runtime-only like the install lock. The plan said the delete-all branch; this is a deliberate small change.
+- `tests/run.php`: registers the suite.
+- `tests/phase3-codes.php`, `tests/phase4-rendering.php`, `tests/phase5-admin.php`: scope checks split (see below). Phase 4 also got the auto-draft cleanup fix.
+- `README.md` (plugin): new "Scan page" section with the flow, matrix, template, headers, login, permalinks, Coming Soon, phone testing and limitations; options, deactivation, uninstall and deployment (`templates/`) updated.
+- `tests/README.md`, `progress.md`.
+
+**No schema change:** `DB_VERSION` is still 1. `vendor-prefixed/`, the renderers, the settings and `CodeRepository` are unchanged.
+
+**Changes to earlier suites** (their assertions were made false by the approved route):
+- "no scan rewrite rules" (3/4/5) → no pqbg/scan rules except the two from `ScanUrl::rewrite_rules()`
+- "`/scan/` returns 404" (4/5) → logged out, it redirects to the login page
+- "no `add_rewrite_rule` in source" (5) → only in `ScanRoute.php`, as a separate check, so Phase 5 now has 157 checks
+- "only the two pqbg options" (3) → also allows `pqbg_rewrite_version`
+
+**Tests.** `php tests/run.php`, with `PQBG_TESTS_ALLOW_PRODUCTION=1` and `PQBG_DECODER` set. **Final run: ALL PASSED, 756 checks, 0 failed, 0 skipped** (5 min 31 s).
+
+| Suite | Result |
+|---|---|
+| phase2-main | 83/83 |
+| phase2-lifecycle | 17/17 |
+| phase2-no-woocommerce | 12/12 |
+| phase3-codes | 110/110 (two checks updated) |
+| phase4-rendering | 165/165 (+1: auto-draft cleanup) |
+| phase5-admin | 157/157 (+1: `add_rewrite_rule` only in `ScanRoute`) |
+| phase6-scan | 212/212, **0 skipped** |
+
+**Phase 6 coverage:**
+- **Routing:**
+  - both rules present, ahead of every page/post catch-all
+  - subdirectory URLs
+  - query vars
+  - flush once: a stale flag flushes exactly once, repeated calls and HTTP requests never flush
+  - 301 for lowercase, a missing slash, spaces, a query string and raw query vars
+  - `/scan` → `/scan/`
+  - `X-Redirect-By` is the plugin, not WordPress's canonical redirect
+  - `/scan/a/b/` handled (400)
+- **Matrix over HTTP as a seller:** every row, including:
+  - private simple product (no banner) vs private variation (disabled banner)
+  - draft, pending and scheduled
+  - both banners together
+  - variation under a private parent
+  - a trashed parent through WooCommerce's cascade, and a trashed parent only
+  - retired after regeneration, with the reprint link for a shop manager but not for a seller
+  - retired with the product deleted
+  - active with the product deleted outside WordPress
+  - unknown code, invalid code
+- **Rendering:**
+  - sale price with `<del>`/`<ins>` and ₹; a single price; "Price not set"
+  - stock: managed quantity, unmanaged, out of stock, on backorder, managed on the parent
+  - categories, SKU, lazy image, the code
+  - a live price change shows on the next scan
+  - no cost, supplier or customer fields
+- **Escaping:** product name, category, entry-box input and path segment all carrying script/HTML payloads; no `<script>` on any screen.
+- **Access:**
+  - logged out: 302 with the exact `redirect_to` for every code type, and no product data
+  - customer and subscriber: 403 with byte-identical bodies and identical headers (except Date) across active, retired, unknown, invalid, lowercase and trashed codes, the entry page and `?code=`
+  - POST gets 405; HEAD gets 200 with an empty body
+- **Login round trips:**
+  - `wp-login.php` for admin, shop manager and seller: scan → login → the same scan URL → product screen
+  - seller with no `redirect_to`, or `redirect_to` = wp-admin → `/scan/`
+  - shop manager and customer defaults unchanged
+  - customer with a scan `redirect_to` → 403
+  - My Account form, with Coming Soon briefly off, for admin, shop manager and seller
+  - seller with a plain My Account login → `/scan/`
+  - My Account POST **with Coming Soon on** → the scan page
+  - a customer via My Account is not redirected
+  - foreign hosts, ports and `/scanner/` are rejected
+  - the Log out link works
+- **Entry box:**
+  - accepted: spaces, tabs and newlines, spaces inside, lowercase, pasted site URL, pasted lowercase URL, pasted label URL on another base, URL with query and fragment
+  - rejected: garbage, wrong alphabet, a URL without a code, too short
+  - empty input shows the entry page
+- **Headers:** all six security headers exact on 11 response types, plus meta robots; no `Last-Modified` or `X-Pingback`.
+- **Template:**
+  - standalone, with no theme, block, emoji, admin-bar or wp-json output
+  - exactly one stylesheet link
+  - the stylesheet is not on the home page
+  - viewport meta; tap targets and font size checked in the CSS
+- **Coming Soon:**
+  - logged out: the login redirect
+  - seller, shop manager and admin: the scan screen, with no marker and no `max-age=60`
+  - control check: Coming Soon is live for the seller on `/`
+- **Sitemaps** forced on in-process: 20 entries, none under `/scan/`.
+- **Slug conflicts:**
+  - a `scan` product category is not flagged
+  - a page `scan` and its child are flagged
+  - the notice is escaped, admin-only and shown on real admin screens
+  - the plugin still wins for `/scan/` and `/scan/child/`
+  - a trashed page is not a conflict
+- **Plain and `index.php` permalinks:**
+  - unavailable, with the notice
+  - `handle()` leaves the request to WordPress
+  - query-var access is not served
+  - login filters are inert
+  - everything restored
+- **Deactivation and reactivation in-process:**
+  - rules and flag removed; every other rule unchanged
+  - `/scan/` not served while deactivated
+  - codes untouched
+  - rules and flag back on reactivation
+- **Round trip:** `QrRenderer` SVG → decoder → exact scan URL → an HTTP GET as a seller → the right product screen.
+- **Scope:**
+  - no REST routes, shortcodes, nopriv or pqbg AJAX hooks
+  - `add_rewrite_rule` only in `ScanRoute`
+  - no DB writes in the scan classes
+  - no theme calls in the template
+  - no JavaScript
+  - the new files give empty output over HTTP
+  - the label format is unchanged
+  - the codes checksum is unchanged by the whole suite
+- **Cleanup:**
+  - codes back to the starting count (AUTO_INCREMENT reset)
+  - 0 products; no posts, meta, term relationships or terms above the start
+  - upload file removed
+  - options byte-identical: settings, Coming Soon, permalink structure, rewrite rules, flag, active plugins
+  - users and temporary directory removed
+
+**Timing** (dev machine):
+
+| Measurement | Result |
+|---|---|
+| Product scan over HTTP as a seller (variation), median of 10 | 201–246 ms across runs (233 ms in the final run) |
+| The same, in-process `resolve()` + `render()` | 17–37 ms, **12 queries** |
+
+**Problems found and fixed during development:**
+- **Pre-existing test-data leak.** Opening the Dashboard as a temporary user who can edit posts creates a Quick Draft auto-draft owned by that user, and `wp_delete_user()` then *trashes* it, leaving a revision.
+  - The Phase 4 suite (the Shop Manager Dashboard check) had left one pair per run since Phase 4, which contradicts the earlier "clean state" notes. The Phase 6 suite did the same until fixed.
+  - Both suites now permanently delete their temporary users' posts, and Phase 4 checks this.
+  - This session's 3 pairs (IDs 1056/1057, 1248/1250, 1280/1282) were checked and deleted.
+  - **10 older trashed "Auto Draft" posts** (IDs 97, 111, 125, 127, 129, 143, 157, 171, 545, 881, each with a revision, authors are deleted test users) are **left in place, pending the user's decision**.
+- **The Phase 6 suite switched permalinks with `WP_Rewrite::init()`,** which also drops every registered endpoint. The later deactivation flush then wrote rules without WooCommerce's endpoints. The suite now sets only `$wp_rewrite->permalink_structure`, and the rule set after deactivation is checked exactly.
+- **An Apache `%2F` 404:** Apache rejects encoded slashes in paths itself (`AllowEncodedSlashes Off`), so that test URL was changed.
+
+**Environment finding: Apache/PHP crashes (not caused by plugin code).**
+- `httpd.exe` child processes crash with `0xC0000005` in **`php8ts.dll` 8.5.6 at offset `0x666de5`**. Windows logged **50 such crashes from 2026-08-23 to 2026-09-24 13:24**, all before this session, and the Apache error log shows the same kind of restarts on this XAMPP since June.
+- During Phase 6 development there were 37 crashes (00:43–00:59). Each one dropped the open connections, which showed up as empty responses (status 0, no curl error).
+- They stopped completely once the Phase 6 test client used a fresh connection per request (`CURLOPT_FORBID_REUSE`). There were no crashes in the 5 later runs, including two full regressions.
+- This is a PHP engine (ZTS) bug under Apache on Windows. It is worth watching; a PHP update may fix it.
+
+**User action observed during testing (not a test side effect):** at 01:19 local, a Chrome session in wp-admin went WooCommerce Home → Payments task → Settings → Payments → Offline and **enabled "Cash on delivery"**. WooCommerce logged it, and the admin notification email failed because mail isn't configured locally. This was left as is.
+
+**Known limitations:**
+- **The scan base URL must reach this site.** The route answers only on this site's `/scan/` path.
+- **The My Account login form is hidden** from logged-out visitors while Coming Soon is on, so staff use `wp-login.php` until launch. This is handled automatically.
+- **Excluded letters are not corrected.** A code typed with `0/O/1/I/L` is rejected, not guessed.
+- **HTTP timings are noisy on XAMPP.** Only a 3 s sanity bound is asserted.
+- **The phone test is manual and still to be done by the user.** The steps are in the plugin README under "Phone testing".
+- No PHPCS run, because it isn't installed.
+
+**Next phase (not started):** Phase 7, Mark Sold + Sales. **The production domain is still not final**, so labels must not be printed yet.
 
 ### Instructions for the next Claude session
 
@@ -792,7 +999,19 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
 - **Never edit `vendor-prefixed/` by hand.** Change `build/` and run `php build/build.php` (see `build/README.md`).
 - The PHP minimum is now **8.2**.
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
-- **Phase 6 (Scan/Product Screen) is next.** It must handle the open items listed at the end of the Phase 5 section: code normalisation, and what the scan page shows for items in trash, draft, pending or private.
+- **Phase 7 (Mark Sold + Sales) is next.** Phase 6 is done but **not committed** until the user approves it. Build selling on top of the Phase 6 scan page (`ScanRoute`/`ScanScreen`): read-only today, with no placeholder "Mark as sold" buttons.
+- **The scan URL format `{base}/scan/{CODE}/` is permanent** (labels will be printed with it). Never change `ScanUrl::for_code()` or the two rewrite rules without a migration plan for printed labels. Bump `ScanRoute::RULES_VERSION` whenever `ScanUrl::rewrite_rules()` changes, so the rules are flushed once.
+- **Scan page rules:**
+  - access is checked before any lookup: logged out → login redirect, no `pqbg_view_products` → a fixed 403
+  - every scan response sends `ScanRoute::security_headers()`
+  - the template is standalone: no theme, no `wp_head()`, no JavaScript
+  - keep the customer 403 identical for every code
+- **Coming Soon hides the My Account login form** from logged-out visitors, so the scan flow uses `wp-login.php`.
+- **In test suites:**
+  - Don't call `WP_Rewrite::init()`: it drops every registered endpoint. Set `$wp_rewrite->permalink_structure` instead.
+  - Permanently delete temporary users' own posts before `wp_delete_user()`: opening the Dashboard creates a Quick Draft auto-draft that would otherwise be trashed and left behind.
+  - Use a fresh HTTP connection per request (`CURLOPT_FORBID_REUSE`) when a suite keeps many cookie jars open. This XAMPP's `php8ts.dll` 8.5.6 crashes (0xC0000005) under the keep-alive pattern (see the Phase 6 section).
+- **10 old trashed "Auto Draft" posts** from earlier test runs are still in the database, pending the user's decision (see the Phase 6 section).
 - Product-save and delete hooks now exist, in `CodeLifecycle` only, on exactly the approved hooks (the four WooCommerce CRUD save hooks and `deleted_post`). Don't add others without explicit approval.
 - Regenerate only through `ProductCodeService::regenerate()` (atomic `CodeRepository::replace_active()`). Admin requests go through `AdminActions`: POST for anything that writes, a nonce bound to the item, and `pqbg_manage_codes`. Never add `nopriv` handlers.
 - Only the classic product editor is supported. Re-check `product_block_editor` before relying on the Phase 5 UI.
@@ -870,3 +1089,13 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
   - The test Quick Edit and Bulk Edit requests now send `post_view`/`change_stock` like the real forms. Without them, core and WooCommerce logged "undefined array key" warnings in the Apache log during testing; these were not from plugin code.
   - Final run: **542 passed, 0 failed, 0 skipped** (decoder installed in the scratchpad). All test data removed.
   - Approved; committed as `ff7805c` and pushed to `origin/main`.
+- **Phase 6 (scan / product screen):**
+  - Re-verified the environment; no differences. Found that Coming Soon hides the My Account login form from logged-out visitors.
+  - Baseline: 542 passed, 0 failed, 0 skipped.
+  - Wrote the plan (routing, access flow, status matrix, screens, phone testing, tests). The user approved all 8 decisions.
+  - Added `ScanRoute`, `ScanScreen`, the standalone template and stylesheet, the `ScanUrl` helpers, and activation/deactivation wiring. Class files were created before `Plugin.php` was wired.
+  - Added `tests/phase6-scan.php` (212 checks) and updated the Phase 3/4/5 scope checks.
+  - Found and fixed a pre-existing test leak (trashed Dashboard auto-drafts) in the Phase 4 suite. Deleted this session's 3 leaked pairs; 10 older pairs await a decision.
+  - Traced intermittent empty HTTP responses to a pre-existing `php8ts.dll` crash on this XAMPP; a fresh connection per request avoids it.
+  - Final run: **756 passed, 0 failed, 0 skipped**. The site is back to its clean state.
+  - Not committed; waiting for approval.

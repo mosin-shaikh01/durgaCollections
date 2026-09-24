@@ -21,6 +21,9 @@ global $wpdb;
 // Runtime-only lock row; never contains data.
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s", 'pqbg_install_lock' ) );
 
+// Runtime-only flag for the scan route's rewrite rules (normally already removed on deactivation).
+delete_option( 'pqbg_rewrite_version' );
+
 if ( ! defined( 'PQBG_UNINSTALL_DELETE_ALL_DATA' ) || true !== PQBG_UNINSTALL_DELETE_ALL_DATA ) {
 	return;
 }

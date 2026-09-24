@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–5 (foundation, data layer, code generation, rendering, admin code management)
+## Current scope: Phases 2–6 (foundation, data layer, code generation, rendering, admin code management, scan page)
 
 Implemented:
 
@@ -18,15 +18,18 @@ Implemented:
 - **Phase 3:** `CodeGenerator`, which produces secure random codes, and `ProductCodeService`, which checks product eligibility and assigns codes. See [Product codes](#product-codes).
 - **Phase 4:** `ScanUrl`, `QrRenderer` and the optional `BarcodeRenderer`, which turn a product code into SVG. Also `Settings` and an administrator-only settings page. See [QR codes and barcodes](#qr-codes-and-barcodes) and [Settings](#settings).
 - **Phase 5:** automatic code assignment on product save, lifecycle rules (trash, delete, type change), atomic regeneration, and the admin UI on the classic product screens: a "QR & Barcode" panel, codes in the variations panel, a "Code" column, SVG downloads. See [Admin code management](#admin-code-management).
+- **Phase 6:** the front-end scan page `/scan/{CODE}/` and the entry page `/scan/`: login round trip, access control, the status → screen matrix, live product details, a standalone mobile template. Read-only. See [Scan page](#scan-page).
 
 **Not implemented yet (later phases):**
-- the `/scan/` route and scan page (scan URLs still return 404), login redirect flow, product screen
 - Mark-as-Sold, stock decrement, sales history and void UI, seller dashboard
 - label printing and layouts, CSV import/export of codes, bulk generation and bulk tools
 - caching of rendered images (planned for Phase 8)
-- REST/AJAX endpoints, shortcodes and templates, and support for WooCommerce's block-based product editor
+- in-browser camera scanning
+- REST/AJAX endpoints and shortcodes, and support for WooCommerce's block-based product editor
 
-The plugin adds **no public endpoints** of any kind. Its only request handlers are the authenticated `admin-post.php` actions of Phase 5, reachable by users with `pqbg_manage_codes` (see [Admin handlers](#admin-handlers)).
+The plugin adds **no REST routes, AJAX handlers or shortcodes**. Its request handlers are:
+- the authenticated `admin-post.php` actions of Phase 5, for users with `pqbg_manage_codes` (see [Admin handlers](#admin-handlers))
+- the read-only scan page of Phase 6, which requires a login and `pqbg_view_products` before it shows anything (see [Scan page](#scan-page))
 
 ## QR codes and barcodes
 
@@ -163,14 +166,14 @@ The libraries are bundled inside the plugin; no Composer is needed on the server
 
 ## Tests
 
-The CLI regression suites for Phases 2–5 are in [`tests/`](tests/README.md): a runner, round-trip QR/barcode decoding, and settings access checked over HTTP. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
+The CLI regression suites for Phases 2–6 are in [`tests/`](tests/README.md): a runner, round-trip QR/barcode decoding, and settings access checked over HTTP. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
 
 ## Production deployment
 
 **Exclude `tests/` and `build/` from any production deployment.** Deploy only the runtime files:
 
 - `product-qrcode-barcode-generator.php`, `uninstall.php`, `index.php`
-- `includes/`, `assets/`, `languages/`, `vendor-prefixed/`
+- `includes/`, `assets/`, `languages/`, `templates/`, `vendor-prefixed/`
 - `README.md` (optional)
 
 `tests/` and `build/` are development tooling. They are kept in the repository so the vendor bundle can be rebuilt exactly and the regression suites can be rerun, but they must never reach a live server:
@@ -456,6 +459,174 @@ The confirmation page is a hidden admin page, `edit.php?post_type=product&page=p
 
 **Barcodes disabled:** no barcode UI anywhere, and the barcode handler refuses. No barcode library class is loaded on any Phase 5 screen or path, and the tests verify this.
 
+## Scan page
+
+Phase 6. When staff scan a label's QR code with a phone camera, or type or scan a code into the page, they see the live WooCommerce product for that code. **Read-only:** nothing is sold, no stock changes, and the page writes nothing to the database.
+
+- Classes: `ScanRoute` (route, access, redirects, headers, login redirects, admin notices), `ScanScreen` (code → screen, rendering) and `ScanUrl` (every scan URL and the rewrite patterns).
+- Template: `templates/pqbg-scan.php`. Stylesheet: `assets/pqbg-scan.css`.
+
+### URLs
+
+| URL | What it is |
+|---|---|
+| `{home}/scan/{CODE}/` | The product screen for a code. **This is the label payload** (`ScanUrl::for_code()`), so its format is permanent. |
+| `{home}/scan/` | The entry page: a "Scan or type a code" box. |
+| `{home}/scan/?code=…` | What the box submits (GET). Redirects to `/scan/{CODE}/`. |
+
+- **Rewrite rules:** two, `^scan/?$` and `^scan/(.+?)/?$`, added at the top so they take precedence over pages and posts.
+  - **Everything below `/scan/` belongs to the plugin.** `/scan/a/b/` shows "Not a valid product code", not a theme 404.
+  - They work in the subdirectory install (`/sharayu/scan/…`), because WordPress matches rules relative to the home path.
+- **Flushing:** once, on activation, and on the first request after the plugin version or `ScanRoute::RULES_VERSION` changes (tracked in the option `pqbg_rewrite_version`).
+  - Ordinary requests never flush.
+  - The flush is soft: `.htaccess` is not rewritten.
+  - Deactivation removes the rules and the flag.
+- **Query vars:** `pqbg_scan` and `pqbg_code`.
+
+### Request flow
+
+The plugin answers on `parse_request`. That is before the main query, WordPress's canonical redirects, `template_redirect`, the theme, and WooCommerce Coming Soon (which acts at `template_include`).
+
+| Step | Response |
+|---|---|
+| Permalinks are Plain or contain `index.php` | Not handled (see [Permalinks](#permalinks)). |
+| Method other than GET or HEAD | **405** with `Allow: GET, HEAD`. |
+| Logged out | **302** to `wp_login_url()`. `redirect_to` is the canonical scan URL, or `/scan/` when the path is not a well-formed code. The code's existence is never checked. |
+| Logged in without `pqbg_view_products` (customers, subscribers) | **403**: one fixed page with no box and no product data. No lookup runs, so the response is byte-identical for existing, retired, unknown and invalid codes, and for the entry page. |
+| Path not canonical: lowercase code, spaces, missing trailing slash, any query string, or raw `?pqbg_code=` | **301** to `{home}/scan/{CODE}/`. |
+| Entry box `?code=` | The input is trimmed, stripped of all whitespace and uppercased; a pasted URL gives the segment after `/scan/`. A well-formed code gets **302** to `/scan/{CODE}/`. Anything else gets **400** "Not a valid product code.", with the input (escaped) back in the box. |
+| Otherwise | The status → screen matrix below. |
+
+### Status → screen matrix
+
+| Code / item | Screen | HTTP |
+|---|---|---|
+| Not a well-formed code | "Not a valid product code." | 400 |
+| Well-formed, not in `pqbg_codes` | "Code not found." | 404 |
+| Retired, item exists | "This label is out of date." plus the name. Users with `pqbg_manage_codes` also get a link to the product edit screen to reprint the label, if they can edit it and it is not in the trash. | 200 |
+| Retired, item deleted | "This label is out of date." plus "This label is no longer valid." | 200 |
+| Active, item missing (deleted outside WordPress) | "This label is no longer valid." | 200 |
+| Active, item or its parent in the trash | "This product is in the trash." Name and SKU only. | 200 |
+| Active, product or parent is a draft, pending or scheduled | Full screen plus "Not published – cannot be sold yet." | 200 |
+| Active, **variation** is private (WooCommerce's "disabled" variation) | Full screen plus "This variation is disabled – cannot be sold." | 200 |
+| Active: published product or variation, **private simple product**, or variation of a private parent | Full screen | 200 |
+
+- The two banners can appear together, for a disabled variation of a draft product.
+- A private *simple* product is a normal, sellable product and gets no banner.
+
+### Product screen
+
+Everything is read live from WooCommerce on each request; nothing is cached. The screen shows:
+- the main image: `woocommerce_thumbnail` size, `loading="lazy"`. A variation without its own image shows its parent's.
+- the name (the parent's, for a variation) and the variation's attributes
+- the SKU
+- the price, formatted by WooCommerce in the store currency (INR). When on sale, the regular price is struck through. "Price not set" when there is no price.
+- the stock status, plus the quantity when stock is managed (including stock managed on the parent)
+- the categories as plain names (the parent's, for a variation)
+- the code
+- "Edit product", for users with `edit_products` (the parent's edit screen, for a variation)
+
+It never shows cost, supplier data, private notes or customer data.
+
+Every staff screen has the **"Scan or type a code"** box at the top and a **Log out** link. The box has `autofocus` and submits on Enter without JavaScript, so USB/Bluetooth scanners that "type" the code and press Enter work.
+
+### Template and headers
+
+- **Standalone template.** `templates/pqbg-scan.php` is a complete HTML document owned by the plugin.
+  - It does not use the active theme (no `get_header()`/`get_footer()`).
+  - It does not call `wp_head()`/`wp_footer()`, so no theme, admin bar or third-party output appears.
+  - There is no JavaScript.
+- **Stylesheet:** only `assets/pqbg-scan.css`, and only on scan pages. Mobile-first: 18 px text, tap targets of at least 48 px, high contrast.
+- **Escaping:** every value is escaped. The price HTML from WooCommerce goes through `wp_kses_post()`, and the image tag comes from `wp_get_attachment_image()`.
+- **Headers** on **every** scan response, redirects included:
+
+  ```
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: same-origin
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self' https: data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+  ```
+
+  HTML pages also carry `<meta name="robots" content="noindex, nofollow">`.
+- **Sitemaps:** scan pages are not posts or terms, so core sitemaps never list them. This is tested with sitemaps forced on.
+
+### Login
+
+- **Logged-out scans** go to **`wp-login.php`** (`wp_login_url()`) and come back to the same scan URL. While WooCommerce Coming Soon is on, logged-out visitors cannot see the My Account login form, but `wp-login.php` always works.
+- **My Account form:** when it is opened with `?redirect_to=<scan URL>`, staff are sent to that scan URL after logging in (`woocommerce_login_redirect`). Only same-host URLs under the scan path are accepted.
+- **Sellers without a destination** go to `/scan/`. This applies to any user who can view products but cannot use wp-admin (no `edit_posts`, i.e. Store Sellers) and logs in without asking for a page.
+  - Without this, core would send them to `profile.php`, and WooCommerce would bounce them to My Account.
+  - Administrators, Shop Managers and customers are unaffected.
+- **Log out** returns to `/scan/`, which then asks for a login again.
+
+### Permalinks
+
+Scan URLs need **pretty permalinks**: any structure except "Plain", and not `/index.php/…`.
+- With Plain or `index.php` permalinks the route is inactive, and users with `pqbg_manage_settings` see an admin notice.
+- Printed labels keep the `/scan/{CODE}/` format either way; switching permalinks back makes them work again.
+
+**Slug conflicts:** a page, post, product or public term may have an address at or below `/scan/`.
+- The scan page takes precedence over it.
+- Users with `pqbg_manage_settings` see a notice naming that content, so its slug can be changed.
+- Addresses under a base, such as `/product-category/scan/`, are not affected and are not flagged.
+
+### WooCommerce Coming Soon
+
+Scan pages are answered before Coming Soon runs:
+- logged-out visitors get the login redirect, not the Coming Soon page
+- Store Sellers see the scan page. Unlike administrators and Shop Managers, they are not exempt from Coming Soon.
+
+### Phone testing
+
+A phone cannot open `http://localhost/sharayu`. For testing, use a **Cloudflare quick tunnel**: no account is needed, it is HTTPS, and it only makes outbound connections.
+
+1. Install and start it (PowerShell):
+
+   ```
+   winget install --id Cloudflare.cloudflared -e
+   cloudflared tunnel --url http://localhost:80
+   ```
+
+   - Note the printed `https://<words>.trycloudflare.com`. The name changes every time the tunnel starts.
+   - Press Ctrl+C to stop it.
+2. Add this to your **local** `wp-config.php`, above `/* That's all, stop editing! */`. It changes nothing for `localhost` requests.
+
+   ```php
+   // PQBG phone testing via a Cloudflare quick tunnel. Remove after testing.
+   if ( isset( $_SERVER['HTTP_HOST'] ) && preg_match( '/^[a-z0-9-]+\.trycloudflare\.com$/D', $_SERVER['HTTP_HOST'] ) ) {
+   	if ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && 'https' === $_SERVER['HTTP_X_FORWARDED_PROTO'] ) {
+   		$_SERVER['HTTPS'] = 'on';
+   	}
+   	define( 'WP_HOME', 'https://' . $_SERVER['HTTP_HOST'] . '/sharayu' );
+   	define( 'WP_SITEURL', 'https://' . $_SERVER['HTTP_HOST'] . '/sharayu' );
+   }
+   ```
+
+3. Go to **WooCommerce → QR & Barcodes**, set **Scan base URL** to `https://<words>.trycloudflare.com/sharayu`, and save. The QR codes in the admin now point at the tunnel, and the local-address warning disappears.
+4. **To revert:** clear the Scan base URL field and save (the warning returns), stop the tunnel, and remove the snippet.
+
+**Warning:** while the tunnel runs, the whole site is reachable at that URL. Scan pages still require a login, but keep the tunnel short-lived.
+
+**Manual checklist:**
+1. On the laptop (`http://localhost/sharayu/wp-admin`), open a product and its "QR & Barcode" panel.
+2. Scan the QR on screen with the phone camera. The tunnel's login page should open.
+3. Log in as a Store Seller. The product screen for that code should appear.
+4. Regenerate the code, then scan the old QR (for example from an earlier download). You should see "This label is out of date."
+5. Type the new code into the box, in lowercase with spaces. It should open the product.
+6. Paste a full scan URL into the box. It should open the product.
+7. Tap Log out, then scan again. You should be asked to log in.
+8. Log in as a customer and scan. You should get "You do not have permission to view products." and no product data.
+
+### Limitations
+
+- **The scan base URL must reach this site.** The route answers only on this site's own `/scan/` path. A base URL on another host needs that host to forward to this site, as the tunnel does.
+- **Timing on the dev machine:**
+  - about 200–250 ms per product scan over HTTP (median); booting WordPress and WooCommerce dominates
+  - 17–37 ms and 12 queries in-process
+- **No guessing of excluded letters.** A code typed with characters outside the code alphabet (`0`, `O`, `1`, `I`, `L`) is not corrected; it gets "Not a valid product code."
+
 ## Requirements
 
 | | Minimum | Tested |
@@ -538,6 +709,7 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 | `pqbg_db_version` | yes | integer schema version (currently `1`) |
 | `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
+| `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
 
 ## Migrations
 
@@ -596,11 +768,11 @@ It never reads or writes orders or the legacy order tables.
 
 ## Deactivation
 
-Deactivation is non-destructive. Tables, codes, sales, settings, the role and capabilities are all kept. The plugin adds no rewrite rules or cron events (as of Phase 5), so nothing needs flushing.
+Deactivation is non-destructive. Tables, codes, sales, settings, the role and capabilities are all kept. Only the scan route's two rewrite rules are removed (with a soft flush), along with the `pqbg_rewrite_version` flag, so `/scan/` stops answering until the plugin is reactivated. There are no cron events.
 
 ## Uninstall
 
-**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only the transient install lock. Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
+**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only the transient install lock and the `pqbg_rewrite_version` flag. Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
 
 To permanently delete all plugin data, add this to `wp-config.php` **before** deleting the plugin:
 
@@ -615,4 +787,5 @@ This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_v
 
 - QR codes point to the scan base URL: `home_url()` unless it is overridden on the settings page. **Do not print labels until the production URL is set.** The admin warning stays visible while the URL is local, and a second warning appears while a public URL uses `http://`.
 - The site timezone is currently UTC. The plugin stores UTC regardless, but the store timezone (India) should be set deliberately.
-- WooCommerce "Coming Soon" mode is on for the whole site. The future `/scan/` route must work with it.
+- WooCommerce "Coming Soon" mode is on for the whole site. The scan page works with it (see [WooCommerce Coming Soon](#woocommerce-coming-soon)). Logged-out staff log in through `wp-login.php`, because Coming Soon hides the My Account login form.
+- Scan URLs need pretty permalinks (see [Permalinks](#permalinks)).

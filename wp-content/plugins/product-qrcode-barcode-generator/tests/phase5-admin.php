@@ -943,13 +943,16 @@ try {
 	$hit = static fn( $s ) => str_contains( $s, 'pqbg' ) || str_contains( $s, 'qrcode-barcode' ) || str_contains( $s, 'scan' );
 	pqbg_t( 'no pqbg or /scan/ REST routes', ! array_filter( rest_get_server()->get_namespaces(), $hit ) && ! array_filter( array_keys( rest_get_server()->get_routes() ), static fn( $r ) => str_contains( $r, 'pqbg' ) || str_starts_with( $r, '/scan' ) ) );
 	pqbg_t( 'no pqbg shortcodes', ! array_filter( array_keys( $GLOBALS['shortcode_tags'] ), $hit ) );
-	pqbg_t( 'no pqbg or scan rewrite rules', ! array_filter( array_keys( (array) get_option( 'rewrite_rules' ) ), static fn( $k ) => str_contains( $k, 'scan' ) || str_contains( $k, 'pqbg' ) ) );
+	// Phase 6 added the scan route: exactly its two rules, and no other pqbg or scan rule.
+	$scan_rules = array_keys( ProductQrBarcode\ScanUrl::rewrite_rules( ProductQrBarcode\ScanRoute::ROUTE_VAR, ProductQrBarcode\ScanRoute::CODE_VAR ) );
+	pqbg_t( 'no pqbg or scan rewrite rules other than the two Phase 6 scan rules', array() === array_diff( array_filter( array_keys( (array) get_option( 'rewrite_rules' ) ), static fn( $k ) => str_contains( $k, 'scan' ) || str_contains( $k, 'pqbg' ) ), $scan_rules ) );
 	// Code tokens only: docblocks may name what is deliberately absent.
 	$src = implode( "\n", array_map( static fn( $f ) => implode( '', array_map( static fn( $t ) => is_array( $t ) ? ( in_array( $t[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? '' : $t[1] ) : $t, token_get_all( (string) file_get_contents( $f ) ) ) ), glob( PQBG_PLUGIN_DIR . 'includes/*.php' ) ) );
-	pqbg_t( 'source: no nopriv handlers, AJAX actions, REST routes, shortcodes or rewrite rules', ! preg_match( '/admin_post_nopriv|wp_ajax_|register_rest_route|add_shortcode|add_rewrite_rule|add_rewrite_endpoint/', $src ) );
+	pqbg_t( 'source: no nopriv handlers, AJAX actions, REST routes, shortcodes or rewrite endpoints', ! preg_match( '/admin_post_nopriv|wp_ajax_|register_rest_route|add_shortcode|add_rewrite_endpoint/', $src ) );
+	pqbg_t( 'source: add_rewrite_rule appears only in ScanRoute (Phase 6)', array( 'ScanRoute.php' ) === array_values( array_map( 'basename', array_filter( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), static fn( $f ) => (bool) preg_match( '/add_rewrite_rule/', implode( '', array_map( static fn( $t ) => is_array( $t ) ? ( in_array( $t[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? '' : $t[1] ) : $t, token_get_all( (string) file_get_contents( $f ) ) ) ) ) ) ) ) );
 	pqbg_t( 'source: the barcode library is referenced only in BarcodeRenderer', 1 === count( array_filter( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), static fn( $f ) => str_contains( (string) file_get_contents( $f ), 'Picqer' ) ) ) );
 	pqbg_t( 'source: no raw writes to pqbg_codes outside CodeRepository', ! preg_match( '/\$wpdb->(insert|update|query|delete)/', implode( "\n", array_map( 'file_get_contents', array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array( PQBG_PLUGIN_DIR . 'includes/CodeRepository.php', PQBG_PLUGIN_DIR . 'includes/Install.php', PQBG_PLUGIN_DIR . 'includes/Schema.php' ) ) ) ) ) );
-	pqbg_t( '/scan/ and /scan/{CODE}/ still 404', 404 === $http( 'anon', 'GET', $home . '/scan/' )['code'] && 404 === $http( 'anon', 'GET', $home . '/scan/' . $code . '/' )['code'] );
+	pqbg_t( 'logged out: /scan/ and /scan/{CODE}/ redirect to the login page (Phase 6)', 302 === $http( 'anon', 'GET', $home . '/scan/' )['code'] && str_starts_with( $http( 'anon', 'GET', $home . '/scan/' . $code . '/' )['location'], wp_login_url() ) );
 	pqbg_t( 'direct HTTP to the new files: empty output', array() === array_filter( array( 'includes/CodeLifecycle.php', 'includes/AdminActions.php', 'includes/AdminProductPanel.php', 'assets/index.php' ), static fn( $f ) => '' !== $http( 'anon', 'GET', PQBG_PLUGIN_URL . $f )['body'] ) );
 } finally {
 	pqbg_section( 'cleanup' );

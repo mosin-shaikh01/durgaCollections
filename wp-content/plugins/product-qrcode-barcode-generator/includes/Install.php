@@ -76,14 +76,17 @@ final class Install {
 				array( 'back_link' => true )
 			);
 		}
+
+		ScanRoute::activate();
 	}
 
 	/**
 	 * Deactivation hook. Intentionally non-destructive: tables, codes, sales,
-	 * settings, the Seller role and capabilities are all kept. Phase 2 adds no
-	 * rewrite rules or cron events, so there is nothing to clean up.
+	 * settings, the Seller role and capabilities are all kept. Only the scan
+	 * route's rewrite rules are removed. There are no cron events.
 	 */
 	public static function deactivate(): void {
+		ScanRoute::deactivate();
 	}
 
 	/**

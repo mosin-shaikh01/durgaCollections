@@ -1,6 +1,6 @@
 # Tests
 
-CLI regression suites for Product QR Code and Barcode Generator (Phases 2–5). They run against a real WordPress + WooCommerce site through `wp-load.php`; there is no PHPUnit.
+CLI regression suites for Product QR Code and Barcode Generator (Phases 2–6). They run against a real WordPress + WooCommerce site through `wp-load.php`; there is no PHPUnit.
 
 - **CLI only.** Every PHP file here exits unless `PHP_SAPI === 'cli'`. The `.htaccess` in this directory answers every HTTP request with 403 (Apache). `index.php` stubs stop directory listings on other servers.
 - **Never loaded by the plugin.** The autoloader only maps `includes/` and `vendor-prefixed/`.
@@ -16,11 +16,27 @@ CLI regression suites for Product QR Code and Barcode Generator (Phases 2–5). 
 | `phase2-main.php` | Schema, options, repository invariant, sales table, migrations, install lock, roles and capabilities, HPOS, no endpoints | 83 |
 | `phase2-lifecycle.php` | Deactivation, the default (data-preserving) uninstall path, reactivation | 17 |
 | `phase2-no-woocommerce.php` | WooCommerce missing, simulated for this process only: no boot, admin notice | 12 |
-| `phase3-codes.php` | Code format and alphabet, randomness, collisions, eligibility, authorization, assignment, retirement, database races, batch, scope. **A reconstruction**, see below. Scope check updated for Phase 5. | 110 |
-| `phase4-rendering.php` | Scan URLs, QR and barcode rendering with round-trip decoding, lazy library loading, SVG safety, base URL validation, the local-address and http:// warnings, settings page access and saving over HTTP, vendor isolation, scope | 164 (5 of them need the decoder) |
-| `phase5-admin.php` | Automatic code assignment on every save path over real HTTP (classic edit screen, AJAX variations, Quick Edit, Bulk Edit, REST, Duplicate) and the CSV importer; users without the capability, cron, failure injection; trash, untrash, delete, Empty Trash, type changes; atomic regeneration including a mid-transaction failure and **4 concurrent PHP processes**; history timezone and "retired by" labels; the panel, variations panel, list column, confirmation page and handlers over HTTP; downloads with round-trip decoding; permissions and nonces for every handler; barcodes disabled; the 40-variation performance measurement; scope | 156 (2 of them need the decoder) |
+| `phase3-codes.php` | Code format and alphabet, randomness, collisions, eligibility, authorization, assignment, retirement, database races, batch, scope. **A reconstruction**, see below. Scope checks updated for Phases 5 and 6. | 110 |
+| `phase4-rendering.php` | Scan URLs, QR and barcode rendering with round-trip decoding, lazy library loading, SVG safety, base URL validation, the local-address and http:// warnings, settings page access and saving over HTTP, vendor isolation, scope | 165 (5 of them need the decoder) |
+| `phase5-admin.php` | Automatic code assignment on every save path over real HTTP (classic edit screen, AJAX variations, Quick Edit, Bulk Edit, REST, Duplicate) and the CSV importer; users without the capability, cron, failure injection; trash, untrash, delete, Empty Trash, type changes; atomic regeneration including a mid-transaction failure and **4 concurrent PHP processes**; history timezone and "retired by" labels; the panel, variations panel, list column, confirmation page and handlers over HTTP; downloads with round-trip decoding; permissions and nonces for every handler; barcodes disabled; the 40-variation performance measurement; scope | 157 (2 of them need the decoder) |
+| `phase6-scan.php` | The scan page over real HTTP: rewrite rules, subdirectory, canonical 301s, flush once, deactivation/reactivation, plain and `index.php` permalinks, slug conflicts; every row of the status → screen matrix (including a private variation vs a private simple product, and a trashed parent); price, sale, stock, category, image rendering and live data; HTML escaping; logged-out redirects; login round trips through `wp-login.php` and the My Account form for administrator, Shop Manager and Store Seller (also with Coming Soon on); the byte-identical customer/subscriber 403; entry box normalisation; methods; every security header on every response type; Coming Soon; sitemaps; QR round trip (QrRenderer → decoder → request); scan timing; scope | 212 (1 of them needs the decoder) |
 
 Each suite ends with a check that plugin code raised no PHP notices, warnings or deprecations. That check is included in the counts.
+
+**Phase 6 changes to the Phase 3, 4 and 5 suites.** Phase 6 was approved to add the scan route, so four kinds of earlier check became false by design. As in Phase 5, each now checks "nothing else, plus exactly the approved addition":
+- "no scan rewrite rules" (Phases 3, 4, 5) → no pqbg or scan rewrite rules other than the two scan rules from `ScanUrl::rewrite_rules()`
+- "`/scan/` and `/scan/{CODE}/` return 404" (Phases 4, 5) → logged out, they redirect to the login page
+- "no `add_rewrite_rule` in source" (Phase 5) → `add_rewrite_rule` appears only in `ScanRoute.php`, plus the unchanged ban on nopriv handlers, AJAX, REST routes, shortcodes and rewrite endpoints (one more check)
+- "only the two pqbg options exist" (Phase 3) → also allows `pqbg_rewrite_version`, the rules flag
+
+**Test data leak fixed in Phase 6.** Opening the wp-admin Dashboard as a temporary user who can edit posts makes WordPress's Quick Draft widget create an auto-draft owned by that user. `wp_delete_user()` then moved it to the trash, with a revision, instead of deleting it. The Phase 4 suite (Shop Manager Dashboard check) left one such pair per run.
+- The Phase 4 and 6 suites now permanently delete their temporary users' own posts before deleting the users.
+- Phase 4 has a new check for this, which is why it now has 165 checks.
+
+**Phase 6 suite notes.**
+- Its HTTP client opens a fresh connection for every request (`CURLOPT_FORBID_REUSE`). With about 20 cookie jars open, reused keep-alive connections that Apache had closed intermittently produced empty responses (status 0, no curl error) during development.
+- It switches Coming Soon off briefly to fetch the real My Account login form, then logs in with Coming Soon back on. It switches permalinks to Plain and `/index.php/…` briefly, and deactivates and reactivates the plugin in-process. Every option it touches (`woocommerce_coming_soon`, `permalink_structure`, `rewrite_rules`, `pqbg_rewrite_version`, `active_plugins`, `pqbg_settings`) is restored byte-for-byte and checked.
+- It prints the scan timing (informational; only a 3-second sanity bound is asserted).
 
 **Phase 5 change to the Phase 3 suite.** Phase 3's scope check "no plugin callbacks on product save/create/delete hooks" was true until Phase 5, which was approved to add them. It is now two checks:
 - there are still no callbacks on `save_post`, `wp_insert_post`, `transition_post_status`, `before_delete_post`, `wp_trash_post` and similar hooks
@@ -46,7 +62,7 @@ The original counts were 80 and 16; the notice check and two cleanup checks are 
 
 - PHP CLI with the `curl` extension, able to load the site's `wp-load.php`.
 - The site reachable over HTTP at `home_url()` from the same machine (Phases 4 and 5 log in as temporary users).
-- **Optional: Node.js 18+ and the round-trip decoder**, for the 5 Phase 4 and 2 Phase 5 checks that rasterise the SVGs and decode them with a real decoder.
+- **Optional: Node.js 18+ and the round-trip decoder**, for the 5 Phase 4, 2 Phase 5 and 1 Phase 6 checks that rasterise the SVGs and decode them with a real decoder.
 
 ### Installing the decoder
 

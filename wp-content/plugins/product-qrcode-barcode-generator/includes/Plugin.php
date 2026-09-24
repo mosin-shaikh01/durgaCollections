@@ -32,7 +32,11 @@ final class Plugin {
 		// Every request: products are also saved over REST, by the importer and by cron.
 		CodeLifecycle::register();
 
+		// Front-end scan page /scan/{CODE}/, and the login redirects back to it.
+		ScanRoute::register();
+
 		if ( is_admin() ) {
+			ScanRoute::register_admin();
 			SettingsPage::register();
 			AdminProductPanel::register();
 			AdminActions::register();
