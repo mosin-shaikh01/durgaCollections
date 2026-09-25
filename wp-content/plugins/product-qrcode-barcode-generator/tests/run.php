@@ -23,6 +23,7 @@ $suites = array(
 	'phase4-rendering.php',
 	'phase5-admin.php',
 	'phase6-scan.php',
+	'phase7-sales.php',
 );
 
 $filters = array_slice( $argv, 1 );

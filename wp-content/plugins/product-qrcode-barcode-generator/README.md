@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–6 (foundation, data layer, code generation, rendering, admin code management, scan page)
+## Current scope: Phases 2–7 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold)
 
 Implemented:
 
@@ -18,10 +18,11 @@ Implemented:
 - **Phase 3:** `CodeGenerator`, which produces secure random codes, and `ProductCodeService`, which checks product eligibility and assigns codes. See [Product codes](#product-codes).
 - **Phase 4:** `ScanUrl`, `QrRenderer` and the optional `BarcodeRenderer`, which turn a product code into SVG. Also `Settings` and an administrator-only settings page. See [QR codes and barcodes](#qr-codes-and-barcodes) and [Settings](#settings).
 - **Phase 5:** automatic code assignment on product save, lifecycle rules (trash, delete, type change), atomic regeneration, and the admin UI on the classic product screens: a "QR & Barcode" panel, codes in the variations panel, a "Code" column, SVG downloads. See [Admin code management](#admin-code-management).
-- **Phase 6:** the front-end scan page `/scan/{CODE}/` and the entry page `/scan/`: login round trip, access control, the status → screen matrix, live product details, a standalone mobile template. Read-only. See [Scan page](#scan-page).
+- **Phase 6:** the front-end scan page `/scan/{CODE}/` and the entry page `/scan/`: login round trip, access control, the status → screen matrix, live product details, a standalone mobile template. See [Scan page](#scan-page).
+- **Phase 7:** Mark as Sold from the scan page: quantity, "Confirm sale", WooCommerce stock decrement, a permanent `pqbg_sales` record with snapshots, a 10-minute Undo for the seller, and `SaleService::void_sale()` for managers (service only). See [Mark as Sold](#mark-as-sold).
 
 **Not implemented yet (later phases):**
-- Mark-as-Sold, stock decrement, sales history and void UI, seller dashboard
+- sales history, the manager void UI and the seller dashboard (Phase 9)
 - label printing and layouts, CSV import/export of codes, bulk generation and bulk tools
 - caching of rendered images (planned for Phase 8)
 - in-browser camera scanning
@@ -29,7 +30,7 @@ Implemented:
 
 The plugin adds **no REST routes, AJAX handlers or shortcodes**. Its request handlers are:
 - the authenticated `admin-post.php` actions of Phase 5, for users with `pqbg_manage_codes` (see [Admin handlers](#admin-handlers))
-- the read-only scan page of Phase 6, which requires a login and `pqbg_view_products` before it shows anything (see [Scan page](#scan-page))
+- the scan page of Phase 6, which requires a login and `pqbg_view_products` before it shows anything (see [Scan page](#scan-page)); since Phase 7 it also accepts POST (sell, undo) on code URLs from users with `pqbg_sell`, with a nonce and a signed form token (see [Mark as Sold](#mark-as-sold))
 
 ## QR codes and barcodes
 
@@ -166,7 +167,7 @@ The libraries are bundled inside the plugin; no Composer is needed on the server
 
 ## Tests
 
-The CLI regression suites for Phases 2–6 are in [`tests/`](tests/README.md): a runner, round-trip QR/barcode decoding, and settings access checked over HTTP. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
+The CLI regression suites for Phases 2–7 are in [`tests/`](tests/README.md): a runner, round-trip QR/barcode decoding, HTTP checks of the admin, scan and sale flows, and concurrency tests with worker processes. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
 
 ## Production deployment
 
@@ -461,9 +462,9 @@ The confirmation page is a hidden admin page, `edit.php?post_type=product&page=p
 
 ## Scan page
 
-Phase 6. When staff scan a label's QR code with a phone camera, or type or scan a code into the page, they see the live WooCommerce product for that code. **Read-only:** nothing is sold, no stock changes, and the page writes nothing to the database.
+Phase 6. When staff scan a label's QR code with a phone camera, or type or scan a code into the page, they see the live WooCommerce product for that code. **GET and HEAD are read-only:** they never sell, change stock or write to the database. Selling is a POST from the sale form (Phase 7, see [Mark as Sold](#mark-as-sold)).
 
-- Classes: `ScanRoute` (route, access, redirects, headers, login redirects, admin notices), `ScanScreen` (code → screen, rendering) and `ScanUrl` (every scan URL and the rewrite patterns).
+- Classes: `ScanRoute` (route, access, redirects, headers, login redirects, admin notices), `ScanScreen` (code → screen, rendering, the sale form and sale page) and `ScanUrl` (every scan URL and the rewrite patterns).
 - Template: `templates/pqbg-scan.php`. Stylesheet: `assets/pqbg-scan.css`.
 
 ### URLs
@@ -490,10 +491,12 @@ The plugin answers on `parse_request`. That is before the main query, WordPress'
 | Step | Response |
 |---|---|
 | Permalinks are Plain or contain `index.php` | Not handled (see [Permalinks](#permalinks)). |
-| Method other than GET or HEAD | **405** with `Allow: GET, HEAD`. |
+| Method other than GET or HEAD, except POST on a code URL | **405** with `Allow: GET, HEAD` (entry page) or `Allow: GET, HEAD, POST` (code URL). |
 | Logged out | **302** to `wp_login_url()`. `redirect_to` is the canonical scan URL, or `/scan/` when the path is not a well-formed code. The code's existence is never checked. |
 | Logged in without `pqbg_view_products` (customers, subscribers) | **403**: one fixed page with no box and no product data. No lookup runs, so the response is byte-identical for existing, retired, unknown and invalid codes, and for the entry page. |
-| Path not canonical: lowercase code, spaces, missing trailing slash, any query string, or raw `?pqbg_code=` | **301** to `{home}/scan/{CODE}/`. |
+| POST to `/scan/{CODE}/` (Phase 7: sell or undo) | Handled by `SaleRequest` (see [Mark as Sold](#mark-as-sold)). A POST to a non-canonical URL gets **400**; POSTs are never redirected. |
+| `/scan/{CODE}/?sale={id}` (Phase 7 sale page) | **200** with the sale, or **303** (never 301, so it is not cached) to the code URL when the sale does not exist, belongs to another code, or is not the user's to see. |
+| Path not canonical: lowercase code, spaces, missing trailing slash, any other query string, or raw `?pqbg_code=` | **301** to `{home}/scan/{CODE}/`. |
 | Entry box `?code=` | The input is trimmed, stripped of all whitespace and uppercased; a pasted URL gives the segment after `/scan/`. A well-formed code gets **302** to `/scan/{CODE}/`. Anything else gets **400** "Not a valid product code.", with the input (escaped) back in the box. |
 | Otherwise | The status → screen matrix below. |
 
@@ -619,6 +622,18 @@ A phone cannot open `http://localhost/sharayu`. For testing, use a **Cloudflare 
 7. Tap Log out, then scan again. You should be asked to log in.
 8. Log in as a customer and scan. You should get "You do not have permission to view products." and no product data.
 
+**Phase 7 checklist (Mark as Sold):** use a test product with **Manage stock** on and a stock of at least 2.
+1. Scan its QR and log in as a Store Seller. The product screen shows a **Sell** box: a quantity list with the total per quantity, and **Confirm sale**.
+2. Leave the quantity at 1 and tap **Confirm sale**. You should see "Sold.", the item, "1 × price", the total, "Stock now" one lower than before, the time, an **Undo this sale** button with "Undo available until …", and the "Scan next item" box.
+3. On the laptop, open the product in wp-admin. The stock should be one lower.
+4. Reload the success page on the phone. Nothing should change: still one sale, same stock.
+5. Tap **Undo this sale**. You should see "This sale was undone at …". In wp-admin, the stock should be back to its original level.
+6. Set the product's stock to 0 in wp-admin and scan it again. There is no Sell box, only "Out of stock – cannot be sold."
+7. Change a product to **Draft** and scan it. You get "Not published – cannot be sold yet." and no Sell box.
+8. (Optional) Log in as a customer and scan: still "You do not have permission to view products."
+
+Restore the test product's stock and status afterwards.
+
 ### Limitations
 
 - **The scan base URL must reach this site.** The route answers only on this site's own `/scan/` path. A base URL on another host needs that host to forward to this site, as the tunnel does.
@@ -626,6 +641,125 @@ A phone cannot open `http://localhost/sharayu`. For testing, use a **Cloudflare 
   - about 200–250 ms per product scan over HTTP (median); booting WordPress and WooCommerce dominates
   - 17–37 ms and 12 queries in-process
 - **No guessing of excluded letters.** A code typed with characters outside the code alphabet (`0`, `O`, `1`, `I`, `L`) is not corrected; it gets "Not a valid product code."
+
+## Mark as Sold
+
+Phase 7. From the product screen, a user with `pqbg_sell` sells the scanned item: WooCommerce stock goes down, a permanent row is written to `pqbg_sales`, and the seller can undo their own sale for 10 minutes.
+
+- Classes: `SaleService` (rules, sell, undo, void), `SaleRepository` (all `pqbg_sales` SQL and the atomic stock statement), `StockLock` (per-stock-holder `GET_LOCK`), `SaleRequest` (POST handling, the form token, the sale page). `ScanScreen` builds the form and the sale page; the template renders them.
+- **No WooCommerce order is created.** These sales do **not** appear in WooCommerce orders, reports, Analytics or the products' `total_sales`. The sales history is `pqbg_sales` (its UI is Phase 9).
+- Not in this phase: payment method, customer details, tax/GST, receipts, sales history UI, manager void UI, REST, camera scanning.
+
+### Rules
+
+| Rule | Behaviour |
+|---|---|
+| Item | Resolved server-side from the code. Product IDs, prices and stock are never taken from the form. |
+| Sellable states | Only the "full product screen" rows of the status matrix: a **published** or **private simple** product; a **published (enabled) variation** whose parent is published or private. Draft, pending, scheduled, disabled variation, trash, retired, deleted and unknown codes are refused server-side, not just hidden. |
+| Stock tracking | Must be on, on the item or (for variations with parent-level stock) on the parent. Otherwise no Sell box and, in the wording of the WooCommerce 11.1.2 product editor, "Stock tracking is off for this product. On the Inventory tab, tick 'Track stock quantity for this product' to sell from a scan." (for a variation: "Stock tracking is off for this variation. Tick 'Manage stock?' on the variation, or 'Track stock quantity for this product' on the product's Inventory tab, to sell from a scan.") |
+| Price | The WooCommerce **active price** (`get_price()`) at the moment of sale, including a running scheduled sale. **An empty or zero price blocks the sale**: "This item has no price. Set a price before selling." / "This item has no price (₹0). Set a price before selling." |
+| Quantity | Default 1, min 1, max = the stock available now. Up to 100 in stock: a list where every option shows its total ("2 × ₹1,499.00 = ₹2,998.00"), so the total is live without JavaScript. Above 100: a number field (min 1, max stock) with "Total = quantity × price". |
+| Stock | Stock 0 or not enough → blocked, **whatever the backorder setting**. Stock held for unpaid online checkouts is not subtracted (the seller has the item in hand). |
+| Price or stock changed since the page was opened | Price changed → refused ("The price changed since you opened this page…"), compared as decimals with the store's price decimals, so "1499" = "1499.00" = 1499.0. Stock changed → refused only if the quantity no longer fits ("Stock changed since you opened this page. Now N in stock."). |
+| Users with `pqbg_view_products` but not `pqbg_sell` | The Phase 6 product screen, with no sale controls and no sale notices. |
+
+### Flow
+
+1. **Form** (product screen, sellable item, user with `pqbg_sell`). POST to the canonical code URL with `pqbg_action=sell`, the nonce `pqbg_sell_{code row id}` in `_pqbg_nonce`, the quantity, and a **signed form token**:
+   - `request_id`: a UUID v4 from `random_bytes()`, new on every render. It is the sale's idempotency key (UNIQUE in `pqbg_sales`).
+   - `issued`, `seen_price`, `seen_stock`, and `sig`, an HMAC-SHA256 over these, the user and the code row, keyed with `wp_salt( 'nonce' )`.
+   - The form is separate from the code box, so Enter in the box (or a scanner that types a code and Enter) only looks up a code.
+2. **Checks, in order:**
+   1. logged in (else 302 to the login page, back to the product URL; the POST is not replayed)
+   2. `pqbg_view_products` (else the fixed Phase 6 403)
+   3. canonical URL (else 400)
+   4. a known action (else 400)
+   5. `pqbg_sell` (else 403)
+   6. the nonce (else 403)
+   7. the signature (else 400)
+   8. **an existing sale with this `request_id` → its outcome** (checked before expiry, so a resubmitted form never sells twice)
+   9. the form is at most **30 minutes** old (else 400 "This sale form has expired…")
+   10. the quantity (else 400)
+   11. `SaleService::sell()`
+3. **Result:** a completed sale answers **303** to `/scan/{CODE}/?sale={id}` (Post/Redirect/Get). Reloading it is a read-only GET. Errors show the product screen with the message and, where the item is still sellable, a fresh form.
+
+**Sale page** (`?sale={id}`): the seller's own sale (`pqbg_view_own_sales`), or any sale for `pqbg_view_all_sales`. It shows the snapshots, not live product data, so it stays correct after the product changes: "Sold.", the item and attributes, quantity × unit price, total, "Stock now", the time in the site timezone (`wp_date()`), the Undo button while allowed, and the "Scan next item" box (autofocus).
+
+**Error responses:**
+
+| HTTP | Message |
+|---|---|
+| 400 | "Choose a quantity between 1 and N." / "Only N in stock. Choose a quantity between 1 and N." / "This form is not valid…" / "This sale form has expired…" / "This request could not be understood." |
+| 403 | "You do not have permission to sell." / "This form is no longer valid…" (nonce) / "You can only undo your own sale." |
+| 404 | "Code not found." |
+| 409 | "Out of stock – cannot be sold." / "Stock changed…" / "The price changed…" / "This item just sold online. Stock was not changed." / the status messages / "This sale was already undone." / "Undo is no longer available (10-minute limit)." |
+| 503 | "Someone else is selling this item right now. Try again." with `Retry-After: 2` |
+| 500 | "The sale could not be completed. Stock was not changed." |
+
+Every response carries the Phase 6 security headers. There is still no JavaScript.
+
+### Stock changes, locking and atomicity
+
+`SaleService::sell()`, under the lock of the **stock holder** (the product whose stock actually changes: the parent when a variation uses parent-level stock):
+
+1. `StockLock::acquire()`: `GET_LOCK('pqbg:{site hash}:stock:{holder}', 5)`. On timeout: "busy" (503). It is released in `finally`, and MariaDB releases it anyway when a connection drops.
+2. Recover stale journal rows: any `pending` row of this holder belongs to a process that died, so it becomes `failed` / `interrupted`.
+3. Fresh reads: `_stock` straight from the database, the product re-read after clearing its cache, `get_price()`. Then the stock and price checks.
+4. Insert the journal row: status `pending`, all snapshots, `stock_holder_id`.
+5. `wc_update_product_stock( $holder, $qty, 'decrease' )`. For this one call, a filter on `woocommerce_update_product_stock_query` (at `PHP_INT_MAX`, removed in `finally`) replaces WooCommerce's own UPDATE with **one multi-table statement** that lowers the stock **and** sets the row to `completed` only if it is still `pending`. So the stock change and its record commit together or not at all. WooCommerce then does everything else as usual: lookup table, product save, stock status, caches and hooks.
+6. Read `_stock` again. **Below 0** means an online order took stock between steps 3 and 5: compensate with `wc_update_product_stock( increase )`, whose statement also sets the row to `failed` / `sold_online`. The seller sees "This item just sold online. Stock was not changed." **Any exception or error** after step 4 is compensated the same way (`failed` / `error`).
+7. Record `stock_before` / `stock_after`, release the lock, then call WooCommerce's `wc_trigger_stock_change_actions()` for the low/no-stock notification. WooCommerce sends those itself only for order-based stock changes.
+
+**The replacement is used only if the SQL WooCommerce hands over has the expected shape:** `UPDATE {postmeta} SET meta_value = meta_value -2.000000 WHERE post_id = N AND meta_key='_stock'`, for this holder and quantity (`SaleService::is_expected_stock_sql()`). Otherwise WooCommerce's SQL runs unchanged.
+
+**Fallback** (the row is still `pending` after WooCommerce ran: another plugin replaced the SQL, the filter did not fire, or WooCommerce threw first): a fresh `_stock` read decides. If the stock dropped by at least the quantity since the read under the lock, the row becomes `completed` (conditional on `pending`). Otherwise it becomes `failed` / `error`. A warning is logged with error codes only (`pqbg_stock_marker_missing`, `pqbg_stock_sql_unexpected`, `pqbg_stock_filter_not_fired`). Undo and compensation use the same rule in the other direction. The Phase 7 test suite has a **compatibility check** that fails loudly if WooCommerce stops passing its stock UPDATE through that filter or changes its shape.
+
+**No transactions.** The sale code never runs `START TRANSACTION`, `COMMIT` or `ROLLBACK`, so it cannot implicitly commit a WooCommerce transaction (or any other). A hook that opens its own transaction during the product save (for example the Phase 5 code sweep, which runs on the parent's save for a shop manager) cannot break the sale's atomicity, which comes from single statements. If the service is called while the connection already has an open transaction (`@@in_transaction`), it refuses.
+
+**Idempotency:** one `request_id` = one outcome, forever. Double taps, a resubmitted form, concurrent duplicates (serialised by the lock, with the UNIQUE index behind it) and a reloaded success page never create a second sale or a second decrement.
+
+**Row statuses:** `pending` (journal; stock not changed) → `completed` → `voided`, or `pending` → `failed`, or `completed` → `failed` (compensated). `failure_code`: `sold_online`, `error`, `interrupted`. Rows are never deleted. Reports must count `completed` sales only.
+
+**Side effects that compensation, undo and void cannot take back:**
+- the low/no-stock e-mail sent after a completed sale (an undo does not "unsend" it)
+- anything third-party code did on `woocommerce_product_set_stock` / `woocommerce_variation_set_stock`, `woocommerce_updated_product_stock` or the product save
+- the product's modified date
+- a stock status that shoppers could briefly see (for example "Out of stock" for a few milliseconds during an online race)
+
+**Online checkout boundary:**
+- WooCommerce checkout does not take our lock. A reduction that lands between our read and our decrement is caught (negative stock) and compensated.
+- An online order paid **after** our sale can still take the stock below 0. That is WooCommerce's own oversell behaviour, not something the scan page can prevent.
+- Stock held for unpaid checkouts (`woocommerce_hold_stock_minutes`) is not counted.
+
+**Remaining crash windows** (documented; the Phase 11 reconciliation check will surface them):
+- a crash after the atomic statement but before the snapshots leaves a `completed` row with `stock_after` NULL. Stock and record still agree.
+- a crash between an online-race decrement and its compensation leaves a `completed` row and negative stock.
+
+### Undo and void
+
+- **Undo** (sale page): the **same seller**, with `pqbg_sell`, their own `completed` sale, within **10 minutes** of the sale, **once**. After 10 minutes the button is gone, and a kept form is refused server-side.
+  - Under the lock of the recorded `stock_holder_id`, one statement puts the quantity back and sets `voided`, `voided_by`, `voided_at_gmt`, `void_reason = 'undo'`, only if the row is still `completed`. A second undo changes nothing ("This sale was already undone.").
+  - The row is never deleted. GET cannot undo.
+  - Refused if stock tracking was turned off or moved (parent ↔ variation) since the sale.
+- **Void** (`SaleService::void_sale( $sale_id, $user_id, $reason, $restock = true )`): needs `pqbg_void_sale` (Shop Manager, Administrator). Any `completed` sale, any age; with or without restock. It has **no UI yet** (Phase 9).
+
+### Timings (dev machine)
+
+| Measurement | Result |
+|---|---|
+| Sale over HTTP (POST → 303), median of 5 | about 260–310 ms |
+| Undo over HTTP (POST → 303), median of 5 | about 245–290 ms |
+| Sale in-process (`SaleService::sell()`), median of 5 | about 40–50 ms |
+| Undo in-process, median of 5 | about 30–35 ms |
+
+**Local mail is not configured on this XAMPP:** a low/no-stock notification makes `mail()` fail after about 2 s. The e-mail is sent after the lock is released, so it never holds up the next sale of the item, but that one response is slower.
+
+### Limitations
+
+- The live total is per option in the quantity list; above 100 in stock the number field shows only the formula (no JavaScript).
+- The undo window is measured on the server clock from the sale's `created_at_gmt`. The page does not refresh itself, so the Undo button can still be visible after the 10 minutes; pressing it is then refused.
+- Held stock for pending online checkouts is not subtracted (decision D2).
+- Taxes are off in this store; the recorded price is `get_price()` as entered. Tax/GST handling is out of scope.
 
 ## Requirements
 
@@ -676,7 +810,7 @@ Indexes: `code` (unique), `active_product_id` (unique), `product_status (product
 
 ### `{prefix}pqbg_sales`
 
-The future Mark-as-Sold ledger. It is empty in Phase 2.
+The Mark-as-Sold ledger (Phase 7). One row per sale attempt that reached the stock; rows are never deleted. See [Mark as Sold](#mark-as-sold).
 
 `product_id` and `variation_id` follow WooCommerce's order-item convention: `product_id` is the simple product or the variation's parent, and `variation_id` is the variation (`0` for simple products).
 Note that this differs from `pqbg_codes.product_id`, which is the purchasable item itself.
@@ -691,22 +825,24 @@ Main columns:
 - `currency` char(3)
 - snapshots: `product_name`, `sku`, `attributes_json`
 - `stock_before`, `stock_after`
-- `source` (default `scan`), `status` (default `completed`)
-- void fields, `note`, `created_at_gmt`
+- `source` (default `scan`), `status`: `pending`, `completed`, `voided` or `failed`
+- void fields (`void_reason`, `voided_by`, `voided_at_gmt`), `note`, `created_at_gmt`
+- **schema v2 (Phase 7):** `stock_holder_id` (the product whose stock the sale changed: the parent when a variation uses parent-level stock; undo restores exactly this one) and `failure_code` (`sold_online`, `error`, `interrupted`)
 
-Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`, `status_created`, `created_at_gmt`, `order_id`.
+Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`, `status_created`, `created_at_gmt`, `order_id`, and (v2) `holder_status (stock_holder_id,status)`.
 
-**Rules for the future Mark-as-Sold phase:**
+**Rules (Phase 7):**
 
 - The price always comes from the current server-side `WC_Product` price. A browser-supplied price or stock value is never trusted.
 - Stock is checked server-side, and insufficient stock blocks the sale even if backorders are enabled.
 - No WooCommerce orders are created for these sales.
+- Only `SaleRepository` writes this table (Install only migrates it).
 
 ### Options
 
 | Option | Autoload | Purpose |
 |---|---|---|
-| `pqbg_db_version` | yes | integer schema version (currently `1`) |
+| `pqbg_db_version` | yes | integer schema version (currently `2`) |
 | `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 | `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
@@ -727,6 +863,11 @@ To add migration N:
 3. Make `migrate_N()` idempotent: call `Schema::create_or_update()`, then run any guarded data transforms.
 
 Migrations never drop tables or delete rows.
+
+| Version | Migration |
+|---|---|
+| 1 | `migrate_1`: the `pqbg_codes` and `pqbg_sales` tables, and the optional CHECK constraint |
+| 2 | `migrate_2` (Phase 7): adds `pqbg_sales.stock_holder_id`, `pqbg_sales.failure_code` and the `holder_status` index. Additive (dbDelta): existing rows keep their values and get NULL; re-running changes nothing. |
 
 **The install lock** is an atomic `INSERT IGNORE` row in the options table. `add_option()` is not used because it runs `INSERT … ON DUPLICATE KEY UPDATE` and is therefore not atomic.
 The lock expires after 5 minutes, so a crashed request cannot block upgrades permanently.
@@ -760,11 +901,12 @@ WooCommerce only lets Shop Managers assign the `customer` role, so only Administ
   - REST requests use the core `wp_rest` nonce
   - A nonce check is always paired with a capability check.
 - `CodeRepository` does not check capabilities itself. Callers must check `Permissions::can_manage_codes()` first.
+- Phase 7 mapping: selling and undo need `pqbg_sell` (undo also: own sale, 10 minutes); the sale page needs `can_view_sale()`; `SaleService::void_sale()` needs `pqbg_void_sale`. No new capability was added.
 
 ## HPOS
 
 The plugin declares compatibility with the `custom_order_tables` feature through `FeaturesUtil::declare_compatibility()` on `before_woocommerce_init`.
-It never reads or writes orders or the legacy order tables.
+It never reads, creates or writes orders or the legacy order tables. Sales go to `pqbg_sales` only.
 
 ## Deactivation
 
@@ -786,6 +928,8 @@ This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_v
 ## Operational notes
 
 - QR codes point to the scan base URL: `home_url()` unless it is overridden on the settings page. **Do not print labels until the production URL is set.** The admin warning stays visible while the URL is local, and a second warning appears while a public URL uses `http://`.
-- The site timezone is currently UTC. The plugin stores UTC regardless, but the store timezone (India) should be set deliberately.
+- The site timezone is Asia/Kolkata (set 2026-09-25). The plugin stores UTC (`*_gmt`) and displays times in the site timezone with `wp_date()`.
 - WooCommerce "Coming Soon" mode is on for the whole site. The scan page works with it (see [WooCommerce Coming Soon](#woocommerce-coming-soon)). Logged-out staff log in through `wp-login.php`, because Coming Soon hides the My Account login form.
 - Scan URLs need pretty permalinks (see [Permalinks](#permalinks)).
+- Mail is not configured on this local XAMPP, so the low/no-stock e-mails sent after scan sales fail locally (about 2 s each, after the stock lock is released). Configure mail on the production server.
+- Scan sales are not in WooCommerce reports or Analytics. Use `pqbg_sales` (Phase 9 adds the history UI).

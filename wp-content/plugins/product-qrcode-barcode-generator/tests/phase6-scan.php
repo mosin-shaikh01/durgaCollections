@@ -368,12 +368,15 @@ try {
 	$get = static fn( string $key, string $who = 'seller' ) => $http( $who, 'GET', $url( $codes[ $key ] ) );
 	$np  = 'Not published – cannot be sold yet.';
 	$dis = 'This variation is disabled – cannot be sold.';
+	// Phase 7: a seller also sees why an otherwise sellable item cannot be sold. These fixtures leave stock unmanaged.
+	$untracked   = "Stock tracking is off for this product. On the Inventory tab, tick 'Track stock quantity for this product' to sell from a scan.";
+	$untracked_v = "Stock tracking is off for this variation. Tick 'Manage stock?' on the variation, or 'Track stock quantity for this product' on the product's Inventory tab, to sell from a scan.";
 	$full = static fn( array $r ) => str_contains( $r['body'], 'class="pqbg-scan__price"' ) && str_contains( $r['body'], 'class="pqbg-scan__stock"' );
 
 	$r = $get( 'simple' );
 	pqbg_t( 'active simple, published: 200 full screen, no banner', 200 === $r['code'] && $full( $r ) && array() === $notices_in( $r['body'] ) && str_contains( $r['body'], esc_html( get_the_title( $simple ) ) ), (string) $r['code'] );
 	$r = $get( 'private' );
-	pqbg_t( 'active simple, private: 200 full screen, NO banner (a private simple product is normal)', 200 === $r['code'] && $full( $r ) && array() === $notices_in( $r['body'] ) );
+	pqbg_t( 'active simple, private: 200 full screen, NO status banner (a private simple product is normal; only the Phase 7 stock-tracking notice)', 200 === $r['code'] && $full( $r ) && array( $untracked ) === $notices_in( $r['body'] ) );
 	foreach ( array( 'draft', 'pending', 'future' ) as $k ) {
 		$r = $get( $k );
 		pqbg_t( "active simple, {$k}: full screen + \"Not published\" banner", 200 === $r['code'] && $full( $r ) && array( $np ) === $notices_in( $r['body'] ) );
@@ -389,7 +392,7 @@ try {
 	$r = $get( 'vdraft1' );
 	pqbg_t( 'disabled variation under a draft parent: both banners', array( $np, $dis ) === $notices_in( $r['body'] ) );
 	$r = $get( 'vpriv' );
-	pqbg_t( 'enabled variation under a private parent: full screen, no banner', 200 === $r['code'] && $full( $r ) && array() === $notices_in( $r['body'] ) );
+	pqbg_t( 'enabled variation under a private parent: full screen, no status banner (only the Phase 7 stock-tracking notice)', 200 === $r['code'] && $full( $r ) && array( $untracked_v ) === $notices_in( $r['body'] ) );
 	$r = $get( 'vtrash' );
 	pqbg_t( 'variation trashed with its parent: "in the trash"', array( 'This product is in the trash.' ) === $notices_in( $r['body'] ) && ! $full( $r ) && str_contains( $r['body'], 'PQBG-P6-' . $vtrash ) );
 	$r = $get( 'vponly' );
@@ -416,7 +419,8 @@ try {
 		$all_screens[ $k ] = $get( $k );
 	}
 	pqbg_t( 'every screen has the box (autofocus, name=code, GET to /scan/) and a Log out link', array() === array_filter( $all_screens, static fn( $r ) => ! ( str_contains( $r['body'], 'name="code"' ) && str_contains( $r['body'], ' autofocus' ) && str_contains( $r['body'], 'method="get" action="' . esc_url( $url() ) . '"' ) && str_contains( $r['body'], 'wp-login.php?action=logout' ) ) ) );
-	pqbg_t( 'no screen offers selling or stock changes', array() === array_filter( $all_screens, static fn( $r ) => (bool) preg_match( '/mark\s+(as\s+)?sold|<form[^>]*method="post"/i', $r['body'] ) ) );
+	$posting = array_keys( array_filter( $all_screens, static fn( $r ) => (bool) preg_match( '/<form[^>]*method="post"/i', $r['body'] ) ) );
+	pqbg_t( 'POST forms appear only as the Phase 7 sale form, only on the sellable items (simple, var0), and nothing says "mark as sold"', array( 'simple', 'var0' ) === $posting && array() === array_filter( $all_screens, static fn( $r ) => preg_match_all( '/<form[^>]*method="post"/i', $r['body'] ) !== substr_count( $r['body'], '<form class="pqbg-scan__sell" method="post"' ) || (bool) preg_match( '/mark\s+(as\s+)?sold/i', $r['body'] ) ), implode( ',', $posting ) );
 	pqbg_t( 'scans wrote nothing to pqbg_codes (checksum unchanged)', $checksum === $sum() );
 
 	pqbg_section( 'rendering: price, stock, categories, image, code (HTTP, seller)' );
@@ -545,9 +549,12 @@ try {
 	}
 
 	pqbg_section( 'access: methods' );
+	// Phase 7 accepts POST (sell, undo) on code URLs; the entry page still refuses it.
+	$r = $http( 'seller', 'POST', $url(), array( 'x' => '1' ) );
+	pqbg_t( 'POST to the entry page as seller: 405 with Allow: GET, HEAD', 405 === $r['code'] && 'GET, HEAD' === ( $r['headers']['allow'] ?? '' ) );
 	$r = $http( 'seller', 'POST', $cu, array( 'x' => '1' ) );
-	pqbg_t( 'POST as seller: 405 with Allow: GET, HEAD', 405 === $r['code'] && 'GET, HEAD' === ( $r['headers']['allow'] ?? '' ) && ! str_contains( $r['body'], 'PQBG P6' ) );
-	pqbg_t( 'POST logged out: 405', 405 === $http( 'anon', 'POST', $cu, array( 'x' => '1' ) )['code'] );
+	pqbg_t( 'POST to a code URL without a sale action (Phase 7): 400 "This request could not be understood."', 400 === $r['code'] && in_array( 'This request could not be understood.', $notices_in( $r['body'] ), true ) );
+	pqbg_t( 'POST logged out: 302 to the login page (Phase 7)', str_starts_with( $http( 'anon', 'POST', $cu, array( 'x' => '1' ) )['location'], wp_login_url() ) );
 	$r = $http( 'seller', 'HEAD', $cu );
 	pqbg_t( 'HEAD as seller: 200, empty body', 200 === $r['code'] && '' === $r['body'] );
 
@@ -562,7 +569,7 @@ try {
 		'400 invalid'      => $entry( 'nope' ),
 		'404 unknown'      => $http( 'seller', 'GET', $url( $unknown ) ),
 		'403 customer'     => $http( 'customer', 'GET', $cu ),
-		'405 method'       => $http( 'seller', 'POST', $cu, 'x=1' ),
+		'405 method'       => $http( 'seller', 'POST', $url(), 'x=1' ),
 		'200 HEAD'         => $http( 'seller', 'HEAD', $cu ),
 	);
 	foreach ( $typed as $name => $r ) {

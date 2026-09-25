@@ -6,14 +6,18 @@
  * the theme and WooCommerce Coming Soon, which all run later):
  *
  *   route unavailable (plain or index.php permalinks) → not handled
- *   method other than GET/HEAD                       → 405
+ *   method other than GET/HEAD (or POST on a code)   → 405
  *   logged out                                       → 302 to the login page, back to the scan URL
  *   no pqbg_view_products                            → 403, identical for every code (no lookup)
+ *   POST to /scan/{CODE}/ (sell, undo; Phase 7)      → SaleRequest::handle(); 400 unless the URL is canonical
+ *   /scan/{CODE}/?sale={id} (sale result page)       → SaleRequest::sale_page(), or 303 to the code URL
+ *                                                      when the sale is not the user's to see
  *   non-canonical path or query string               → 301 to the canonical URL
  *   entry box ?code=                                 → 302 to /scan/{CODE}/, or 400 "Not a valid product code."
  *   otherwise                                        → ScanScreen::resolve()
  *
- * Read-only: nothing here writes to the database except the rewrite-rules flag.
+ * GET and HEAD are read-only: nothing here writes to the database except the
+ * rewrite-rules flag. Writes happen only on POST, in SaleService.
  * No REST routes, AJAX handlers or shortcodes.
  *
  * Rewrite rules are flushed once on activation and when RULES_VERSION or the
@@ -145,15 +149,17 @@ final class ScanRoute {
 			return;
 		}
 
-		$code = isset( $wp->query_vars[ self::CODE_VAR ] ) && is_string( $wp->query_vars[ self::CODE_VAR ] ) ? $wp->query_vars[ self::CODE_VAR ] : null;
-		$box  = isset( $_GET['code'] ) && is_string( $_GET['code'] ) ? wp_unslash( $_GET['code'] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only lookup; normalised by ScanUrl::extract_code() and escaped on output.
+		$code   = isset( $wp->query_vars[ self::CODE_VAR ] ) && is_string( $wp->query_vars[ self::CODE_VAR ] ) ? $wp->query_vars[ self::CODE_VAR ] : null;
+		$box    = isset( $_GET['code'] ) && is_string( $_GET['code'] ) ? wp_unslash( $_GET['code'] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only lookup; normalised by ScanUrl::extract_code() and escaped on output.
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : 'GET';
 
 		self::send(
 			self::decide(
-				isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : 'GET',
+				$method,
 				isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only its path is compared.
 				$code,
-				$box
+				$box,
+				'POST' === $method ? wp_unslash( $_POST ) : array() // phpcs:ignore WordPress.Security.NonceVerification.Missing -- SaleRequest verifies the nonce, the capability and a signed token.
 			)
 		);
 	}
@@ -165,13 +171,17 @@ final class ScanRoute {
 	 * @param string      $request_uri Request URI (path and query).
 	 * @param string|null $code        Raw code segment from the path, or null for the entry page.
 	 * @param string|null $box         Raw ?code= value from the entry box, or null.
-	 * @return array{status: int, location?: string, view?: array<string, mixed>}
+	 * @param array       $post        Unslashed POST fields (POST only).
+	 * @return array{status: int, location?: string, view?: array<string, mixed>, headers?: array<string, string>}
 	 */
-	public static function decide( string $method, string $request_uri, ?string $code, ?string $box ): array {
-		if ( ! in_array( $method, array( 'GET', 'HEAD' ), true ) ) {
+	public static function decide( string $method, string $request_uri, ?string $code, ?string $box, array $post = array() ): array {
+		$is_post = 'POST' === $method && null !== $code;
+
+		if ( ! in_array( $method, array( 'GET', 'HEAD' ), true ) && ! $is_post ) {
 			return array(
-				'status' => 405,
-				'view'   => ScanScreen::method_not_allowed(),
+				'status'  => 405,
+				'view'    => ScanScreen::method_not_allowed(),
+				'headers' => array( 'Allow' => null === $code ? 'GET, HEAD' : 'GET, HEAD, POST' ),
 			);
 		}
 
@@ -236,8 +246,38 @@ final class ScanRoute {
 		}
 
 		$canonical = ScanUrl::site_url( $candidate );
+		$is_path   = (string) wp_parse_url( $canonical, PHP_URL_PATH ) === $path;
 
-		if ( (string) wp_parse_url( $canonical, PHP_URL_PATH ) !== $path || '' !== $query ) {
+		if ( $is_post ) {
+			// A POST is never redirected: the browser would turn it into a GET and drop it.
+			if ( ! $is_path || '' !== $query ) {
+				return array(
+					'status' => 400,
+					'view'   => ScanScreen::with_error( ScanScreen::resolve( $candidate ), 400, __( 'This request could not be understood.', 'product-qrcode-barcode-generator' ) ),
+				);
+			}
+
+			return SaleRequest::handle( $candidate, $post );
+		}
+
+		$sale_id = $is_path ? self::sale_query( $query ) : 0;
+
+		if ( $sale_id > 0 ) {
+			$view = SaleRequest::sale_page( $candidate, $sale_id );
+
+			// 303, never 301: whether the page may be seen depends on the user, so it must not be cached.
+			return null === $view
+				? array(
+					'status'   => 303,
+					'location' => $canonical,
+				)
+				: array(
+					'status' => 200,
+					'view'   => $view,
+				);
+		}
+
+		if ( ! $is_path || '' !== $query ) {
 			return array(
 				'status'   => 301,
 				'location' => $canonical,
@@ -250,6 +290,15 @@ final class ScanRoute {
 			'status' => (int) $view['status'],
 			'view'   => $view,
 		);
+	}
+
+	/**
+	 * The sale ID when the query string is exactly "sale={digits}", else 0.
+	 *
+	 * @param string $query Query string.
+	 */
+	private static function sale_query( string $query ): int {
+		return 1 === preg_match( '/^' . SaleRequest::SALE_ARG . '=([1-9][0-9]{0,18})$/', $query, $m ) ? (int) $m[1] : 0;
 	}
 
 	/**
@@ -411,18 +460,14 @@ final class ScanRoute {
 	/**
 	 * Sends a decided response and ends the request.
 	 *
-	 * @param array{status: int, location?: string, view?: array<string, mixed>} $response Response.
+	 * @param array{status: int, location?: string, view?: array<string, mixed>, headers?: array<string, string>} $response Response.
 	 */
 	private static function send( array $response ): void {
-		foreach ( self::security_headers() as $name => $value ) {
+		foreach ( array_merge( self::security_headers(), $response['headers'] ?? array() ) as $name => $value ) {
 			header( $name . ': ' . $value );
 		}
 
 		header_remove( 'Last-Modified' );
-
-		if ( 405 === $response['status'] ) {
-			header( 'Allow: GET, HEAD' );
-		}
 
 		if ( isset( $response['location'] ) ) {
 			wp_safe_redirect( $response['location'], $response['status'], 'Product QR Code and Barcode Generator' );

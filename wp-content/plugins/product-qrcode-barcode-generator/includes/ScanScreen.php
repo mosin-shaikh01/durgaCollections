@@ -5,7 +5,9 @@
  *
  * Read-only. Product data is read live from WooCommerce on every request and
  * nothing is cached or written. Only display data is collected: no cost,
- * supplier, notes or customer data.
+ * supplier, notes or customer data. Selling is done by SaleRequest and
+ * SaleService; this class only builds the sale form (for users with pqbg_sell
+ * on a sellable item) and the sale result page.
  *
  * Access control is NOT done here; ScanRoute checks it before calling in.
  *
@@ -18,6 +20,10 @@
  *   links    array    list of [ url, label ]
  *   box      bool     whether to show the "Scan or type a code" box
  *   value    string   value to prefill in the box
+ *   sell     ?array   the sale form (see sell_form())
+ *   sale     ?array   a recorded sale (see sale())
+ *   undo     ?array   the Undo form for that sale
+ *   box_label string  label of the box; '' for the default
  *
  * @package ProductQrBarcode
  */
@@ -37,6 +43,12 @@ final class ScanScreen {
 
 	/** Parent statuses that mean "not published yet". */
 	const UNPUBLISHED = array( 'draft', 'pending', 'future', 'auto-draft' );
+
+	/** Above this stock level the quantity is a number field instead of a list with totals. */
+	const QUANTITY_LIST_MAX = 100;
+
+	/** Sale refusals shown as a notice on the product screen (the status ones already have their own). */
+	const SELL_NOTICES = array( 'pqbg_stock_unmanaged', 'pqbg_no_price', 'pqbg_zero_price' );
 
 	/**
 	 * The screen for a well-formed code.
@@ -111,6 +123,27 @@ final class ScanScreen {
 			$links[] = array( $edit_link, __( 'Edit product', 'product-qrcode-barcode-generator' ) );
 		}
 
+		$sell = null;
+
+		// Users without pqbg_sell see the product screen exactly as in Phase 6.
+		if ( Permissions::can_sell() ) {
+			$item = SaleService::check_item( $row );
+
+			if ( is_wp_error( $item ) ) {
+				if ( in_array( $item->get_error_code(), self::SELL_NOTICES, true ) ) {
+					$notices[] = array( 'warning', $item->get_error_message() );
+				}
+			} else {
+				$stock = SaleRepository::read_stock( $item['holder']->get_id() );
+
+				if ( null === $stock || $stock <= 0 ) {
+					$notices[] = array( 'warning', __( 'Out of stock – cannot be sold.', 'product-qrcode-barcode-generator' ) );
+				} else {
+					$sell = self::sell_form( $code, $row, $item['product'], (int) $stock );
+				}
+			}
+		}
+
 		return self::view(
 			200,
 			$notices,
@@ -118,8 +151,135 @@ final class ScanScreen {
 				'code'    => $code,
 				'product' => self::product_details( $product, $parent ),
 				'links'   => $links,
+				'sell'    => $sell,
 			)
 		);
+	}
+
+	/**
+	 * A view with an error notice first and another HTTP status.
+	 *
+	 * @param array<string, mixed> $view    View.
+	 * @param int                  $status  HTTP status.
+	 * @param string               $message Message.
+	 * @return array<string, mixed>
+	 */
+	public static function with_error( array $view, int $status, string $message ): array {
+		$view['status']  = $status;
+		$view['notices'] = array_merge( array( array( 'error', $message ) ), $view['notices'] );
+
+		return $view;
+	}
+
+	/**
+	 * A recorded sale, shown from the row's snapshots (not live product data).
+	 *
+	 * @param array<string, string> $sale Sale row.
+	 * @param string                $code Code in the URL.
+	 * @return array<string, mixed>
+	 */
+	public static function sale( array $sale, string $code ): array {
+		$args  = array( 'currency' => $sale['currency'] );
+		$attrs = json_decode( (string) $sale['attributes_json'], true );
+		$pairs = array();
+
+		foreach ( is_array( $attrs ) ? $attrs : array() as $label => $value ) {
+			$pairs[] = $label . ': ' . $value;
+		}
+
+		if ( SaleRepository::STATUS_COMPLETED === $sale['status'] ) {
+			$notice = array( 'success', __( 'Sold.', 'product-qrcode-barcode-generator' ) );
+		} elseif ( SaleRepository::STATUS_VOIDED === $sale['status'] ) {
+			$when   = wp_date( get_option( 'time_format' ), (int) strtotime( $sale['voided_at_gmt'] . ' UTC' ) );
+			$notice = array(
+				'info',
+				SaleService::VOID_REASON_UNDO === $sale['void_reason']
+					/* translators: %s: time. */
+					? sprintf( __( 'This sale was undone at %s. Stock was restored.', 'product-qrcode-barcode-generator' ), $when )
+					/* translators: %s: time. */
+					: sprintf( __( 'This sale was voided at %s.', 'product-qrcode-barcode-generator' ), $when ),
+			);
+		} else {
+			$notice = array(
+				'error',
+				SaleRepository::FAILURE_SOLD_ONLINE === $sale['failure_code']
+					? __( 'This item just sold online. Stock was not changed.', 'product-qrcode-barcode-generator' )
+					: __( 'The sale could not be completed. Stock was not changed.', 'product-qrcode-barcode-generator' ),
+			);
+		}
+
+		$undo = null;
+
+		if ( SaleRepository::STATUS_COMPLETED === $sale['status'] && SaleService::can_undo( $sale, get_current_user_id() ) ) {
+			$undo = array(
+				'action'  => ScanUrl::site_url( $code ),
+				'nonce'   => wp_create_nonce( Permissions::nonce_action( 'undo_' . $sale['id'] ) ),
+				'sale_id' => (string) $sale['id'],
+				'until'   => wp_date( get_option( 'time_format' ), SaleService::undo_until( $sale ) ),
+			);
+		}
+
+		return self::view(
+			200,
+			array( $notice ),
+			array(
+				'code'      => $code,
+				'sale'      => array(
+					'status'     => $sale['status'],
+					'name'       => $sale['product_name'],
+					'attributes' => implode( ', ', $pairs ),
+					'sku'        => (string) $sale['sku'],
+					'quantity'   => number_format_i18n( (int) $sale['quantity'] ),
+					'unit'       => self::plain_price( $sale['unit_price'], $args ),
+					'total'      => self::plain_price( $sale['line_total'], $args ),
+					'stock'      => SaleRepository::STATUS_COMPLETED === $sale['status'] && null !== $sale['stock_after'] ? number_format_i18n( (int) $sale['stock_after'] ) : '',
+					'time'       => wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), SaleService::created_ts( $sale ) ),
+				),
+				'undo'      => $undo,
+				'box_label' => __( 'Scan next item', 'product-qrcode-barcode-generator' ),
+			)
+		);
+	}
+
+	/**
+	 * The sale form for a sellable item.
+	 *
+	 * @param string                $code    Code.
+	 * @param array<string, string> $row     Code row.
+	 * @param WC_Product            $product Item.
+	 * @param int                   $stock   The holder's stock, read from the database.
+	 * @return array<string, mixed>
+	 */
+	private static function sell_form( string $code, array $row, WC_Product $product, int $stock ): array {
+		$price   = SaleService::normalize_price( $product->get_price() );
+		$unit    = self::plain_price( $price );
+		$options = array();
+
+		if ( $stock <= self::QUANTITY_LIST_MAX ) {
+			for ( $qty = 1; $qty <= $stock; $qty++ ) {
+				/* translators: 1: quantity, 2: unit price, 3: total. */
+				$options[ $qty ] = sprintf( __( '%1$s × %2$s = %3$s', 'product-qrcode-barcode-generator' ), number_format_i18n( $qty ), $unit, self::plain_price( SaleService::line_total( $price, $qty ) ) );
+			}
+		}
+
+		return array(
+			'action'  => ScanUrl::site_url( $code ),
+			'nonce'   => wp_create_nonce( Permissions::nonce_action( 'sell_' . $row['id'] ) ),
+			'fields'  => SaleRequest::issue_token( get_current_user_id(), (int) $row['id'], $price, $stock ),
+			'options' => $options,
+			'max'     => $stock,
+			'unit'    => $unit,
+		);
+	}
+
+	/**
+	 * A price as plain text (e.g. "₹1,499.00") for places where HTML is not allowed.
+	 *
+	 * @param string               $amount Amount.
+	 * @param array<string, mixed> $args   wc_price() arguments.
+	 */
+	private static function plain_price( string $amount, array $args = array() ): string {
+		return trim( html_entity_decode( wp_strip_all_tags( wc_price( (float) $amount, $args ) ), ENT_QUOTES, 'UTF-8' ) );
 	}
 
 	/**
@@ -327,14 +487,18 @@ final class ScanScreen {
 	private static function view( int $status, array $notices, array $extra = array() ): array {
 		return array_merge(
 			array(
-				'status'  => $status,
-				'notices' => $notices,
-				'product' => null,
-				'summary' => null,
-				'code'    => '',
-				'links'   => array(),
-				'box'     => true,
-				'value'   => '',
+				'status'    => $status,
+				'notices'   => $notices,
+				'product'   => null,
+				'summary'   => null,
+				'code'      => '',
+				'links'     => array(),
+				'box'       => true,
+				'value'     => '',
+				'sell'      => null,
+				'sale'      => null,
+				'undo'      => null,
+				'box_label' => '',
 			),
 			$extra
 		);

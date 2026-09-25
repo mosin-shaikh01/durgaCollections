@@ -32,7 +32,7 @@ try {
 	pqbg_t( 'deactivated', ! is_plugin_active( $pf ) );
 	pqbg_t( 'tables persist after deactivation', Schema::tables_exist() );
 	pqbg_t( 'marker row persists', null !== CodeRepository::find_by_code( 'TEST-PQBG-LIFE' ) );
-	pqbg_t( 'options persist', 1 === (int) get_option( 'pqbg_db_version' ) && is_array( get_option( 'pqbg_settings' ) ) );
+	pqbg_t( 'options persist', Install::DB_VERSION === (int) get_option( 'pqbg_db_version' ) && is_array( get_option( 'pqbg_settings' ) ) );
 	pqbg_t( 'seller role + caps persist', get_role( 'pqbg_seller' ) && get_role( 'administrator' )->has_cap( 'pqbg_manage_settings' ) );
 
 	// Default uninstall path (constant NOT defined): must preserve everything. Plugin files are not touched.
@@ -42,7 +42,7 @@ try {
 	pqbg_t( 'default uninstall: tables kept', Schema::tables_exist() );
 	pqbg_t( 'default uninstall: marker row kept', null !== CodeRepository::find_by_code( 'TEST-PQBG-LIFE' ) );
 	wp_cache_flush();
-	pqbg_t( 'default uninstall: options kept', 1 === (int) get_option( 'pqbg_db_version' ) && is_array( get_option( 'pqbg_settings' ) ) );
+	pqbg_t( 'default uninstall: options kept', Install::DB_VERSION === (int) get_option( 'pqbg_db_version' ) && is_array( get_option( 'pqbg_settings' ) ) );
 	pqbg_t( 'default uninstall: role/caps kept', get_role( 'pqbg_seller' ) && get_role( 'shop_manager' )->has_cap( 'pqbg_manage_codes' ) );
 } finally {
 	if ( ! is_plugin_active( $pf ) ) {
@@ -52,7 +52,7 @@ try {
 
 pqbg_t( 'reactivated', ( ! isset( $r ) || ! is_wp_error( $r ) ) && is_plugin_active( $pf ) );
 pqbg_t( 'marker row survives reactivation', null !== CodeRepository::find_by_code( 'TEST-PQBG-LIFE' ) );
-pqbg_t( 'db version still 1', 1 === Install::stored_version() );
+pqbg_t( 'db version still Install::DB_VERSION', Install::DB_VERSION === Install::stored_version() );
 
 $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . Schema::codes_table() . ' WHERE code = %s', 'TEST-PQBG-LIFE' ) );
 $wpdb->query( 'ALTER TABLE ' . Schema::codes_table() . ' AUTO_INCREMENT = 1' );

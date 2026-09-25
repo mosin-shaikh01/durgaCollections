@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
 final class Install {
 
 	/** Current schema version. Must equal the highest key in migrations(). */
-	const DB_VERSION = 1;
+	const DB_VERSION = 2;
 
 	const DB_VERSION_OPTION = 'pqbg_db_version';
 	const LOCK_OPTION       = 'pqbg_install_lock';
@@ -40,6 +40,7 @@ final class Install {
 	public static function migrations(): array {
 		return array(
 			1 => array( __CLASS__, 'migrate_1' ),
+			2 => array( __CLASS__, 'migrate_2' ),
 		);
 	}
 
@@ -168,6 +169,29 @@ final class Install {
 
 		// Defence in depth only; CodeRepository enforces the invariant on every server.
 		Schema::ensure_active_check();
+
+		return true;
+	}
+
+	/**
+	 * Schema version 2 (Phase 7, Mark as Sold): adds pqbg_sales.stock_holder_id,
+	 * pqbg_sales.failure_code and the holder_status index. Additive only
+	 * (dbDelta), so existing rows keep their values and get NULL in the new
+	 * columns; re-running changes nothing.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function migrate_2() {
+		global $wpdb;
+
+		Schema::create_or_update();
+
+		$table   = Schema::sales_table();
+		$columns = $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
+
+		if ( ! in_array( 'stock_holder_id', $columns, true ) || ! in_array( 'failure_code', $columns, true ) ) {
+			return new WP_Error( 'pqbg_schema_failed', __( 'Product QR Code and Barcode Generator could not update its database tables.', 'product-qrcode-barcode-generator' ) . ' ' . $wpdb->last_error );
+		}
 
 		return true;
 	}

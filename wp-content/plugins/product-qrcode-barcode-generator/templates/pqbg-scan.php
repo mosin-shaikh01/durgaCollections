@@ -9,6 +9,10 @@
  * price (WooCommerce's price functions, passed through wp_kses_post()) and
  * the image tag (wp_get_attachment_image(), which escapes its attributes).
  *
+ * The sale and Undo forms are separate from the code box, so pressing Enter
+ * in the box (or a scanner that types a code and Enter) only looks up a code
+ * and never submits a sale.
+ *
  * Loaded by ScanScreen::render() with $view, $entry_url and $logout_url in scope.
  *
  * @package ProductQrBarcode
@@ -22,6 +26,9 @@ defined( 'ABSPATH' ) || exit;
 
 $pqbg_product = $view['product'];
 $pqbg_summary = $view['summary'];
+$pqbg_sell    = $view['sell'];
+$pqbg_sale    = $view['sale'];
+$pqbg_undo    = $view['undo'];
 ?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -40,7 +47,7 @@ $pqbg_summary = $view['summary'];
 <main class="pqbg-scan__main">
 <?php if ( $view['box'] ) : ?>
 	<form class="pqbg-scan__form" method="get" action="<?php echo esc_url( $entry_url ); ?>" role="search">
-		<label class="pqbg-scan__label" for="pqbg-code"><?php esc_html_e( 'Scan or type a code', 'product-qrcode-barcode-generator' ); ?></label>
+		<label class="pqbg-scan__label" for="pqbg-code"><?php echo esc_html( '' !== $view['box_label'] ? $view['box_label'] : __( 'Scan or type a code', 'product-qrcode-barcode-generator' ) ); ?></label>
 		<div class="pqbg-scan__row">
 			<input class="pqbg-scan__input" id="pqbg-code" name="code" type="text" value="<?php echo esc_attr( $view['value'] ); ?>" placeholder="DC-XXXX-XXXX-XXXX" maxlength="200" required autofocus autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go">
 			<button class="pqbg-scan__button" type="submit"><?php esc_html_e( 'Look up', 'product-qrcode-barcode-generator' ); ?></button>
@@ -91,6 +98,72 @@ $pqbg_summary = $view['summary'];
 			<dd class="pqbg-scan__code"><?php echo esc_html( $view['code'] ); ?></dd>
 		</dl>
 	</article>
+	<?php if ( is_array( $pqbg_sell ) ) : ?>
+		<form class="pqbg-scan__sell" method="post" action="<?php echo esc_url( $pqbg_sell['action'] ); ?>">
+			<h2 class="pqbg-scan__sell-title"><?php esc_html_e( 'Sell', 'product-qrcode-barcode-generator' ); ?></h2>
+			<input type="hidden" name="pqbg_action" value="sell">
+			<input type="hidden" name="_pqbg_nonce" value="<?php echo esc_attr( $pqbg_sell['nonce'] ); ?>">
+			<?php foreach ( $pqbg_sell['fields'] as $pqbg_name => $pqbg_value ) : ?>
+				<input type="hidden" name="<?php echo esc_attr( $pqbg_name ); ?>" value="<?php echo esc_attr( $pqbg_value ); ?>">
+			<?php endforeach; ?>
+			<label class="pqbg-scan__label" for="pqbg-quantity"><?php esc_html_e( 'Quantity', 'product-qrcode-barcode-generator' ); ?></label>
+			<?php if ( array() !== $pqbg_sell['options'] ) : ?>
+				<select class="pqbg-scan__quantity" id="pqbg-quantity" name="quantity">
+					<?php foreach ( $pqbg_sell['options'] as $pqbg_qty => $pqbg_label ) : ?>
+						<option value="<?php echo esc_attr( (string) $pqbg_qty ); ?>"<?php selected( 1, $pqbg_qty ); ?>><?php echo esc_html( $pqbg_label ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			<?php else : ?>
+				<input class="pqbg-scan__quantity" id="pqbg-quantity" name="quantity" type="number" inputmode="numeric" min="1" max="<?php echo esc_attr( (string) $pqbg_sell['max'] ); ?>" step="1" value="1" required>
+				<p class="pqbg-scan__hint">
+					<?php
+					/* translators: %s: unit price. */
+					echo esc_html( sprintf( __( 'Total = quantity × %s', 'product-qrcode-barcode-generator' ), $pqbg_sell['unit'] ) );
+					?>
+				</p>
+			<?php endif; ?>
+			<button class="pqbg-scan__button pqbg-scan__button--sell" type="submit"><?php esc_html_e( 'Confirm sale', 'product-qrcode-barcode-generator' ); ?></button>
+		</form>
+	<?php endif; ?>
+<?php elseif ( is_array( $pqbg_sale ) ) : ?>
+	<article class="pqbg-scan__product pqbg-scan__sale">
+		<h1 class="pqbg-scan__name"><?php echo esc_html( $pqbg_sale['name'] ); ?></h1>
+		<?php if ( '' !== trim( $pqbg_sale['attributes'] ) ) : ?>
+			<p class="pqbg-scan__attributes"><?php echo esc_html( $pqbg_sale['attributes'] ); ?></p>
+		<?php endif; ?>
+		<dl class="pqbg-scan__facts">
+			<dt><?php esc_html_e( 'Quantity', 'product-qrcode-barcode-generator' ); ?></dt>
+			<dd><?php echo esc_html( $pqbg_sale['quantity'] . ' × ' . $pqbg_sale['unit'] ); ?></dd>
+			<dt><?php esc_html_e( 'Total', 'product-qrcode-barcode-generator' ); ?></dt>
+			<dd class="pqbg-scan__total"><?php echo esc_html( $pqbg_sale['total'] ); ?></dd>
+			<?php if ( '' !== $pqbg_sale['stock'] ) : ?>
+				<dt><?php esc_html_e( 'Stock now', 'product-qrcode-barcode-generator' ); ?></dt>
+				<dd><?php echo esc_html( $pqbg_sale['stock'] ); ?></dd>
+			<?php endif; ?>
+			<dt><?php esc_html_e( 'Time', 'product-qrcode-barcode-generator' ); ?></dt>
+			<dd><?php echo esc_html( $pqbg_sale['time'] ); ?></dd>
+			<?php if ( '' !== $pqbg_sale['sku'] ) : ?>
+				<dt><?php esc_html_e( 'SKU', 'product-qrcode-barcode-generator' ); ?></dt>
+				<dd><?php echo esc_html( $pqbg_sale['sku'] ); ?></dd>
+			<?php endif; ?>
+			<dt><?php esc_html_e( 'Code', 'product-qrcode-barcode-generator' ); ?></dt>
+			<dd class="pqbg-scan__code"><?php echo esc_html( $view['code'] ); ?></dd>
+		</dl>
+	</article>
+	<?php if ( is_array( $pqbg_undo ) ) : ?>
+		<form class="pqbg-scan__undo" method="post" action="<?php echo esc_url( $pqbg_undo['action'] ); ?>">
+			<input type="hidden" name="pqbg_action" value="undo">
+			<input type="hidden" name="_pqbg_nonce" value="<?php echo esc_attr( $pqbg_undo['nonce'] ); ?>">
+			<input type="hidden" name="sale" value="<?php echo esc_attr( $pqbg_undo['sale_id'] ); ?>">
+			<button class="pqbg-scan__button pqbg-scan__button--undo" type="submit"><?php esc_html_e( 'Undo this sale', 'product-qrcode-barcode-generator' ); ?></button>
+			<p class="pqbg-scan__hint">
+				<?php
+				/* translators: %s: time. */
+				echo esc_html( sprintf( __( 'Undo available until %s', 'product-qrcode-barcode-generator' ), $pqbg_undo['until'] ) );
+				?>
+			</p>
+		</form>
+	<?php endif; ?>
 <?php elseif ( is_array( $pqbg_summary ) ) : ?>
 	<article class="pqbg-scan__product">
 		<h1 class="pqbg-scan__name"><?php echo esc_html( $pqbg_summary['name'] ); ?></h1>

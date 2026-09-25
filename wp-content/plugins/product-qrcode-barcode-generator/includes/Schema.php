@@ -39,9 +39,13 @@ final class Schema {
 	}
 
 	/**
-	 * Sales ledger (future Mark-as-Sold). product_id/variation_id follow the
+	 * Sales ledger (Mark as Sold, Phase 7). product_id/variation_id follow the
 	 * WooCommerce order-item convention: product_id is the simple product or the
 	 * variation's parent, variation_id is the variation (0 for simple products).
+	 *
+	 * Schema version 2 added stock_holder_id (the product whose stock the sale
+	 * changed: the parent when a variation uses parent-level stock) and
+	 * failure_code. Statuses: pending, completed, voided, failed. See SaleRepository.
 	 */
 	public static function sales_table(): string {
 		global $wpdb;
@@ -114,6 +118,8 @@ voided_by bigint(20) unsigned NULL DEFAULT NULL,
 voided_at_gmt datetime NULL DEFAULT NULL,
 note text NULL,
 created_at_gmt datetime NOT NULL,
+stock_holder_id bigint(20) unsigned NULL DEFAULT NULL,
+failure_code varchar(40) NULL DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY request_id (request_id),
 KEY code_id (code_id),
@@ -121,7 +127,8 @@ KEY product_variation (product_id,variation_id),
 KEY seller_created (seller_id,created_at_gmt),
 KEY status_created (status,created_at_gmt),
 KEY created_at_gmt (created_at_gmt),
-KEY order_id (order_id)
+KEY order_id (order_id),
+KEY holder_status (stock_holder_id,status)
 ) {$collate};",
 		);
 	}

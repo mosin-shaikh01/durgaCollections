@@ -47,7 +47,7 @@ $cols = fn( $t ) => array_column( $wpdb->get_results( "SHOW FULL COLUMNS FROM $t
 $cc   = $cols( $C );
 $sc   = $cols( $S );
 pqbg_t( 'pqbg_codes columns', array_keys( $cc ) === array( 'id', 'code', 'kind', 'product_id', 'parent_id', 'active_product_id', 'status', 'created_at_gmt', 'created_by', 'retired_at_gmt', 'retired_by' ), implode( ',', array_keys( $cc ) ) );
-pqbg_t( 'pqbg_sales columns', array_keys( $sc ) === array( 'id', 'request_id', 'code_id', 'unit_id', 'product_id', 'variation_id', 'order_id', 'seller_id', 'quantity', 'unit_price', 'regular_price', 'line_total', 'currency', 'product_name', 'sku', 'attributes_json', 'stock_before', 'stock_after', 'source', 'status', 'void_reason', 'voided_by', 'voided_at_gmt', 'note', 'created_at_gmt' ), implode( ',', array_keys( $sc ) ) );
+pqbg_t( 'pqbg_sales columns', array_keys( $sc ) === array( 'id', 'request_id', 'code_id', 'unit_id', 'product_id', 'variation_id', 'order_id', 'seller_id', 'quantity', 'unit_price', 'regular_price', 'line_total', 'currency', 'product_name', 'sku', 'attributes_json', 'stock_before', 'stock_after', 'source', 'status', 'void_reason', 'voided_by', 'voided_at_gmt', 'note', 'created_at_gmt', 'stock_holder_id', 'failure_code' ), implode( ',', array_keys( $sc ) ) ); // Schema v2 (Phase 7) added the last two.
 pqbg_t( 'codes types/defaults', 'bigint(20) unsigned' === $cc['id']['Type'] && 'varchar(32)' === $cc['code']['Type'] && 'YES' === $cc['active_product_id']['Null'] && 'active' === $cc['status']['Default'] && 'product' === $cc['kind']['Default'] && '0' === $cc['parent_id']['Default'] && 'YES' === $cc['retired_at_gmt']['Null'] && 'datetime' === $cc['created_at_gmt']['Type'] );
 pqbg_t( 'sales types/defaults', 'char(36)' === $sc['request_id']['Type'] && 'decimal(26,8)' === $sc['unit_price']['Type'] && 'decimal(26,8)' === $sc['line_total']['Type'] && 'YES' === $sc['regular_price']['Null'] && 'char(3)' === $sc['currency']['Type'] && 'varchar(100)' === $sc['sku']['Type'] && 'longtext' === $sc['attributes_json']['Type'] && 'text' === $sc['product_name']['Type'] && 'scan' === $sc['source']['Default'] && 'completed' === $sc['status']['Default'] && '0' === $sc['variation_id']['Default'] && 'YES' === $sc['code_id']['Null'] && 'YES' === $sc['order_id']['Null'] && 'YES' === $sc['unit_id']['Null'] && 'NO' === $sc['seller_id']['Null'] );
 pqbg_t( 'collation matches WP', $cc['code']['Collation'] === $wpdb->collate && $sc['product_name']['Collation'] === $wpdb->collate, $cc['code']['Collation'] );
@@ -62,7 +62,7 @@ $idx = function ( $t ) use ( $wpdb ) {
 $ci  = $idx( $C );
 $si  = $idx( $S );
 pqbg_t( 'codes indexes', $ci['code']['unique'] && $ci['active_product_id']['unique'] && array( 'product_id', 'status' ) === $ci['product_status']['cols'] && isset( $ci['parent_id'], $ci['status'] ) && 6 === count( $ci ) );
-pqbg_t( 'sales indexes', $si['request_id']['unique'] && array( 'product_id', 'variation_id' ) === $si['product_variation']['cols'] && array( 'seller_id', 'created_at_gmt' ) === $si['seller_created']['cols'] && array( 'status', 'created_at_gmt' ) === $si['status_created']['cols'] && isset( $si['code_id'], $si['created_at_gmt'], $si['order_id'] ) && 8 === count( $si ) );
+pqbg_t( 'sales indexes', $si['request_id']['unique'] && array( 'product_id', 'variation_id' ) === $si['product_variation']['cols'] && array( 'seller_id', 'created_at_gmt' ) === $si['seller_created']['cols'] && array( 'status', 'created_at_gmt' ) === $si['status_created']['cols'] && isset( $si['code_id'], $si['created_at_gmt'], $si['order_id'] ) && array( 'stock_holder_id', 'status' ) === $si['holder_status']['cols'] && 9 === count( $si ) ); // holder_status: schema v2 (Phase 7).
 $eng = fn( $t ) => $wpdb->get_var( $wpdb->prepare( 'SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s', DB_NAME, $t ) );
 pqbg_t( 'engine InnoDB', 'InnoDB' === $eng( $C ) && 'InnoDB' === $eng( $S ) );
 pqbg_t( 'CHECK constraint present', Schema::has_active_check(), Schema::active_check_name() );
@@ -70,7 +70,7 @@ $dd = Schema::create_or_update();
 pqbg_t( 'dbDelta re-run is a no-op', array() === $dd, json_encode( $dd ) );
 
 pqbg_section( 'options' );
-pqbg_t( 'pqbg_db_version = 1', 1 === Install::stored_version() );
+pqbg_t( 'pqbg_db_version = Install::DB_VERSION (2 since Phase 7)', Install::DB_VERSION === Install::stored_version() );
 $ao = fn( $n ) => $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM {$wpdb->options} WHERE option_name=%s", $n ) );
 pqbg_t( 'pqbg_settings exists, not autoloaded', is_array( get_option( 'pqbg_settings' ) ) && in_array( $ao( 'pqbg_settings' ), array( 'off', 'no' ), true ), $ao( 'pqbg_settings' ) );
 $settings_before = get_option( 'pqbg_settings' );
@@ -140,7 +140,7 @@ pqbg_t( 'activation hook re-run completes', true );
 pqbg_t( 'data + schema unchanged after reruns', $before == $snapshot() );
 update_option( 'pqbg_db_version', 0, true );
 Install::maybe_upgrade();
-pqbg_t( 'migrate v0 -> v1 via maybe_upgrade', 1 === Install::stored_version() );
+pqbg_t( 'migrate v0 -> current via maybe_upgrade', Install::DB_VERSION === Install::stored_version() );
 pqbg_t( 'data preserved through migration re-run', $before == $snapshot() );
 update_option( 'pqbg_db_version', 5, true );
 Install::maybe_upgrade();
@@ -236,7 +236,7 @@ $wpdb->query( "ALTER TABLE $C AUTO_INCREMENT = 1" );
 $wpdb->query( "ALTER TABLE $S AUTO_INCREMENT = 1" );
 pqbg_t( 'tables back to their starting row counts', $base_c === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" ) && $base_s === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $S" ) );
 pqbg_t( 'test user removed', ! get_user_by( 'login', 'pqbg_phase2_test_seller' ) );
-pqbg_t( 'pqbg_db_version = 1, no lock', 1 === Install::stored_version() && null === $ao( 'pqbg_install_lock' ) );
+pqbg_t( 'pqbg_db_version = Install::DB_VERSION, no lock', Install::DB_VERSION === Install::stored_version() && null === $ao( 'pqbg_install_lock' ) );
 pqbg_t( 'no canary capability left on any role', ! str_contains( (string) wp_json_encode( get_option( wp_roles()->role_key ) ), $canary ) );
 
 pqbg_test_done();

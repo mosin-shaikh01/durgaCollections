@@ -113,6 +113,69 @@
 	background: #e6f0ff;
 }
 
+.pqbg-scan__notice--success {
+	border-color: #146c2e;
+	background: #e3f4e8;
+}
+
+.pqbg-scan__sell,
+.pqbg-scan__undo {
+	margin-top: 20px;
+	padding: 16px;
+	border: 2px solid #111;
+	border-radius: 6px;
+}
+
+.pqbg-scan__sell-title {
+	margin: 0 0 8px;
+	font-size: 22px;
+}
+
+.pqbg-scan__quantity {
+	display: block;
+	width: 100%;
+	min-height: 52px;
+	margin-bottom: 12px;
+	padding: 8px 12px;
+	border: 2px solid #111;
+	border-radius: 6px;
+	background: #fff;
+	color: #111;
+	font: inherit;
+	font-weight: 700;
+}
+
+.pqbg-scan__quantity:focus {
+	outline: 3px solid #0a58ca;
+	outline-offset: 2px;
+}
+
+.pqbg-scan__button--sell,
+.pqbg-scan__button--undo {
+	width: 100%;
+	min-height: 56px;
+	font-size: 20px;
+}
+
+.pqbg-scan__button--sell {
+	background: #146c2e;
+}
+
+.pqbg-scan__button--undo {
+	background: #8a1c1c;
+}
+
+.pqbg-scan__hint {
+	margin: 8px 0 0;
+	color: #333;
+	font-size: 16px;
+}
+
+.pqbg-scan__total {
+	font-size: 24px;
+	font-weight: 700;
+}
+
 .pqbg-scan__product {
 	margin-top: 16px;
 }

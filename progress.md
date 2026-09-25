@@ -17,12 +17,12 @@ Repo: https://github.com/mosin-shaikh01/durgaCollections
 | Database | MariaDB 10.4.32 — db `sharayu`, user `root`, prefix `wp_`, InnoDB, `utf8mb4_unicode_520_ci` |
 | WooCommerce | 11.1.2 — HPOS enabled (sync off), currency INR, stock management on, Coming Soon on (whole site) |
 | Permalinks | `/%postname%/` |
-| Timezone | UTC (`timezone_string` empty, offset 0) — **not yet changed; store is in India, change only with approval** |
+| Timezone | **Asia/Kolkata** (`timezone_string`; `gmt_offset` stored empty, as WordPress stores it for a city). Set on 2026-09-25 with the user's approval, after the Phase 7 phone test. It was UTC before. |
 | Active theme | twentytwentyfive |
 | Active plugins | classic-editor, woocommerce, product-qrcode-barcode-generator (Product QR Code and Barcode Generator; installed in Phase 2 under its former name) |
 | Admin user | Dev-admin |
 
-_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, and on 2026-09-25 at the start of Phase 6. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
+_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, and on 2026-09-25 at the start of Phases 6 and 7. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
 
 ---
 
@@ -111,8 +111,9 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Committed `3654086`, pushed.** |
 | **5** | **Admin code management** | **Done 2026-09-25. Committed `ff7805c`, pushed.** |
 | **6** | **Scan/product screen** | **Done 2026-09-25. Committed `381a909`, pushed.** |
-| 7 | Mark sold + sales | Next. Not started |
-| 8 → 12 | printing → seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
+| **7** | **Mark sold + sales** | **Done 2026-09-25. Phone test passed. Approved, committed as a single commit and pushed (the hash is recorded in the next progress update).** |
+| 8 | Printing | Next. Not started |
+| 9 → 12 | seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
 > **Pre-rename records.**
 >
@@ -986,6 +987,264 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
 
 **Next phase (not started):** Phase 7, Mark Sold + Sales. **The production domain is still not final**, so labels must not be printed yet.
 
+### Phase 7: Mark as Sold + Sales (2026-09-25)
+
+**Status:** implemented and tested. The plugin stays active.
+- The user ran the **phone test** on a real phone, as a Store Seller over the local network, and it **passed**: product screen, sell, stock decrement, undo, zero-stock refusal, draft refusal.
+- After the post-review changes below, Phase 7 was **approved**, committed as a single commit ("Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2)") and pushed to `origin/main` (normal push, no force).
+
+**Environment:** re-verified at the start, with no differences.
+- WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6 ZTS (not updated; the user can't update XAMPP on this machine), MariaDB 10.4.32
+- 0 codes, 0 sales, 0 products, 0 orders, 1 user; `pqbg_db_version` 1 at the start
+- store settings: stock management on, hold stock 60 min, low-stock alert at 2, no-stock alert at 0, taxes off, INR with 2 decimals, Cash on delivery enabled, timezone still UTC
+- the database supports `@@in_transaction` and `GET_LOCK`; autocommit is on; REPEATABLE-READ
+- **Local mail is not configured:** a WooCommerce stock e-mail makes `mail()` fail after about 2 s.
+
+**Windows crash count** (`httpd.exe` Application Error, Event ID 1000): **139** at the start: 137 in `php8ts.dll` at 0x666de5 and 2 in `ntdll.dll`, the latest at 00:59:10 during Phase 6.
+- **Still 139 after every Phase 7 run:** the baseline, 3 Phase 7 development runs, the partial regressions and the final full run. There were no crashes and no Apache restarts (the same Apache process served every run).
+- The Phase 6 workaround (a fresh HTTP connection per request) is kept in the new suite.
+
+**Baseline before any change:** `php tests/run.php` ALL PASSED, **756 passed, 0 failed, 0 skipped** (272 s). The decoder was installed in this session's scratchpad with `npm ci` and used through `PQBG_DECODER`.
+
+**Approved plan and decisions** (the user's review):
+- **D1** the quantity is a list 1..stock where every option shows its total (up to 100 in stock); a number field above 100
+- **D2** stock held for unpaid online checkouts is ignored (documented boundary)
+- **D3** a price changed since the form was opened is refused; prices are compared as normalised decimals (`wc_format_decimal` to the store's price decimals), so "1499" = "1499.00" = 1499.0
+- **D4** after a completed sale, WooCommerce's `wc_trigger_stock_change_actions()` sends the low/no-stock notification (WooCommerce only does this for order-based changes)
+- **D5** failed attempts are kept as `failed` rows with a `failure_code`; the journal row is written before the stock changes
+- **D6** the form is valid for 30 minutes; the lock timeout is 5 s
+- **D7 (changed by the user)** an empty **or zero** price blocks the sale: "This item has no price (₹0). Set a price before selling."
+- **Change 1:** an unauthorised `?sale=` gets a **303**, never a 301.
+- **Change 2:** the normalised price comparison, tested with "1499" / "1499.00" / 1499.0.
+- **Change 3:** the SQL-filter override:
+  - it is removed in `finally`, which is tested after success, failure and exceptions
+  - the exact fallback is implemented and both branches are tested
+  - a WooCommerce compatibility test fails loudly if the filter or the SQL shape changes
+- **Change 4:** the Phase 11 reconciliation open item (below).
+
+**Design:**
+- **Sale flow** (POST to the canonical `/scan/{CODE}/`, `pqbg_action=sell`):
+  - checks in order: login → `pqbg_view_products` → canonical URL → action → `pqbg_sell` → nonce `pqbg_sell_{code row id}` → a signed form token (HMAC over request_id, issued, seen price, seen stock, user and code row) → **an existing sale with this request_id returns its outcome** (before the expiry check) → expiry (30 min) → quantity → `SaleService::sell()`
+  - a completed sale answers **303** to `/scan/{CODE}/?sale={id}`
+- **`SaleService::sell()`**, under `StockLock` (`GET_LOCK`, 5 s, a site-scoped name) on the **stock holder** (the parent for parent-level variation stock):
+  1. recover stale `pending` rows of the holder → `failed`/`interrupted`
+  2. fresh reads (`_stock` by direct SELECT, the product re-read, `get_price()`)
+  3. stock and price checks
+  4. **a `pending` journal row** with every snapshot
+  5. `wc_update_product_stock()` with WooCommerce's UPDATE replaced, via `woocommerce_update_product_stock_query`, by **one multi-table statement** that changes the stock and sets the row `completed` only if it is still `pending`
+  6. a fresh `_stock` read; below 0 (an online order won the race) or any error → compensate with `wc_update_product_stock( increase )`, whose statement sets the row `failed` (`sold_online` or `error`)
+  7. the stock snapshots are written, the lock is released, and then the low/no-stock notification is sent
+- **The replacement is used only for SQL of the expected shape.**
+  - **Fallback:** if the row is still `pending` after WooCommerce ran, a fresh `_stock` read decides: a drop of at least the quantity since the read under the lock → `completed` (conditional on `pending`); otherwise → `failed`/`error`.
+  - Warnings are logged with error codes only.
+- **No transactions** anywhere in the sale code, so it can never implicitly commit a WooCommerce transaction. A hook that opens its own transaction (our own Phase 5 sweep runs on the parent's save for a shop manager) can't break the atomicity. Called inside an open transaction, the service refuses.
+- **Undo** (sale page):
+  - the same seller, `pqbg_sell`, own `completed` sale, ≤ 10 min, once
+  - under the lock of the recorded `stock_holder_id`, one statement restores the stock and sets `voided`/`voided_by`/`voided_at_gmt`/`void_reason='undo'`, conditional on `completed`
+  - rows are never deleted
+- **`SaleService::void_sale()`** (service only, `pqbg_void_sale`): any completed sale, with or without restock. The UI is Phase 9.
+- **Screens** (standalone Phase 6 template, no JavaScript, all escaped, every security header):
+  - the Sell box (quantity list with totals, "Confirm sale"), in a separate form from the code box
+  - the sale page: "Sold.", snapshots, total, stock now, time via `wp_date`, Undo with "available until", the "Scan next item" box
+  - errors: 400/403/404/409/503 (`Retry-After: 2`)/500 with fixed messages
+  - users without `pqbg_sell` see the Phase 6 screen unchanged
+- **Capabilities:** the existing seven; no new one.
+- **No WooCommerce order is created.** Scan sales are not in WooCommerce reports, Analytics or `total_sales`.
+
+**Schema: DB_VERSION 1 → 2** (`migrate_2`, additive dbDelta):
+- `pqbg_sales.stock_holder_id bigint unsigned NULL`
+- `pqbg_sales.failure_code varchar(40) NULL`
+- `KEY holder_status (stock_holder_id,status)`
+
+The live site migrated on its first request after the change; it had 0 sales rows. No column was removed or renamed. Uninstall is unchanged.
+
+**Files created** (plugin-relative):
+- `includes/SaleService.php`, `includes/SaleRepository.php`, `includes/SaleRequest.php`, `includes/StockLock.php`
+- `tests/phase7-sales.php`
+
+**Files modified:**
+- `includes/Schema.php` (v2 columns and index)
+- `includes/Install.php` (DB_VERSION 2, `migrate_2`)
+- `includes/ScanRoute.php` (POST dispatch, `?sale=`, per-response headers such as `Allow` and `Retry-After`)
+- `includes/ScanScreen.php` (the sale form, the sale page, `with_error()`)
+- `templates/pqbg-scan.php`, `assets/pqbg-scan.css`
+- `tests/run.php`
+- earlier suites, updated where Phase 7 made an assertion false by design (listed in `tests/README.md`):
+  - `tests/phase2-main.php`: the column list, 9 indexes, and version checks against `Install::DB_VERSION`
+  - `tests/phase2-lifecycle.php`: version checks
+  - `tests/phase5-admin.php`: the write scope also allows `SaleRepository`
+  - `tests/phase6-scan.php`: POST handling, the Phase 7 stock-tracking notice for sellers on unmanaged fixtures, sale forms only on sellable fixtures; +1 check
+- `README.md` (plugin), `tests/README.md`, `progress.md`
+
+`Plugin.php`, `Permissions.php`, `uninstall.php`, `CodeRepository`, the renderers and `vendor-prefixed/` are unchanged.
+
+**Tests.** `php tests/run.php` with `PQBG_TESTS_ALLOW_PRODUCTION=1` and `PQBG_DECODER` set. **Final run: ALL PASSED, 965 checks, 0 failed, 0 skipped** (400 s). **Crash count 139 before and after.**
+
+| Suite | Result |
+|---|---|
+| phase2-main | 83/83 (checks updated for v2) |
+| phase2-lifecycle | 17/17 (checks updated for v2) |
+| phase2-no-woocommerce | 12/12 |
+| phase3-codes | 110/110 |
+| phase4-rendering | 165/165 |
+| phase5-admin | 157/157 (write scope updated) |
+| phase6-scan | 213/213 (+1; POST and notice checks updated) |
+| phase7-sales | 208/208 |
+
+**Phase 7 coverage:**
+- **The form:**
+  - quantity list with totals
+  - number field above 100
+  - exact hidden fields
+  - a new UUID v4 per render
+  - separate from the code box
+  - shown to seller, shop manager and admin; absent for view-only users and sellers without `pqbg_sell` (who also get no notices)
+- **Blocked states:** unmanaged stock, empty and zero price, stock 0, stock 0 with backorders
+- **A sale over HTTP:**
+  - the 303
+  - one row with every snapshot, `stock_holder_id` and the form's request_id
+  - WooCommerce stock, status and lookup table
+  - the success page: "Sold.", quantity × price, total, stock now, `wp_date` time, Undo "until", the "Scan next item" box with autofocus
+  - a reload or HEAD changes nothing
+  - resubmitting the form gives the same sale
+- **Quantity bounds:** 0, -1, abc, 1.5, empty, " 1", 1e1, huge, missing, stock + 1; exactly all remaining → 0 and outofstock
+- **Refused on POST (not just hidden):**
+  - stock 0 with backorders
+  - stock changed (and still allowed when the quantity fits)
+  - stock tracking turned off
+  - price removed, price 0, price changed
+  - draft, pending, scheduled, trash, disabled variation, variation under a draft parent, trashed parent, retired code, vanished product, unknown code, invalid code
+  - allowed: a private simple product, and a variation under a private parent
+- **Prices:** "1499" vs "1499.00" vs 1499.0 gives no false "price changed"; a running scheduled sale records 1500 (regular 2000); a future one records 2000
+- **Variations:**
+  - own stock: the variation is decremented; `variation_set_stock` fires
+  - parent-level stock: **the parent is decremented and locked**. With the parent's lock held by another process the sale gets 503 after about 5 s; a lock on the variation doesn't block it. The sibling then offers only the remaining stock.
+- **Permissions and tokens:**
+  - logged out → 302, never replayed
+  - customer → the byte-identical fixed 403
+  - viewer and seller without `pqbg_sell` → 403
+  - missing, invalid, other-item and other-session nonce
+  - tampered price, request_id or signature; another item's token
+  - expired form; after expiry the same request_id still returns the original sale
+  - unknown action; non-canonical URL and query string → 400
+  - entry page POST → 405 `GET, HEAD`; PUT → 405 `GET, HEAD, POST`
+- **The sale page:** another seller, a nonexistent sale or another code's sale → **303**; shop manager and admin 200 without Undo; viewer 303; other query strings keep the Phase 6 301
+- **Undo:**
+  - over HTTP: restore, voided row (not deleted), the page says undone, a second undo → 409, another seller → 403, GET can't undo, after 10 min the button is gone and a kept form is refused
+  - in-process: 9:59 allowed and 10:01 refused, own sale only (also for shop managers), `pqbg_sell` required, the lock (busy), 4 concurrent undos → exactly one restore
+  - `void_sale()`: seller refused; manager with and without restock; no double void; failed sales can't be undone or voided
+- **Concurrency** (CLI worker processes):
+  - the same request_id from 4 processes → one sale, one decrement; replay by another seller refused
+  - **8 workers selling the last 3** → exactly 3 sales, stock 0, never negative, stock_after 2/1/0
+  - the same across two sibling variations sharing parent stock
+  - no pending rows left and every lock free
+- **The online race:** another process places a real WooCommerce order (`wc_reduce_stock_levels`) between our read and our decrement → compensated, row `failed/sold_online`, final stock = start − online, WooCommerce ran both stock changes, and the seller sees 409 "This item just sold online. Stock was not changed."
+- **Failure injection:**
+  - an exception before the UPDATE, right after it, and after the product save → stock restored, row failed, filter removed, lock released
+  - a broken snapshot UPDATE doesn't undo a completed sale
+  - an open caller transaction → refused
+  - a stale pending row → recovered as `interrupted`, and its request_id replays the failure
+- **Fallback and compatibility:**
+  - another plugin replacing our SQL with a plain decrement → `completed` via the conditional UPDATE, warning `pqbg_stock_marker_missing (applied)`
+  - replacing it with a no-op → `failed/error`, `(not_applied)`
+  - SQL of an unexpected shape is never replaced (`pqbg_stock_sql_unexpected`)
+  - a normal sale logs nothing
+  - **COMPATIBILITY:** the filter still fires once per change with (sql, id, new stock, operation), and the SQL has the expected shape
+- **WooCommerce:** `product_set_stock` / `variation_set_stock`; outofstock and back to instock in the meta and the lookup table; one low-stock and one no-stock notification on sales, none on undo; **no orders** except the 2 simulated online ones; `total_sales` untouched
+- **Migration** on a temporary prefix: a v1 fixture with a row → `migrate_2` adds the columns and index, the row is unchanged with NULLs, a re-run is a no-op (empty dbDelta log), a fresh install gives the full v2 schema; the real tables are never altered; the uninstall logic is unchanged
+- **Output safety:** the product name and SKU with HTML/script payloads escaped on the form and the sale page; the sale page keeps the snapshot name after a rename; no `<script>`; every security header on 303/400/403/409/503/sale page
+- **GET never writes:** GET/HEAD, the form as a query string, the entry box and the sale page change no sale and no stock
+- **Scope:**
+  - no transactions in the sale code
+  - no order creation, REST, AJAX or nopriv
+  - `wc_update_product_stock` only in `SaleService`
+  - sales rows are written only by `SaleRepository`
+  - no JavaScript
+  - the new files give empty output over HTTP
+- **Cleanup:** sales, codes, products, orders (items, addresses, operational data), comments/notes, users, Action Scheduler jobs, temporary tables; options byte-identical; no filter left behind
+
+**Timings** (dev machine, final run; the earlier runs were similar):
+
+| Measurement | Result |
+|---|---|
+| Sale over HTTP (POST → 303), median of 5 | 254 ms (254–304 ms across runs) |
+| Undo over HTTP (POST → 303), median of 5 | 266 ms (245–285 ms across runs) |
+| Sale in-process (`SaleService::sell()`), median of 5 | 48.7 ms |
+| Undo in-process, median of 5 | 37.6 ms |
+| Phase 6 product scan over HTTP, median of 10 | 215 ms; in-process 23.7 ms and **13 queries** (12 before, +1 for the seller's stock read) |
+
+**Problems found and fixed during development:**
+- **The low/no-stock e-mail first ran while the stock lock was held.** With local mail failing after about 2 s, that would have held up the next sale of the same item. It now runs after the lock is released.
+- **Test-suite bugs** (not plugin bugs), found in the first runs:
+  - a sold-out product was reused for a form
+  - a status check ran after the undo
+  - the log capture needed deduping, because WooCommerce calls the log filter once per handler
+  - the scope check had to allow `Install.php` to name the sales table
+- **The Phase 4 "no scan path literal" guard flagged `SaleService::SOURCE = 'scan'`.** The constant was removed; `source` comes from the column default (`scan`).
+- **Cleanup of a probe:** a one-off probe of the WooCommerce stock SQL created and deleted one product, and left 2 completed Action Scheduler jobs (IDs 4274 and 4275, `woocommerce_run_product_attribute_lookup_update_callback` for the deleted product) with 6 log rows. Both were deleted; nothing else remained.
+
+**Known limitations:**
+- **Online-checkout boundary:**
+  - WooCommerce checkout doesn't take our lock
+  - a reduction between our read and our decrement is compensated
+  - an online order paid after our sale can still oversell (WooCommerce's own behaviour)
+  - held stock isn't counted (D2)
+- **Side effects that can't be undone:** the low/no-stock e-mail already sent, third-party hooks on stock changes and product saves, the product's modified date, a stock status briefly visible to shoppers during a race.
+- **Remaining crash windows:** a `completed` row with `stock_after` NULL (a crash after the atomic statement), or negative stock with a `completed` row (a crash between an online-race decrement and its compensation). **Records and stock still agree** in the first case; see the open item for Phase 11.
+- **The fallback's stock comparison** can misjudge only if the SQL was overridden by another plugin **and** an online order lands in the same milliseconds.
+- **The page doesn't refresh itself:** an Undo button can still be visible after 10 minutes; pressing it is refused.
+- **Mail isn't configured locally:** a sale that triggers a stock e-mail takes about 2 s longer on this machine (after the lock is released).
+- **Scan sales aren't in WooCommerce reports.** Phase 9 adds the history UI.
+- **The phone test is manual** and still to be done by the user.
+- No PHPCS run, because it isn't installed.
+
+**Open items:**
+- **Phase 11 (hardening): a "stock vs. sales reconciliation" check** that surfaces:
+  - negative stock on any product that holds stock
+  - `completed` sales rows with `stock_after` NULL, and any `pending` rows
+
+  These are the documented crash windows above. It should report, not auto-fix.
+- **Phase 9:** the sales history UI and the manager void UI on top of `SaleService::void_sale()`. Reports must count `completed` rows only, and show `voided` ones as voided.
+
+**Post-review changes (after the phone test):**
+- **Stock-tracking message reworded to match the WooCommerce 11.1.2 product editor**, checked in the installed source with site language `en_US`. The Inventory tab's "Stock management" checkbox reads "Track stock quantity for this product"; a variation's checkbox reads "Manage stock?". The messages are now:
+  - simple product: "Stock tracking is off for this product. On the Inventory tab, tick 'Track stock quantity for this product' to sell from a scan."
+  - variation: "Stock tracking is off for this variation. Tick 'Manage stock?' on the variation, or 'Track stock quantity for this product' on the product's Inventory tab, to sell from a scan."
+
+  The Phase 6 and Phase 7 checks were updated, and a variation check was added (Phase 7: 209 checks).
+- **Manual-test data removed** (listed first; deleted with the user's confirmation):
+  - product #2921 "Test" with its meta, term relationships and lookup row
+  - user #311 "test" (Store Seller) and its session
+  - `pqbg_codes` #1
+  - `pqbg_sales` #1 and #2 (both undone)
+  - Action Scheduler jobs #5751, #5752 and #5754 (#5754 was scheduled by the product delete itself)
+  - the plugin's WooCommerce log file from the test runs
+
+  Both tables' AUTO_INCREMENT were reset.
+- **Settings the phone test had changed, restored:** `home` and `siteurl` were `http://192.168.1.6.:80/sharayu` and are back to `http://localhost/sharayu`; Coming Soon was off and is back on.
+- **Timezone set to Asia/Kolkata**, with the user's approval.
+- **Kept, as the user decided:** post #2922 `wp_global_styles` "Custom Styles" (created when the Site Editor or Customize Store was opened), and the WooCommerce admin options written while browsing wp-admin.
+- **Deleted: 422 leaked completed Action Scheduler jobs and their 1,266 log rows** (`woocommerce_run_product_attribute_lookup_update_callback` for products that no longer exist, dating from 2026-09-24). See the Phase 8 open item.
+- **Side effect found and reverted: turning Coming Soon back on made WooCommerce re-save the Cart page.**
+  - `ComingSoonCacheInvalidator` calls `wp_update_post()` on the Cart page (#8) whenever `woocommerce_coming_soon` changes.
+  - Run from CLI as user 0 (no `unfiltered_html`), the content was re-serialized in two places: `"taxQuery":{}` became `[]`, and `<hr …/>` became `<hr … />`. Revision #2923 was created.
+  - The original content was restored byte for byte (verified to differ only in those two spots), and the revision was deleted. `/cart/` returns 200.
+  - **Lesson:** toggle Coming Soon through wp-admin, or with raw option writes as the Phase 6 suite does, not with `update_option()` from the CLI.
+- **Verified afterwards:** as a temporary administrator (removed afterwards), wp-admin (Dashboard, Products, General Settings), the storefront (`/`, `/shop/`) and `/cart/` all load normally on `http://localhost/sharayu`.
+
+**Re-run from the clean state:** ALL PASSED, **966 checks, 0 failed, 0 skipped** (418 s). **Crash count 139 before and after.**
+- phase2-main 83, phase2-lifecycle 17, phase2-no-woocommerce 12, phase3-codes 110, phase4-rendering 165, phase5-admin 157, phase6-scan 213, phase7-sales 209
+- timings: sale over HTTP 278 ms, undo over HTTP 303 ms, sale in-process 46.1 ms, undo in-process 31.7 ms
+- As expected, this run leaked 36 more Phase 3 jobs (action IDs 5797–5872). They were left in place, because the approval covered the 422 only. See the Phase 8 open item.
+
+**Phone testing:** never change Settings → General → WordPress Address for phone tests; use the `wp-config.php` snippet from the README instead.
+
+**Open items:**
+- **At the start of Phase 8:** `phase3-codes.php` leaves ~35 completed Action Scheduler jobs per run because WooCommerce schedules them after the cleanup check; fix the suite's cleanup and assert zero leaked jobs. (36 such jobs from the last Phase 7 run, action IDs 5797–5872, still exist.)
+- **Phase 11 (hardening):** concurrency tests: print the minimum stock observed, and assert per-row stock_before/stock_after snapshots for the parent-level stock test as well.
+
+**Next phase (not started):** Phase 8, Printing. **The production domain is still not final**, so labels must not be printed yet.
+
 ### Instructions for the next Claude session
 
 - Read this file and `wp-content/plugins/product-qrcode-barcode-generator/README.md` first. Re-verify the environment; don't trust these notes blindly.
@@ -999,12 +1258,22 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
   The `dpc_`/`DPC_`/`Durga\ProductCodes` names in the Phase 2 and Phase 3 sections are pre-rename history. Never reintroduce them.
 - Get codes only through `ProductCodeService::get_or_create()`. Don't call `CodeRepository::create_active()` with hand-made strings, and don't write to `pqbg_codes` directly.
 - Phases 4 and 5 are done. Build scan URLs only through `ScanUrl`, and render only through `QrRenderer`/`BarcodeRenderer`. Never reference the barcode library outside `BarcodeRenderer`, and keep the "barcodes disabled means the library is not loaded" guarantee.
+- **Report the Windows crash count** (`httpd.exe` Application Error events, Event ID 1000) before and after test runs. A crashed run is neither a pass nor a fail of plugin logic: re-run the suite. It was 139 on 2026-09-25 after Phase 7.
 - **Run `php tests/run.php` before and after every phase** (see `tests/README.md`). Preferred: `define( 'WP_ENVIRONMENT_TYPE', 'local' );` in the local `wp-config.php`, which the user will add themselves; never edit or commit `wp-config.php`. The fallback is `PQBG_TESTS_ALLOW_PRODUCTION=1`. The round-trip checks need `npm ci` in `tests/decoder`, or `PQBG_DECODER` pointing to a copy outside the web root. Add each new phase's suite to `tests/` and to `run.php`.
 - **Exclude `tests/` and `build/` from any production deployment** (see "Production deployment" in the plugin README).
 - **Never edit `vendor-prefixed/` by hand.** Change `build/` and run `php build/build.php` (see `build/README.md`).
 - The PHP minimum is now **8.2**.
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
-- **Phase 7 (Mark Sold + Sales) is next.** Phases 2–6 are done, committed and pushed. Phase 6 is `381a909`. Build selling on top of the Phase 6 scan page (`ScanRoute`/`ScanScreen`): read-only today, with no placeholder "Mark as sold" buttons.
+- **Phase 7 (Mark as Sold) is done, approved, committed and pushed** (2026-09-25). **Phase 8 (Printing) is next.** First fix the Phase 3 suite's Action Scheduler leak (see the Phase 7 open items).
+- **Phone testing:** never change Settings → General → WordPress Address for phone tests; use the `wp-config.php` snippet from the plugin README instead.
+- **Don't toggle `woocommerce_coming_soon` with `update_option()` from the CLI.** WooCommerce then re-saves the Cart page as user 0 and re-serializes its content (see the Phase 7 post-review notes).
+- **Selling rules** (Phase 7):
+  - Sell only through `SaleService::sell()`, undo through `SaleService::undo()`, and void through `SaleService::void_sale()`.
+  - Only `SaleRepository` writes `pqbg_sales`, and rows are never deleted.
+  - Never wrap the sale code in a DB transaction.
+  - Never change stock except through `wc_update_product_stock()` inside `SaleService::change_stock()`.
+  - If WooCommerce is upgraded, run the Phase 7 suite: its COMPATIBILITY checks fail loudly if `woocommerce_update_product_stock_query` stops firing or its SQL changes shape.
+- `DB_VERSION` is **2**. The next schema change is migration 3.
 - **The scan URL format `{base}/scan/{CODE}/` is permanent** (labels will be printed with it). Never change `ScanUrl::for_code()` or the two rewrite rules without a migration plan for printed labels. Bump `ScanRoute::RULES_VERSION` whenever `ScanUrl::rewrite_rules()` changes, so the rules are flushed once.
 - **Scan page rules:**
   - access is checked before any lookup: logged out → login redirect, no `pqbg_view_products` → a fixed 403
@@ -1015,7 +1284,8 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
 - **In test suites:**
   - Don't call `WP_Rewrite::init()`: it drops every registered endpoint. Set `$wp_rewrite->permalink_structure` instead.
   - Permanently delete temporary users' own posts before `wp_delete_user()`: opening the Dashboard creates a Quick Draft auto-draft that would otherwise be trashed and left behind.
-  - Use a fresh HTTP connection per request (`CURLOPT_FORBID_REUSE`) when a suite keeps many cookie jars open. This XAMPP's `php8ts.dll` 8.5.6 crashes (0xC0000005) under the keep-alive pattern (see the Phase 6 section).
+  - Use a fresh HTTP connection per request (`CURLOPT_FORBID_REUSE`) when a suite keeps many cookie jars open. This XAMPP's `php8ts.dll` 8.5.6 crashes (0xC0000005) under the keep-alive pattern (see the Phase 6 section). The user can't update XAMPP/PHP on this machine; don't ask them to.
+  - Short-circuit `pre_wp_mail` in-process: local mail isn't configured and each failing `mail()` takes about 2 s.
 - Product-save and delete hooks now exist, in `CodeLifecycle` only, on exactly the approved hooks (the four WooCommerce CRUD save hooks and `deleted_post`). Don't add others without explicit approval.
 - Regenerate only through `ProductCodeService::regenerate()` (atomic `CodeRepository::replace_active()`). Admin requests go through `AdminActions`: POST for anything that writes, a nonce bound to the item, and `pqbg_manage_codes`. Never add `nopriv` handlers.
 - Only the classic product editor is supported. Re-check `product_block_editor` before relying on the Phase 5 UI.
@@ -1104,3 +1374,18 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
   - Final run: **756 passed, 0 failed, 0 skipped**. The site is back to its clean state.
   - The user ran the manual phone test, and it passed.
   - Approved; committed as `381a909` and pushed to `origin/main`.
+- **Phase 7 (Mark as Sold + Sales):**
+  - Re-verified the environment; no differences. Crash count 139; PHP 8.5.6 unchanged.
+  - Baseline: 756 passed, 0 failed, 0 skipped.
+  - Checked in the WooCommerce 11.1.2 source:
+    - how `wc_update_product_stock()` runs, and that its SQL goes through `woocommerce_update_product_stock_query`
+    - that low/no-stock e-mails are sent only for order-based stock changes
+    - that the Phase 5 sweep can start a transaction inside a product save
+  - Wrote the plan. The user approved it with D7 changed (zero price blocked) and four changes: a 303 for `?sale=`, normalised price comparison, the exact SQL-override fallback plus a compatibility test, and a Phase 11 reconciliation item.
+  - Added `SaleService`, `SaleRepository`, `SaleRequest`, `StockLock` and schema v2 (`migrate_2`), the sale form, the sale page and undo on the scan page. Class files were created before any wiring referenced them. The live site migrated to v2 with 0 sales rows.
+  - Added `tests/phase7-sales.php` (208 checks) and updated the Phase 2, 5 and 6 checks that Phase 7 made false by design.
+  - Final run: **965 passed, 0 failed, 0 skipped**. Crash count 139 before and after every run. The site is back to its clean state: 0 codes, 0 sales, 0 products, 0 orders, 1 user.
+  - Phone test passed. Reworded the stock-tracking message to WooCommerce's own checkbox labels.
+  - Removed the manual-test data and 422 leaked Action Scheduler jobs, and restored `home`, `siteurl` and Coming Soon, all with the user's confirmation. Set the timezone to Asia/Kolkata. Reverted the Cart page re-save side effect.
+  - Re-run from the clean state: 966 passed, 0 failed, 0 skipped; crash count 139.
+  - Approved; committed as a single commit and pushed to `origin/main`.
