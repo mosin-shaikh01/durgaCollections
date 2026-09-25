@@ -9,6 +9,7 @@
  *   - the regeneration confirmation page (hidden admin page, GET, no side effects)
  *
  * Everything requires Permissions::MANAGE_CODES. Actions post to AdminActions.
+ * "Print label" / "Print all variation labels" link to the print setup screen (PrintAdmin).
  *
  * Performance: the edit screen renders at most ONE QR code synchronously (a
  * simple product's). Variation QR codes are loaded on click from
@@ -163,6 +164,11 @@ final class AdminProductPanel {
 		}
 
 		$codes = CodeRepository::find_active_for_products( array_keys( $variations ) );
+
+		if ( array() !== $codes ) {
+			/* translators: %d: variations with a code. */
+			echo '<p><a class="button pqbg-print-all" href="' . esc_url( PrintAdmin::setup_url( array( $product->get_id() ) ) ) . '">' . esc_html( sprintf( __( 'Print all variation labels (%d)', 'product-qrcode-barcode-generator' ), count( $codes ) ) ) . '</a></p>';
+		}
 
 		echo '<table class="widefat striped pqbg-variations"><thead><tr>';
 		echo '<th>' . esc_html__( 'Variation', 'product-qrcode-barcode-generator' ) . '</th>';
@@ -548,6 +554,7 @@ final class AdminProductPanel {
 			$links[] = '<a class="button pqbg-download-barcode" href="' . esc_url( AdminActions::image_url( $item_id, 'barcode', 'download' ) ) . '">' . esc_html__( 'Download barcode (SVG)', 'product-qrcode-barcode-generator' ) . '</a>';
 		}
 
+		$links[] = '<a class="button pqbg-print-label" href="' . esc_url( PrintAdmin::setup_url( array( $item_id ) ) ) . '">' . esc_html__( 'Print label', 'product-qrcode-barcode-generator' ) . '</a>';
 		$links[] = '<a class="button pqbg-regenerate" href="' . esc_url( self::confirm_url( $item_id ) ) . '">' . esc_html__( 'Regenerate…', 'product-qrcode-barcode-generator' ) . '</a>';
 
 		return implode( ' ', $links ) . ( $with_view ? '<span class="pqbg-qr-slot"></span>' : '' );

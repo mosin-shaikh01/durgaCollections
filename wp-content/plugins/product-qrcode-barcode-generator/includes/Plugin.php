@@ -40,6 +40,10 @@ final class Plugin {
 			SettingsPage::register();
 			AdminProductPanel::register();
 			AdminActions::register();
+
+			// Label printing: setup screen, bulk action and the print page (admin-post.php only).
+			PrintAdmin::register();
+			PrintPage::register();
 		}
 	}
 

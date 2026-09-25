@@ -1,0 +1,14 @@
+{
+  "name": "pqbg-print-check",
+  "private": true,
+  "description": "Test tooling only: drives the installed Chrome/Edge headless to check the Phase 8 print page (geometry, print-resolution screenshots, PDF, fonts, CSP).",
+  "type": "module",
+  "license": "GPL-2.0-or-later",
+  "engines": {
+    "node": ">=22.13 <23 || >=24"
+  },
+  "dependencies": {
+    "pdfjs-dist": "6.3.289",
+    "puppeteer-core": "25.12.0"
+  }
+}

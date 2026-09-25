@@ -52,12 +52,11 @@ global $wpdb;
 $vendor_classes = static fn( string $lib ) => array_values( preg_grep( '/^ProductQrBarcode\\\\Vendor\\\\' . preg_quote( $lib, '/' ) . '\\\\/', array_merge( get_declared_classes(), get_declared_interfaces(), get_declared_traits() ) ) );
 
 $C           = Schema::codes_table();
-$as_table    = $wpdb->prefix . 'actionscheduler_actions';
 $option      = Plugin::SETTINGS_OPTION;
 $raw_setting = static fn() => $wpdb->get_row( $wpdb->prepare( "SELECT option_value, autoload FROM {$wpdb->options} WHERE option_name = %s", $option ), ARRAY_A );
 $original    = $raw_setting();
 $start_id    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(id), 0) FROM $C" );
-$start_as    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(action_id), 0) FROM $as_table" );
+$as_mark  = pqbg_test_as_mark(); // Action Scheduler cleanup, see bootstrap.php.
 $start_post  = (int) $wpdb->get_var( "SELECT COALESCE(MAX(ID), 0) FROM {$wpdb->posts}" );
 $base_c      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" );
 $base_prod   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type IN ('product','product_variation')" );
@@ -951,7 +950,8 @@ try {
 	pqbg_t( 'source: no nopriv handlers, AJAX actions, REST routes, shortcodes or rewrite endpoints', ! preg_match( '/admin_post_nopriv|wp_ajax_|register_rest_route|add_shortcode|add_rewrite_endpoint/', $src ) );
 	pqbg_t( 'source: add_rewrite_rule appears only in ScanRoute (Phase 6)', array( 'ScanRoute.php' ) === array_values( array_map( 'basename', array_filter( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), static fn( $f ) => (bool) preg_match( '/add_rewrite_rule/', implode( '', array_map( static fn( $t ) => is_array( $t ) ? ( in_array( $t[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? '' : $t[1] ) : $t, token_get_all( (string) file_get_contents( $f ) ) ) ) ) ) ) ) );
 	pqbg_t( 'source: the barcode library is referenced only in BarcodeRenderer', 1 === count( array_filter( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), static fn( $f ) => str_contains( (string) file_get_contents( $f ), 'Picqer' ) ) ) );
-	pqbg_t( 'source: no raw writes outside CodeRepository, SaleRepository (Phase 7), Install and Schema', ! preg_match( '/\$wpdb->(insert|update|query|delete)/', implode( "\n", array_map( 'file_get_contents', array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array( PQBG_PLUGIN_DIR . 'includes/CodeRepository.php', PQBG_PLUGIN_DIR . 'includes/SaleRepository.php', PQBG_PLUGIN_DIR . 'includes/Install.php', PQBG_PLUGIN_DIR . 'includes/Schema.php' ) ) ) ) ) );
+	// Phase 8 (approved): PrintCache::clear_all() deletes its own transient rows (the render cache, not data).
+	pqbg_t( 'source: no raw writes outside CodeRepository, SaleRepository (Phase 7), PrintCache (Phase 8), Install and Schema', ! preg_match( '/\$wpdb->(insert|update|query|delete)/', implode( "\n", array_map( 'file_get_contents', array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array( PQBG_PLUGIN_DIR . 'includes/CodeRepository.php', PQBG_PLUGIN_DIR . 'includes/SaleRepository.php', PQBG_PLUGIN_DIR . 'includes/PrintCache.php', PQBG_PLUGIN_DIR . 'includes/Install.php', PQBG_PLUGIN_DIR . 'includes/Schema.php' ) ) ) ) ) );
 	pqbg_t( 'logged out: /scan/ and /scan/{CODE}/ redirect to the login page (Phase 6)', 302 === $http( 'anon', 'GET', $home . '/scan/' )['code'] && str_starts_with( $http( 'anon', 'GET', $home . '/scan/' . $code . '/' )['location'], wp_login_url() ) );
 	pqbg_t( 'direct HTTP to the new files: empty output', array() === array_filter( array( 'includes/CodeLifecycle.php', 'includes/AdminActions.php', 'includes/AdminProductPanel.php', 'assets/index.php' ), static fn( $f ) => '' !== $http( 'anon', 'GET', PQBG_PLUGIN_URL . $f )['body'] ) );
 } finally {
@@ -972,22 +972,10 @@ try {
 	delete_transient( CodeLifecycle::NOTICE_TRANSIENT . '0' );
 	$wpdb->query( $wpdb->prepare( "DELETE FROM $C WHERE id > %d", $start_id ) );
 	$wpdb->query( "ALTER TABLE $C AUTO_INCREMENT = 1" );
-	$new_actions = $wpdb->get_results( $wpdb->prepare( "SELECT action_id, hook, args FROM $as_table WHERE action_id > %d", $start_as ), ARRAY_A );
-	$ours_as     = array_filter(
-		$new_actions,
-		static function ( $a ) use ( $ids ) {
-			foreach ( $ids as $id ) {
-				if ( preg_match( '/(^|\D)' . $id . '(\D|$)/', (string) $a['args'] ) ) {
-					return true;
-				}
-			}
-			return false;
-		}
-	);
-	foreach ( $ours_as as $a ) {
-		ActionScheduler::store()->delete_action( (int) $a['action_id'] );
-	}
-	echo '   removed ' . count( $ids ) . ' post(s) and ' . count( $ours_as ) . ' Action Scheduler job(s): ' . implode( ', ', array_unique( array_column( $ours_as, 'hook' ) ) ) . "\n";
+	// Every Action Scheduler job for an ID allocated during the suite, including deleted products (bootstrap.php).
+	$removed_as = pqbg_test_as_cleanup( $as_mark );
+	echo '   removed ' . count( $ids ) . ' post(s) and ' . $removed_as . " Action Scheduler job(s)\n";
+	pqbg_test_as_check( $as_mark );
 	$wpdb->update( $wpdb->options, $original, array( 'option_name' => $option ) );
 	wp_cache_delete( $option, 'options' );
 	wp_cache_delete( 'alloptions', 'options' );

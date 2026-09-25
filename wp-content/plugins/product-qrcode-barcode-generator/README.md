@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–7 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold)
+## Current scope: Phases 2–8 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing)
 
 Implemented:
 
@@ -20,16 +20,18 @@ Implemented:
 - **Phase 5:** automatic code assignment on product save, lifecycle rules (trash, delete, type change), atomic regeneration, and the admin UI on the classic product screens: a "QR & Barcode" panel, codes in the variations panel, a "Code" column, SVG downloads. See [Admin code management](#admin-code-management).
 - **Phase 6:** the front-end scan page `/scan/{CODE}/` and the entry page `/scan/`: login round trip, access control, the status → screen matrix, live product details, a standalone mobile template. See [Scan page](#scan-page).
 - **Phase 7:** Mark as Sold from the scan page: quantity, "Confirm sale", WooCommerce stock decrement, a permanent `pqbg_sales` record with snapshots, a 10-minute Undo for the seller, and `SaleService::void_sale()` for managers (service only). See [Mark as Sold](#mark-as-sold).
+- **Phase 8:** label printing from wp-admin: "Print label" on the product panel, "Print QR labels" on the products list, a print setup screen (A4 sheet and thermal presets, custom layouts, start position, copies, fields), and a standalone print-ready page with exact millimetre geometry, plus a render cache. See [Label printing](#label-printing).
 
 **Not implemented yet (later phases):**
 - sales history, the manager void UI and the seller dashboard (Phase 9)
-- label printing and layouts, CSV import/export of codes, bulk generation and bulk tools
-- caching of rendered images (planned for Phase 8)
+- CSV import/export of codes, bulk code generation and bulk tools (Phase 10)
+- PDF output, print history, a label designer, direct printer drivers
 - in-browser camera scanning
 - REST/AJAX endpoints and shortcodes, and support for WooCommerce's block-based product editor
 
 The plugin adds **no REST routes, AJAX handlers or shortcodes**. Its request handlers are:
 - the authenticated `admin-post.php` actions of Phase 5, for users with `pqbg_manage_codes` (see [Admin handlers](#admin-handlers))
+- the Phase 8 print setup screen (a hidden wp-admin page), its `admin-post.php` POST, and the print page (`admin-post.php`, GET/HEAD), all for users with `pqbg_manage_codes` (see [Label printing](#label-printing))
 - the scan page of Phase 6, which requires a login and `pqbg_view_products` before it shows anything (see [Scan page](#scan-page)); since Phase 7 it also accepts POST (sell, undo) on code URLs from users with `pqbg_sell`, with a nonce and a signed form token (see [Mark as Sold](#mark-as-sold))
 
 ## QR codes and barcodes
@@ -167,7 +169,7 @@ The libraries are bundled inside the plugin; no Composer is needed on the server
 
 ## Tests
 
-The CLI regression suites for Phases 2–7 are in [`tests/`](tests/README.md): a runner, round-trip QR/barcode decoding, HTTP checks of the admin, scan and sale flows, and concurrency tests with worker processes. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
+The CLI regression suites for Phases 2–8 are in [`tests/`](tests/README.md): a runner with an Action Scheduler leak guard, round-trip QR/barcode decoding (also at printed size, 203 and 300 dpi), HTTP checks of the admin, scan, sale and print flows, concurrency tests with worker processes, and optional headless Chrome/Edge checks of the print page. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
 
 ## Production deployment
 
@@ -180,7 +182,7 @@ The CLI regression suites for Phases 2–7 are in [`tests/`](tests/README.md): a
 `tests/` and `build/` are development tooling. They are kept in the repository so the vendor bundle can be rebuilt exactly and the regression suites can be rerun, but they must never reach a live server:
 - The test suites create and delete data, and one briefly deactivates the plugin.
 - The `.htaccess` denial only works on Apache.
-- `tests/decoder/node_modules/`, `build/vendor/` and `build/tools/` are never committed and must not be deployed either.
+- `tests/decoder/node_modules/`, `tests/print-check/node_modules/`, `build/vendor/` and `build/tools/` are never committed and must not be deployed either.
 
 ## Naming and the rename
 
@@ -634,6 +636,21 @@ A phone cannot open `http://localhost/sharayu`. For testing, use a **Cloudflare 
 
 Restore the test product's stock and status afterwards.
 
+**Phase 8 checklist (label printing).** Set up the tunnel and the `wp-config.php` snippet as in steps 1–3 above, so the labels point to `https://<words>.trycloudflare.com/sharayu`. **Never change Settings → General → WordPress Address for this.** With the tunnel URL saved as the Scan base URL, labels print without the TEST mark; if you skip the tunnel, they print with "TEST – NOT FOR USE" and phones cannot open them.
+
+Use two or three test products with codes, one with a price (to check the ₹ sign) and one variable product.
+
+1. **Products** list: tick the test products, choose **Print QR labels** under Bulk actions, and click **Apply**. The setup screen lists the items (variable products as their variations) and any "Skipped – no code yet" items.
+2. Choose your layout: the A4 sheet that matches your label stock, or the thermal preset (set the same label size in the thermal printer's own driver settings). Keep the defaults otherwise, and click **Preview and print**.
+3. On the print page, check the preview, then click **Print**. In the print dialog set **Scale 100%** ("Default" in Chrome/Edge; never "Fit to page"), **Margins: None**, **Headers and footers: off**.
+4. **A4 sheets:** print one page on **plain paper** first and hold it against a label sheet in front of a light: every label outline should fall inside a label. If everything is shifted the same way, use **Printer offset** on the setup screen (e.g. 1 mm right) and print again. Then print on the label sheet.
+5. Measure one printed label and its QR code with a ruler: the label size should match the layout, and the QR code the size shown on the print page (e.g. "QR code 35.1 mm").
+6. **Check that ₹ prints correctly** in the price (a rupee sign, not an empty box or a question mark).
+7. Scan several labels with your phone camera, including one from the last row or last thermal label, through the Phase 6 flow: the tunnel's login page (if logged out), then the product screen for exactly that item.
+8. (Optional) Print a partly used sheet with **Start at position** set to the first free label.
+
+**To revert:** clear the Scan base URL field and save, stop the tunnel, and remove the snippet. Throw away labels printed with the tunnel URL: they stop working when the tunnel stops.
+
 ### Limitations
 
 - **The scan base URL must reach this site.** The route answers only on this site's own `/scan/` path. A base URL on another host needs that host to forward to this site, as the tunnel does.
@@ -761,6 +778,105 @@ Every response carries the Phase 6 security headers. There is still no JavaScrip
 - Held stock for pending online checkouts is not subtracted (decision D2).
 - Taxes are off in this store; the recorded price is `get_price()` as entered. Tax/GST handling is out of scope.
 
+## Label printing
+
+Phase 8. Administrators and Shop Managers (`pqbg_manage_codes`) print product labels from wp-admin with the browser's own print dialog, on A4 label sheets or thermal label printers. There is no PDF library: the page is HTML with inline SVG and exact millimetre CSS.
+
+### Rules
+
+- **Only ACTIVE codes are printed.** Items are resolved server-side and their codes read with `CodeRepository::find_active_for_products()`; a retired code is never printed.
+- **Printing never generates codes.** An item without a code is listed as "Skipped – no code yet" with a link to the product. (Bulk code generation is Phase 10.)
+- The QR payload comes only from `ScanUrl::for_code()` and the images only from `QrRenderer`/`BarcodeRenderer`.
+- Barcodes are printed only when they are enabled in Settings; otherwise the barcode library is never loaded.
+- Draft, pending and private items are printed, with a note on the setup screen: their labels scan to "Not published – cannot be sold yet" until they are published. Items in the trash are skipped.
+
+### Entry points
+
+| Where | What |
+|---|---|
+| Product edit screen, simple product | **Print label** next to Download QR |
+| Product edit screen, variable product | **Print all variation labels (n)** above the variations table, and **Print label** on each variation row that has a code |
+| Products list | Bulk action **Print QR labels** (a variable product expands to its variations) |
+
+All three lead to the **print setup screen** (a hidden page under Products). **Preview and print** remembers your choices and opens the **print page**.
+
+- **Job limit: 300 labels, and at most 300 selected products.** A cold job renders about 50 ms per new QR code, so 300 new codes take about 15 s; the page for 300 labels is about 1.5 MB, which print preview handles well; and 300 IDs keep the link far below server URL limits. Over the limit, the setup screen says "This job has N labels; the maximum is 300…".
+
+### Setup options
+
+- **Layout** (with the QR size each preset gives for your scan URL):
+
+  | Preset | Paper | Grid | Label (mm) | Left / top margin (mm) | Column / row gap (mm) | Per page |
+  |---|---|---|---|---|---|---|
+  | `a4-3x7` **(default)** | A4 | 3 × 7 | 63.5 × 38.1 | 7.25 / 15.15 | 2.5 / 0 | 21 |
+  | `a4-3x8` | A4 | 3 × 8 | 70 × 37 | 0 / 0.5 | 0 / 0 | 24 (edge-to-edge sheet) |
+  | `a4-4x10` | A4 | 4 × 10 | 48.5 × 25.4 | 8 / 21.5 | 0 / 0 | 40 |
+  | `a4-5x13` | A4 | 5 × 13 | 38.1 × 21.2 | 4.75 / 10.7 | 2.5 / 0 | 65 |
+  | `th-50x25` | 50 × 25 | 1 | 50 × 25 | – | – | 1 (thermal, 203 dpi) |
+  | `th-38x25` | 38 × 25 | 1 | 38 × 25 | – | – | 1 (thermal, 203 dpi) |
+  | `th-100x50` | 100 × 50 | 1 | 100 × 50 | – | – | 1 (thermal, 203 dpi) |
+
+  Every A4 preset adds up to exactly 210 × 297 mm. Content keeps a safe inset from each label edge (1–1.5 mm; 4 × 2.5 mm on the edge-to-edge 3 × 8 sheet). **Custom**: a label sheet (page size, label size, columns, rows, left/top margin, gaps; at most 500 labels per sheet, everything must fit on the page) or a thermal printer (label size, 203 or 300 dpi). Invalid values are refused with a message naming the field.
+- **Start at position** N (label sheets only), counted row by row from the top left, to reuse a partly used sheet.
+- **Copies:** a fixed number per item (1–100), or **one label per unit in stock**. The latter needs the item's own tracked stock; stock shared with the parent product, or not tracked, gives 1 label with a note; stock at or below 0 skips the item.
+- **Show on the label:** product name (2 lines), variation attributes, SKU, price, store name (off by default). The code text is always printed. "Printed prices go out of date when you change them; the QR always shows the live price."
+- **Printer offset** (label sheets only): moves everything right/down by up to ±5 mm to correct a printer that prints slightly off.
+- Your choices are remembered per user (`pqbg_print_prefs` user meta), never site-wide.
+
+### QR size
+
+- The QR code is never printed with modules smaller than **0.40 mm**, and never larger than 0.99 mm. Its 4-module quiet zone lies inside the label's safe inset.
+- The module count comes from the real encoding of the job's scan URLs at error correction level M: 41 × 41 modules including the quiet zone (version 4) for a scan base URL of up to 38 characters, then 45, 49 and 53, and 57 (version 8) at the 99–100 character maximum.
+- **Why 0.40 mm:** the Phase 8 tests rasterise labels at exactly 0.40 mm modules at 203 and 300 dpi and decode them. For reference, GS1 General Specifications (Release 26.0, Table 5-46) give 0.396 mm as the minimum X-dimension for QR codes with GS1 Digital Link URIs on retail consumer items; our scan URLs are not GS1 Digital Link, so this is a reference point, not a conformance claim.
+- On thermal printers the module is rounded down to whole printer dots (0.125 mm at 203 dpi) when that keeps it at or above 0.40 mm.
+- If the chosen fields leave too little room, optional text is dropped first (store name, then price, SKU, attributes, name); the page lists what was not printed. If the QR code still does not fit, the layout is refused with the size it needs, e.g. "Your scan URL (61 characters) needs a QR code of at least 19.6 mm (49 × 49 modules …). This label has room for 19.2 mm."
+- With a typical production base URL (version 4) the QR is 35.1 mm on 3 × 7, 32 mm on 3 × 8, 22.4 mm on 4 × 10, 19.2 mm on 5 × 13, 20.5 mm on thermal 50 × 25, 19.5 mm on 38 × 25 and 35.9 mm on 100 × 50.
+- **Barcodes** (when enabled): a full-width strip at the bottom, 0.25 mm per module (2 dots at 203 dpi), 7 mm bars, up to 60.5 mm wide including its quiet zones. It fits 3 × 7, 3 × 8 and 100 × 50; on narrower labels it is left off with a notice.
+- Text never overlaps the QR code or barcode: every text line has a fixed box, names are clamped to two lines, long values end with "…", and the code text wraps after its second hyphen on narrow labels.
+- **Rupee sign:** the label font stack is Segoe UI, Nirmala UI, Roboto, Noto Sans, Arial, all of which contain "₹", before the generic fallback.
+
+### The print page
+
+- A standalone page (no wp-admin menus) with CSS `@page` set to the layout's exact size and zero margins, one page per sheet (or per thermal label), and an on-screen preview with page and label outlines.
+- **In the print dialog:** Scale 100% ("Default" in Chrome/Edge, "Actual size" elsewhere; never "Fit to page"), Margins **None**, Headers and footers **off**. Background graphics are not needed. For a thermal printer, also set the label size in the printer's own driver settings.
+- **Measured in headless Chrome and Edge 153** (`page.pdf()` with the page's own size): A4 comes out as 209.889 × 297.011 mm (Chromium uses the standard 595 × 842 pt), and 50 × 25 mm as 50.123 × 25.061 mm (rounded up to printer units). Content is placed from the top-left corner, so labels stay where they belong; the tests check the page count, the page size to ±0.5 mm and every label position.
+- **Local scan URL:** the page shows a large warning and prints nothing until you click **Print TEST labels anyway**; every label then carries **TEST – NOT FOR USE**. With a public `https://` scan URL there is no mark. A public `http://` URL shows the "Labels should use an https:// scan URL in production." warning on the page (no mark on the labels).
+- **Read-only:** opening or reloading the setup screen or the print page changes nothing (only the render cache below). Both are GET, capability-checked, and carry a nonce bound to the product selection (and to the user). The setup screen's POST (`pqbg_print_prepare`) only saves your options.
+- **Headers:** the scan page's security headers (`Cache-Control: no-store…`, `X-Robots-Tag`, `Referrer-Policy`, `X-Frame-Options: DENY`, `nosniff`) with a print-page CSP:
+  ```
+  Content-Security-Policy: default-src 'none'; style-src 'self' 'nonce-…'; script-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+  ```
+  The geometry is in one `<style>` element carrying the per-request nonce; the stylesheet (`assets/pqbg-print.css`) and the only script (`assets/pqbg-print.js`, the Print button) are same-origin files. There are no inline style attributes or event handlers.
+
+### Render cache
+
+- Rendered QR and barcode SVGs are cached so a 300-label job does not re-encode every code.
+- **Storage:** transients (`pqbg_svg_{md5}`), which WordPress keeps in `wp_options` (not autoloaded) or in a persistent object cache when the host has one. Nothing is written to files.
+- **Key:** the code plus everything that affects the image: for QR codes the exact payload from `ScanUrl::for_code()` (so the scan base URL), for barcodes the renderer arguments, plus the renderer constants, `PrintCache::VERSION` and the plugin version. Changing the scan base URL or the barcode settings never serves an old image; each stored entry repeats its code and fingerprint and both are checked on read. While barcodes are disabled, no barcode is looked up.
+- **Retired codes** are never served: the print code only asks for codes it has just read as active rows.
+- **Bounds:** entries expire after 30 days; an index option (`pqbg_svg_cache_index`, not autoloaded) keeps at most 2,000 entries (about 10 MB at most) and evicts the least recently used, once per request.
+- **Uninstall** always clears the cache, whatever the data-preservation setting: it is not data.
+- **Timings:** 300 labels take about 14 s cold and under 2 s warm over HTTP; see [the table below](#timings-dev-machine-1).
+
+### Timings (dev machine)
+
+Measured by the Phase 8 suite on the dev machine (XAMPP, PHP 8.5.6, no persistent object cache), A4 3 × 7 with every field, each label a different product. "Cold" is an empty render cache; "warm" is the next request with the cache filled. In-process = building and rendering the page in PHP; HTTP = the whole print page request.
+
+| Labels | In-process cold | In-process warm | HTTP cold | HTTP warm | Page size |
+|---|---|---|---|---|---|
+| 100 | 4.47 s | 0.33 s | 4.77 s | 0.78 s | 448 KB |
+| 300 | 14.17 s | 0.82 s | 13.67 s | 1.85 s | 1,340 KB |
+
+Cold time is almost all QR encoding (about 45 ms per new code, in bacon's pure-PHP encoder); the cache removes it. Copies of the same code are rendered once per request.
+
+### Limitations
+
+- The browser's print dialog settings (scale, margins, headers and footers) are the user's; the page can only explain them. Always print one test page on plain paper first.
+- Printer hardware margins: most office printers cannot print within 3–5 mm of the paper edge, so the edge-to-edge 3 × 8 sheet needs a printer that can.
+- The QR size assumes all codes have the same length (they do: `DC-XXXX-XXXX-XXXX`); the page still uses the largest version in the job.
+- Prices on labels are a snapshot; the QR always opens the live price.
+- No PDF output, print history, label designer or printer drivers (out of scope).
+
 ## Requirements
 
 | | Minimum | Tested |
@@ -846,6 +962,10 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 | `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 | `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
+| `pqbg_svg_cache_index` | no | Phase 8 render cache index: `{transient key} => last used`, at most 2,000 entries. Not data; removed on every uninstall. |
+| `_transient_pqbg_svg_{md5}` (+ `_transient_timeout_…`) | no | Phase 8 cached QR/barcode SVGs, 30-day expiry (in the object cache instead when the host has a persistent one). Not data; removed on every uninstall. |
+
+User meta `pqbg_print_prefs` (Phase 8) holds each user's last-used print options; it is removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`.
 
 ## Migrations
 
@@ -914,7 +1034,7 @@ Deactivation is non-destructive. Tables, codes, sales, settings, the role and ca
 
 ## Uninstall
 
-**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only the transient install lock and the `pqbg_rewrite_version` flag. Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
+**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only runtime state: the transient install lock, the `pqbg_rewrite_version` flag and the render cache of QR/barcode images (Phase 8; the cache is not data). Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
 
 To permanently delete all plugin data, add this to `wp-config.php` **before** deleting the plugin:
 
@@ -922,12 +1042,12 @@ To permanently delete all plugin data, add this to `wp-config.php` **before** de
 define( 'PQBG_UNINSTALL_DELETE_ALL_DATA', true );
 ```
 
-This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_version`, removes every `pqbg_*` capability, and deletes the Store Seller role. Affected users keep their accounts.
+This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_version` and every user's remembered print options (`pqbg_print_prefs` user meta), removes every `pqbg_*` capability, and deletes the Store Seller role. Affected users keep their accounts.
 **This cannot be undone. Back up the database first.** On multisite, only the site running the uninstall is affected.
 
 ## Operational notes
 
-- QR codes point to the scan base URL: `home_url()` unless it is overridden on the settings page. **Do not print labels until the production URL is set.** The admin warning stays visible while the URL is local, and a second warning appears while a public URL uses `http://`.
+- QR codes point to the scan base URL: `home_url()` unless it is overridden on the settings page. **Do not print labels until the production URL is set.** The admin warning stays visible while the URL is local, and a second warning appears while a public URL uses `http://`. While the URL is local, the print page only prints labels marked "TEST – NOT FOR USE", after an explicit confirmation (see [Label printing](#label-printing)).
 - The site timezone is Asia/Kolkata (set 2026-09-25). The plugin stores UTC (`*_gmt`) and displays times in the site timezone with `wp_date()`.
 - WooCommerce "Coming Soon" mode is on for the whole site. The scan page works with it (see [WooCommerce Coming Soon](#woocommerce-coming-soon)). Logged-out staff log in through `wp-login.php`, because Coming Soon hides the My Account login form.
 - Scan URLs need pretty permalinks (see [Permalinks](#permalinks)).

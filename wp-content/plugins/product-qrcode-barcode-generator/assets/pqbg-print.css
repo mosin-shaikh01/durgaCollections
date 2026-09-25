@@ -1,0 +1,187 @@
+/*
+ * Print page (PrintPage). The exact geometry (page, label, QR, text and slot
+ * positions in mm) is in the page's own nonce'd <style> element; this file holds
+ * everything that does not depend on the layout.
+ *
+ * Label font: families that contain the rupee sign (U+20B9) come before any
+ * generic fallback: Segoe UI and Nirmala UI (Windows), Roboto and Noto Sans
+ * (Android, Linux, ChromeOS), then Arial.
+ */
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+
+body.pqbg-print {
+	background: #e5e7eb;
+	color: #111;
+	font: 15px/1.45 "Segoe UI", "Nirmala UI", Roboto, "Noto Sans", Arial, sans-serif;
+}
+
+.pqbg-toolbar {
+	max-width: 60rem;
+	margin: 0 auto;
+	padding: 1rem 1.25rem;
+	background: #fff;
+	border-bottom: 1px solid #cbd0d6;
+}
+
+.pqbg-toolbar h1 {
+	margin: 0 0 0.5rem;
+	font-size: 1.4rem;
+}
+
+.pqbg-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.pqbg-button {
+	display: inline-block;
+	padding: 0.45rem 1rem;
+	border: 1px solid #2271b1;
+	border-radius: 3px;
+	background: #f6f7f7;
+	color: #2271b1;
+	font: inherit;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.pqbg-button--primary {
+	background: #2271b1;
+	color: #fff;
+}
+
+.pqbg-help ul,
+.pqbg-skipped {
+	margin: 0.25rem 0 0.75rem;
+	padding-left: 1.25rem;
+}
+
+.pqbg-warning,
+.pqbg-error {
+	padding: 0.6rem 0.8rem;
+	border-left: 4px solid #d63638;
+	background: #fcf0f1;
+}
+
+.pqbg-warning--big {
+	font-size: 1.15rem;
+}
+
+.pqbg-note {
+	padding: 0.4rem 0.8rem;
+	border-left: 4px solid #dba617;
+	background: #fcf9e8;
+}
+
+.pqbg-muted {
+	color: #646970;
+}
+
+/* Preview: every page with its outline, labels with dashed outlines (screen only). */
+.pqbg-sheets {
+	padding: 1rem 0 2rem;
+}
+
+.pqbg-sheet {
+	position: relative;
+	overflow: hidden;
+	box-sizing: border-box;
+	margin: 0 auto 1rem;
+	background: #fff;
+	box-shadow: 0 0 0 1px #9ca3af, 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.pqbg-label {
+	position: absolute;
+	box-sizing: border-box;
+	overflow: hidden;
+	outline: 0.2mm dashed #9ca3af;
+	outline-offset: -0.1mm;
+	color: #000;
+	font-family: "Segoe UI", "Nirmala UI", Roboto, "Noto Sans", Arial, sans-serif;
+}
+
+.pqbg-qr,
+.pqbg-text,
+.pqbg-bc {
+	position: absolute;
+	overflow: hidden;
+}
+
+.pqbg-qr svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.pqbg-bc svg {
+	display: block;
+	width: auto;
+	margin: 0 auto;
+}
+
+.pqbg-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.pqbg-l {
+	flex: none;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.pqbg-l-name {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	font-weight: 600;
+}
+
+.pqbg-l-test {
+	font-weight: 700;
+}
+
+.pqbg-l-code {
+	margin-top: auto;
+	font-family: Consolas, "Cascadia Mono", "Roboto Mono", "Noto Sans Mono", "DejaVu Sans Mono", "Courier New", monospace;
+	text-overflow: clip;
+}
+
+@media print {
+	body.pqbg-print {
+		background: none;
+	}
+
+	.pqbg-toolbar {
+		display: none;
+	}
+
+	.pqbg-sheets {
+		padding: 0;
+	}
+
+	.pqbg-sheet {
+		margin: 0;
+		box-shadow: none;
+		break-after: page;
+		page-break-after: always;
+	}
+
+	.pqbg-sheet:last-child {
+		break-after: auto;
+		page-break-after: auto;
+	}
+
+	.pqbg-label {
+		outline: none;
+	}
+}

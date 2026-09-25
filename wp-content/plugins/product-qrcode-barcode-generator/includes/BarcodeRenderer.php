@@ -48,10 +48,17 @@ final class BarcodeRenderer {
 	/**
 	 * Renders the barcode for a product code.
 	 *
-	 * @param string $code Product code; must match CodeGenerator::FORMAT_PATTERN exactly.
+	 * Optional arguments (for printed labels, which print the code text themselves):
+	 *   - bar_height (int, 1–500): bar height in modules; default BAR_HEIGHT
+	 *   - text (bool): the code beneath the bars; default true. Without it there is
+	 *     no top margin either, so the SVG is exactly the bars and quiet zones.
+	 * With no arguments the output is unchanged.
+	 *
+	 * @param string              $code Product code; must match CodeGenerator::FORMAT_PATTERN exactly.
+	 * @param array<string, mixed> $args Optional arguments, see above.
 	 * @return string|WP_Error SVG markup.
 	 */
-	public function render( string $code ) {
+	public function render( string $code, array $args = array() ) {
 		if ( ! Settings::is_barcode_enabled() ) {
 			return new WP_Error( 'pqbg_barcode_disabled', __( 'Barcodes are disabled.', 'product-qrcode-barcode-generator' ) );
 		}
@@ -66,6 +73,10 @@ final class BarcodeRenderer {
 			return self::failed( $e );
 		}
 
+		$bar_height = isset( $args['bar_height'] ) && is_int( $args['bar_height'] ) && $args['bar_height'] >= 1 && $args['bar_height'] <= 500 ? $args['bar_height'] : self::BAR_HEIGHT;
+		$with_text  = ! array_key_exists( 'text', $args ) || true === $args['text'];
+		$top        = $with_text ? self::TOP_MARGIN : 0;
+
 		$runs = array();
 		$x    = self::QUIET_ZONE;
 
@@ -73,17 +84,17 @@ final class BarcodeRenderer {
 			$width = (int) $bar->getWidth();
 
 			if ( $bar->isBar() && $width > 0 ) {
-				$runs[] = array( $x, self::TOP_MARGIN, $width );
+				$runs[] = array( $x, $top, $width );
 			}
 
 			$x += $width;
 		}
 
 		$width  = (int) $barcode->getWidth() + 2 * self::QUIET_ZONE;
-		$height = self::TOP_MARGIN + self::BAR_HEIGHT + self::TEXT_SIZE + 4;
-		$text   = Svg::text( intdiv( $width, 2 ), self::TOP_MARGIN + self::BAR_HEIGHT + self::TEXT_SIZE, self::TEXT_SIZE, $code );
+		$height = $with_text ? self::TOP_MARGIN + $bar_height + self::TEXT_SIZE + 4 : $bar_height;
+		$text   = $with_text ? Svg::text( intdiv( $width, 2 ), self::TOP_MARGIN + $bar_height + self::TEXT_SIZE, self::TEXT_SIZE, $code ) : '';
 
-		return Svg::document( $width, $height, self::MODULE_PX, $code, Svg::runs( $runs, self::BAR_HEIGHT ) . $text );
+		return Svg::document( $width, $height, self::MODULE_PX, $code, Svg::runs( $runs, $bar_height ) . $text );
 	}
 
 	/**

@@ -1,12 +1,13 @@
 # Tests
 
-CLI regression suites for Product QR Code and Barcode Generator (Phases 2–7). They run against a real WordPress + WooCommerce site through `wp-load.php`; there is no PHPUnit.
+CLI regression suites for Product QR Code and Barcode Generator (Phases 2–8). They run against a real WordPress + WooCommerce site through `wp-load.php`; there is no PHPUnit.
 
 - **CLI only.** Every PHP file here exits unless `PHP_SAPI === 'cli'`. The `.htaccess` in this directory answers every HTTP request with 403 (Apache). `index.php` stubs stop directory listings on other servers.
 - **Never loaded by the plugin.** The autoloader only maps `includes/` and `vendor-prefixed/`.
 - **Not for production.** Exclude `tests/` (and `build/`) from any production deployment; see the plugin README.
 - **Development sites only.** The suites create and then delete test data: code rows, sales rows, products, users, Action Scheduler jobs and (Phase 7 only) two WooCommerce orders that simulate online checkouts. The lifecycle suite also briefly deactivates and reactivates the plugin.
   - Every suite cleans up everything it creates, even when a check fails, and checks its own cleanup.
+  - After every suite, `run.php` runs the **Action Scheduler leak guard** (`as-guard.php`); see [Action Scheduler jobs](#action-scheduler-jobs).
   - The suites refuse to run when `wp_get_environment_type()` is `production`. See [Environment type](#environment-type).
 
 ## Suites
@@ -18,11 +19,21 @@ CLI regression suites for Product QR Code and Barcode Generator (Phases 2–7). 
 | `phase2-no-woocommerce.php` | WooCommerce missing, simulated for this process only: no boot, admin notice | 12 |
 | `phase3-codes.php` | Code format and alphabet, randomness, collisions, eligibility, authorization, assignment, retirement, database races, batch, scope. **A reconstruction**, see below. Scope checks updated for Phases 5 and 6. | 110 |
 | `phase4-rendering.php` | Scan URLs, QR and barcode rendering with round-trip decoding, lazy library loading, SVG safety, base URL validation, the local-address and http:// warnings, settings page access and saving over HTTP, vendor isolation, scope | 165 (5 of them need the decoder) |
-| `phase5-admin.php` | Automatic code assignment on every save path over real HTTP (classic edit screen, AJAX variations, Quick Edit, Bulk Edit, REST, Duplicate) and the CSV importer; users without the capability, cron, failure injection; trash, untrash, delete, Empty Trash, type changes; atomic regeneration including a mid-transaction failure and **4 concurrent PHP processes**; history timezone and "retired by" labels; the panel, variations panel, list column, confirmation page and handlers over HTTP; downloads with round-trip decoding; permissions and nonces for every handler; barcodes disabled; the 40-variation performance measurement; scope | 157 (2 of them need the decoder) |
-| `phase6-scan.php` | The scan page over real HTTP: rewrite rules, subdirectory, canonical 301s, flush once, deactivation/reactivation, plain and `index.php` permalinks, slug conflicts; every row of the status → screen matrix (including a private variation vs a private simple product, and a trashed parent); price, sale, stock, category, image rendering and live data; HTML escaping; logged-out redirects; login round trips through `wp-login.php` and the My Account form for administrator, Shop Manager and Store Seller (also with Coming Soon on); the byte-identical customer/subscriber 403; entry box normalisation; methods; every security header on every response type; Coming Soon; sitemaps; QR round trip (QrRenderer → decoder → request); scan timing; scope | 213 (1 of them needs the decoder) |
+| `phase5-admin.php` | Automatic code assignment on every save path over real HTTP (classic edit screen, AJAX variations, Quick Edit, Bulk Edit, REST, Duplicate) and the CSV importer; users without the capability, cron, failure injection; trash, untrash, delete, Empty Trash, type changes; atomic regeneration including a mid-transaction failure and **4 concurrent PHP processes**; history timezone and "retired by" labels; the panel, variations panel, list column, confirmation page and handlers over HTTP; downloads with round-trip decoding; permissions and nonces for every handler; barcodes disabled; the 40-variation performance measurement; scope | 158 (2 of them need the decoder) |
+| `phase6-scan.php` | The scan page over real HTTP: rewrite rules, subdirectory, canonical 301s, flush once, deactivation/reactivation, plain and `index.php` permalinks, slug conflicts; every row of the status → screen matrix (including a private variation vs a private simple product, and a trashed parent); price, sale, stock, category, image rendering and live data; HTML escaping; logged-out redirects; login round trips through `wp-login.php` and the My Account form for administrator, Shop Manager and Store Seller (also with Coming Soon on); the byte-identical customer/subscriber 403; entry box normalisation; methods; every security header on every response type; Coming Soon; sitemaps; QR round trip (QrRenderer → decoder → request); scan timing; scope | 214 (1 of them needs the decoder) |
 | `phase7-sales.php` | Mark as Sold: the sale form (quantity list with totals, number field above 100, hidden token fields, separate from the code box) for sellers, shop managers and administrators and its absence for view-only users; a sale over real HTTP with every snapshot, the 303 and the success page; quantity bounds; every non-sellable state refused on POST (not just hidden); unmanaged stock, empty and zero price, backorders, stock and price changed since the form was opened; price normalisation; scheduled sale prices; own-stock and parent-level variation stock (decrement **and lock** on the parent); permissions, nonces, signed tokens, expiry; the sale page's 303 for other users; undo over HTTP and in-process (own sale, 9:59 vs 10:01, once, GET, lock, 4 concurrent undos) and `void_sale()`; idempotency (sequential, 4 concurrent processes, after expiry); **8 worker processes selling the last 3** (simple and parent-level stock); the **online race** with a real WooCommerce order from another process; failure injection before, during and after the stock change; the **SQL-override fallback** in both branches and the **WooCommerce compatibility check** on `woocommerce_update_product_stock_query`; stock hooks, stock status, lookup table and low/no-stock notifications; no WooCommerce orders from sales; the v1 → v2 migration on a temporary table prefix; escaping; headers; GET never writes; scope; timings | 209 |
+| `phase8-printing.php` | Label printing: layout geometry for every preset and custom layouts (slot positions, start-at-N, pages, 26 invalid custom layouts, 14 invalid options); the QR minimum size (module counts from the real encoding for base URLs of 24–100 characters, the planned module size or refusal for every preset, exactly 0.40 mm accepted and 0.01 mm less refused, thermal dot snapping, optional text dropped before refusing); job resolution (variable products expanded, duplicates, every skip reason, copies = N and = stock, the 300-label and 300-product limits, codes never generated); the local-address TEST mark and confirmation, no mark for https, the http warning; fields and code wrapping; retired codes never printed after regeneration; barcodes on/off and library loading; the render cache (hit/miss, TTL, not autoloaded, base URL and barcode-argument invalidation, tampered entries, eviction at 2,000, uninstall); **round trips at printed size** (every label's QR and barcode rasterised at 300 dpi for A4 and 203 dpi for thermal, and at exactly 0.40 mm for V4 and V8 URLs, then decoded); every entry point over real HTTP (panel links, bulk action, setup screen, POST, print page, HEAD, confirmation), nonces bound to the selection and the user, methods, the permission matrix (admin, shop manager, seller, customer, subscriber, logged out), GET never writes, escaping, headers and CSP; **headless Chrome and Edge** (see below); the 100/300-label timings; scope | 167 (4 need the decoder; the browser checks need the decoder, the print-check package and Chrome/Edge) |
 
 Each suite ends with a check that plugin code raised no PHP notices, warnings or deprecations. That check is included in the counts.
+
+**Phase 8 changes to earlier suites.**
+- Phases 3, 5, 6 and 7: Action Scheduler cleanup goes through the shared helpers (see [Action Scheduler jobs](#action-scheduler-jobs)). Phases 5 and 6 gain the zero-leak check (+1 check each).
+- Phase 5: "no raw writes outside CodeRepository, SaleRepository, Install and Schema" also allows `PrintCache` (Phase 8). Its only raw SQL deletes its own transient rows, which the Phase 8 suite checks exactly.
+
+**Phase 8 suite notes.**
+- It creates about 330 products (300 of them for the timings) and 5 temporary users. It switches the scan base URL and the barcode setting in `pqbg_settings`; every option it touches is restored byte for byte and checked.
+- It runs the default (data-preserving) path of `uninstall.php` in-process, to prove that the render cache is cleared and nothing else is. It restores the `pqbg_rewrite_version` flag that path removes.
+- It prints the 100/300-label timings (informational: only "warm < cold" and "300 cold under 60 s" are asserted) and the PDF page sizes Chromium produced.
 
 **Phase 7 changes to the Phase 2, 5 and 6 suites.** Phase 7 was approved to add selling and schema version 2, so these checks became false by design. As before, each now checks "nothing else, plus exactly the approved addition":
 - Phase 2 main: the `pqbg_sales` column list ends with `stock_holder_id`, `failure_code`; the index count is 9 (with `holder_status`); the three "`pqbg_db_version` = 1" checks now compare with `Install::DB_VERSION` (2).
@@ -77,12 +88,29 @@ The original counts were 80 and 16; the notice check and two cleanup checks are 
 
 **Phase 3 reconstruction.** The original Phase 3 script (92 checks) was deleted after Phase 3. `phase3-codes.php` was rebuilt in Phase 4 from the checklist recorded in `progress.md`. It covers every category listed there, but its checks are not the original ones.
 
+## Action Scheduler jobs
+
+WooCommerce schedules a product-attributes-lookup job (`woocommerce_run_product_attribute_lookup_update_callback`) on every product save and delete, and an Apache queue runner, started by the suites' own HTTP requests, may be running those jobs while a suite cleans up.
+
+- **The leak (found and fixed in Phase 8).** The Phase 5 suite left 36 completed jobs per run. Its cleanup matched jobs to post IDs that still existed at cleanup time, so it missed the products it had already deleted inside its own sections (trash/delete, type changes, the edit screen, downloads). The progress log had blamed the Phase 3 suite; a trace of every suite showed that Phase 3 always cleaned up.
+- **The fix (tests only).** `bootstrap.php` has shared helpers, used by Phases 3, 5, 6, 7 and 8:
+  - `pqbg_test_as_mark()` records the highest action, log, post and order IDs when a suite starts.
+  - `pqbg_test_as_cleanup()` matches jobs on **every post/order ID allocated during the suite** (up to `AUTO_INCREMENT − 1`, so deleted posts count). It waits up to 15 s for any claimed or running job, then deletes the jobs (Action Scheduler deletes their logs with them) and any orphaned log rows.
+  - `pqbg_test_as_check()` is each suite's "zero Action Scheduler jobs or logs left for test data" check. It is new in Phases 5 and 6 and replaces the older check in Phases 3 and 7.
+- **The guard.** `run.php` runs `as-guard.php mark` before each suite and `as-guard.php check` after the suite's process has exited, so after its PHP shutdown and after any queue runner (it waits up to 20 s). It fails the suite on:
+  - any new job that references a test ID
+  - any new job whose hook had no job before the suite
+  - any orphaned log row
+
+  New jobs of hooks that already existed and that reference no test ID are the site's own WP-Cron work, triggered by the suites' HTTP requests (e.g. `fetch_patterns`, the Action Scheduler migration hook). They are reported on the `AS-GUARD` line, not failed.
+
 ## Requirements
 
 - PHP CLI with the `curl` extension, able to load the site's `wp-load.php`.
 - The site reachable over HTTP at `home_url()` from the same machine (Phases 4 and 5 log in as temporary users).
 - `proc_open()` and `exec()` for the concurrency workers (Phases 5 and 7).
-- **Optional: Node.js 18+ and the round-trip decoder**, for the 5 Phase 4, 2 Phase 5 and 1 Phase 6 checks that rasterise the SVGs and decode them with a real decoder.
+- **Optional: Node.js 18+ and the round-trip decoder**, for the 5 Phase 4, 2 Phase 5, 1 Phase 6 and 4 Phase 8 checks that rasterise the SVGs and decode them with a real decoder.
+- **Optional: Node.js 22.13+ (or 24+), the print-check package and an installed Chrome or Edge**, for the Phase 8 browser checks (below).
 
 ### Installing the decoder
 
@@ -105,6 +133,31 @@ npm ci
 - The rest of the suite still runs, and the runner can still pass.
 
 Install the decoder before relying on a run as the full Phase 4 verification.
+
+`decode.mjs` takes `--width=PX` to rasterise the SVG files that follow at exactly that width (Phase 8: a label's QR code or barcode at its printed size), `--zoom` to go back to 2×, and PNG files (browser screenshots), which it decodes as they are.
+
+### Installing the print-check package (Phase 8)
+
+```
+cd tests/print-check
+npm ci
+```
+
+- It installs exactly what `package-lock.json` pins: `puppeteer-core` 25.12.0 and `pdfjs-dist` 6.3.289. **puppeteer-core never downloads a browser**: `check.mjs` drives the Chrome or Edge that is already installed.
+- As with the decoder, prefer a copy outside the web root, and point `PQBG_PRINTCHECK` at its `check.mjs`. `node_modules/` is never committed.
+- Browsers: by default, the standard Edge and Chrome install paths on Windows (and `/usr/bin/google-chrome`, `/usr/bin/chromium`). `PQBG_BROWSERS` takes a `;`-separated list of executables.
+- Without Node.js, the package, the decoder or a browser, the browser checks are **skipped** with a message.
+
+What `check.mjs` checks in each browser, logged in as the suite's temporary administrator:
+- The setup screen, the local-address confirmation page and the print pages load with **zero CSP violations, console errors, page errors or failed requests**. A `securitypolicyviolation` listener is installed before any script runs.
+- **Clicking Print calls `window.print()`.** It is replaced by a counter, so no dialog opens.
+- **Print-media geometry**, in mm:
+  - every sheet and label matches `PrintLayout` to 0.06 mm, including the QR, text and barcode boxes
+  - nothing overlaps, and the code text is never cut
+  - long names are clamped and long SKUs ellipsised, inside the text column
+- **The rupee sign:** every platform font Chromium actually used for the price (CDP `CSS.getPlatformFontsForNode`) is in the label font stack, and "₹" drawn in that font is inked and differs from a missing-glyph box.
+- **Every label is decoded** from a screenshot taken at dpi/96 device pixels per CSS pixel, i.e. at its printed size: 300 dpi for A4, 203 dpi for thermal, and a label with 0.40 mm modules at 203 dpi.
+- **The PDF** (`page.pdf()` with the page's own `@page` size, read back with pdf.js): one page per sheet or thermal label, the page size (±0.5 mm), and every code text at its layout position.
 
 ## Environment type
 
@@ -138,5 +191,7 @@ Optional environment variables:
 | `PQBG_TESTS_ALLOW_PRODUCTION` | unset | Fallback when the site reports environment type `production` (prefer `WP_ENVIRONMENT_TYPE`) |
 | `PQBG_WP_LOAD` | four directories up + `/wp-load.php` | Path to `wp-load.php` |
 | `PQBG_DECODER` | `tests/decoder/decode.mjs` | Another copy of `decode.mjs` whose `node_modules` sits next to it, e.g. outside the web root |
+| `PQBG_PRINTCHECK` | `tests/print-check/check.mjs` | Another copy of `check.mjs` whose `node_modules` sits next to it (Phase 8) |
+| `PQBG_BROWSERS` | the standard Edge/Chrome paths | `;`-separated browser executables for the Phase 8 browser checks |
 
 The runner exits 0 only when no selected suite has a failure. Skipped checks are listed in each suite's result line.

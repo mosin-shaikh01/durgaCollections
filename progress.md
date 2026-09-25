@@ -22,7 +22,7 @@ Repo: https://github.com/mosin-shaikh01/durgaCollections
 | Active plugins | classic-editor, woocommerce, product-qrcode-barcode-generator (Product QR Code and Barcode Generator; installed in Phase 2 under its former name) |
 | Admin user | Dev-admin |
 
-_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, and on 2026-09-25 at the start of Phases 6 and 7. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
+_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, and on 2026-09-25 at the start of Phases 6, 7 and 8. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
 
 ---
 
@@ -115,8 +115,9 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **5** | **Admin code management** | **Done 2026-09-25. Committed `ff7805c`, pushed.** |
 | **6** | **Scan/product screen** | **Done 2026-09-25. Committed `381a909`, pushed.** |
 | **7** | **Mark sold + sales** | **Done 2026-09-25. Committed `2413698`, pushed.** |
-| 8 | Printing | Next. Not started |
-| 9 → 12 | seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
+| **8** | **Printing** | **Done 2026-09-25. Approved; committed and pushed (see Repository).** |
+| 9 | Seller dashboard / sales history | Next. Not started |
+| 10 → 12 | bulk/CSV → hardening/performance → QA/documentation | Not started |
 
 > **Pre-rename records.**
 >
@@ -1243,10 +1244,122 @@ The live site migrated on its first request after the change; it had 0 sales row
 **Phone testing:** never change Settings → General → WordPress Address for phone tests; use the `wp-config.php` snippet from the README instead.
 
 **Open items:**
-- **At the start of Phase 8:** `phase3-codes.php` leaves ~35 completed Action Scheduler jobs per run because WooCommerce schedules them after the cleanup check; fix the suite's cleanup and assert zero leaked jobs. (36 such jobs from the last Phase 7 run, action IDs 5797–5872, still exist.)
+- ~~**At the start of Phase 8:** `phase3-codes.php` leaves ~35 completed Action Scheduler jobs per run…~~ **Done in Phase 8.** The leak was actually in `phase5-admin.php` (see the Phase 8 section); fixed in the test suites, with a runner-level guard, and the leaked jobs were deleted with the user's approval.
 - **Phase 11 (hardening):** concurrency tests: print the minimum stock observed, and assert per-row stock_before/stock_after snapshots for the parent-level stock test as well.
 
-**Next phase (not started):** Phase 8, Printing. **The production domain is still not final**, so labels must not be printed yet.
+**Next phase at the end of Phase 7:** Phase 8, Printing. Done; see below.
+
+### Phase 8: Label printing (2026-09-25)
+
+**Status:** implemented and tested. The plugin stays active. **Approved** by the user on 2026-09-25, before their printer test, then committed as a single commit and pushed to `origin/main` with a normal push (no force). The manual printer test (the Phase 8 checklist in the plugin README) is still to be done by the user.
+
+**Environment:** re-verified at the start, with no differences.
+- WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6 ZTS (not updated; the user can't update XAMPP), MariaDB 10.4.32
+- 0 codes, 0 sales, 0 products, 0 orders, 1 user; `pqbg_settings = {"settings_version":1}`; DB_VERSION 2; timezone Asia/Kolkata; scan base URL = `http://localhost/sharayu` (local)
+- no persistent object cache; `WP_ENVIRONMENT_TYPE` still unset (tests use `PQBG_TESTS_ALLOW_PRODUCTION=1`)
+- headless browsers available: Microsoft Edge 153 and Google Chrome (both used by the new browser checks)
+
+**Windows crash count** (`httpd.exe` Application Error, Event ID 1000): **139** at the start, and **139 before and after every run** in this phase: the baseline, the diagnostic traces, the Phase 5 check, two Phase 8 development runs and the final full run. No Apache restarts (the same two `httpd.exe` processes throughout). The fresh-connection-per-request workaround is kept in the new suite.
+
+**Baseline before any change:** `php tests/run.php` ALL PASSED, **966 checks, 0 failed, 0 skipped** (decoder via `PQBG_DECODER`). Afterwards: **36 leaked completed `woocommerce_run_product_attribute_lookup_update_callback` jobs** (IDs 6333–6408) with 108 log rows, plus 6 ordinary site WP-Cron jobs.
+
+**The Action Scheduler leak (open item from Phase 7) — the wrong suite had been blamed.**
+- A scratchpad tracer ran every suite and logged each job stored/deleted plus everything left after PHP shutdown (including jobs from Apache). Phases 2, 3 and 4 leave **nothing**; Phase 3 stores 22 jobs and deletes 22. **The leak is in `phase5-admin.php`**: 36 jobs for 17 products on every run.
+- Cause: Phase 5's cleanup matched jobs to post IDs that *still existed* at cleanup, so products it had already deleted inside its own sections (trash/delete, type changes, edit screen, downloads) were missed; and it had no zero-leak check.
+- **Fix (tests only):** shared helpers in `tests/bootstrap.php` (`pqbg_test_as_mark()`, `pqbg_test_as_cleanup()` — matches every post/order ID *allocated* during the suite, up to `AUTO_INCREMENT − 1`, waits for claimed/running jobs, deletes jobs and orphaned logs — and `pqbg_test_as_check()`), used by Phases 3, 5, 6, 7 and 8; plus a runner-level guard `tests/as-guard.php` that `run.php` runs after each suite's process has exited. Result: 0 leaked jobs and 0 orphan logs in every suite of the final run (Phase 5 now removes 318 jobs instead of 284).
+- **Cleanup with the user's approval (D10):** deleted the 108 leaked lookup jobs (IDs 5797–5872 from Phase 7, 6333–6408 from the baseline, 6891–6965 from the diagnostic trace), their 324 log rows, and 1 orphaned log row (action 6144, "This action data appears to be corrupt…", from before this session). Each was verified first: completed lookup jobs for products that no longer exist.
+
+**Approved plan and decisions** (D1–D12 as recommended, plus the user's three changes):
+- **D1** default preset A4 3 × 7 (63.5 × 38.1 mm) until the user names their label stock
+- **D2** QR module ≥ 0.40 mm, ≤ 0.99 mm; thermal presets rounded down to whole dots only when that stays ≥ 0.40 mm
+- **D3** barcodes (when enabled) are left off with a notice where they don't fit at 0.25 mm per module; `BarcodeRenderer::render()` got optional `bar_height`/`text` arguments, default output byte-identical
+- **D4** at most 300 labels and 300 selected products per job
+- **D5** render cache in transients, 30 days, 2,000 entries, no purge hook on retirement
+- **D6** copies = stock: own tracked stock → that many; shared (parent) or untracked stock → 1 with a note; ≤ 0 → skipped
+- **D7** draft/pending/private items printed with a note; trashed items skipped
+- **D8** printer offset ±5 mm (sheets only): yes
+- **D9** the leak guard reports (does not fail) new jobs of pre-existing site hooks that reference no test ID
+- **D10** delete the listed leaked jobs and logs: done (above)
+- **D11** optional `tests/print-check` package (puppeteer-core + pdfjs-dist, pinned)
+- **D12** print preferences (user meta) kept on uninstall unless `PQBG_UNINSTALL_DELETE_ALL_DATA`
+- **Change 1 (CSP):** print page `script-src 'self'` (pqbg-print.js only) and `style-src 'self' 'nonce-…'` matching the one `<style>` element; a headless-browser test that clicking Print calls `window.print()` and that the setup, confirmation and print pages have zero CSP violations and console errors.
+- **Change 2 (GS1):** verified at the source: *GS1 General Specifications Standard, Release 26.0 (ratified Jan 2026), Table 5-46 "Symbol specification table 1 addendum 2 for 2D barcodes", p. 412*: "QR Code (GS1 Digital Link URI)" X-dimension min 0.396 mm, target 0.495 mm, max 0.990 mm, quiet zone 4X (retail POS, consumer trade items). Cited in the code and README as a reference point only (our URLs are not GS1 Digital Link); the 0.40 mm floor is justified by the round-trip tests at exactly 0.40 mm. The 0.99 mm maximum follows the same table.
+- **Change 3 (₹):** label font stack Segoe UI, Nirmala UI, Roboto, Noto Sans, Arial before the generic fallback; a browser test (CDP platform fonts + a glyph comparison against a missing-glyph box); "check ₹ prints correctly" in the manual checklist.
+
+**Design:**
+- **Flow:** product panel "Print label" (simple product, each variation row), "Print all variation labels (n)", products-list bulk action "Print QR labels" → **setup screen** (hidden page `edit.php?post_type=product&page=pqbg-print`, GET, read-only, nonce bound to the selection) → **POST** `admin-post.php?action=pqbg_print_prepare` (nonce + capability; saves the user's options in user meta `pqbg_print_prefs`; 303) → **print page** `admin-post.php?action=pqbg_print` (GET/HEAD, nonce bound to the selection, capability, options re-validated from the query string, read-only apart from the render cache).
+- **Items:** simple product = 1 item; variable product → its variations (publish/private, menu order); variation ID = 1 item; duplicates printed once. Skipped with reasons: no code yet (with a product link), in the trash, not found, grouped/external, variable without variations, no stock (stock mode). Codes only via `CodeRepository::find_active_for_products()`; nothing is ever generated.
+- **Layouts:** A4 3 × 7 63.5 × 38.1 (margins 7.25/15.15, gaps 2.5/0), A4 3 × 8 70 × 37 (0/0.5, edge-to-edge warning), A4 4 × 10 48.5 × 25.4 (8/21.5), A4 5 × 13 38.1 × 21.2 (4.75/10.7, gaps 2.5/0), thermal 50 × 25, 38 × 25, 100 × 50 (203 dpi, one per page); custom sheet or thermal (203/300 dpi), validated. Every A4 preset sums to exactly 210 × 297 mm.
+- **Fit (`PrintLayout::fit()`):** the module count comes from the real encoding (V4 = 41 modules with quiet zone up to a 38-character base URL; 45/49/53; V8 = 57 at 99–100 characters). QR left of the text (stacked on tall labels), module = min(0.99, room/N), refused below 0.40 mm after dropping optional text (store → price → SKU → attributes → name). Code text always printed, wrapped after its second hyphen on narrow labels. TEST line required while the scan URL is local. Barcode strip 7 mm, 0.25 mm modules, ≤ 60.5 mm wide.
+- **Print page:** standalone template `templates/pqbg-print.php` (no wp_head), `@page` exact size with zero margins, one `<section>` per page with `break-after: page` (not the last), on-screen outlines; toolbar with print-dialog instructions; local base URL → warning page, "Print TEST labels anyway" (GET `confirm_test=1`), then every label marked "TEST – NOT FOR USE"; public http:// → the Phase 4 https warning. Headers: `ScanRoute::security_headers()` + the print CSP.
+- **Cache (`PrintCache`):** transients keyed by md5(type | code | exact payload or barcode args | renderer constants | versions), value checked on read (code + fingerprint), 30-day TTL, LRU index `pqbg_svg_cache_index` (≤ 2,000, not autoloaded), `clear_all()` on every uninstall. Barcode lookups check the setting first, so the library stays unloaded while disabled.
+
+**Files created** (plugin-relative):
+- `includes/PrintLayout.php`, `includes/PrintJob.php`, `includes/PrintCache.php`, `includes/PrintPage.php`, `includes/PrintAdmin.php`
+- `templates/pqbg-print.php`, `assets/pqbg-print.css`, `assets/pqbg-print.js`
+- `tests/phase8-printing.php`, `tests/as-guard.php`, `tests/print-check/` (`package.json`, `package-lock.json`, `check.mjs`, `index.php`)
+
+**Files modified:**
+- `includes/Plugin.php` (registers `PrintAdmin`/`PrintPage` in the admin block; wired after the class files existed)
+- `includes/AdminProductPanel.php` (the print links), `includes/BarcodeRenderer.php` (optional arguments), `uninstall.php` (cache always cleared; prefs only with the delete-all flag)
+- `tests/bootstrap.php`, `tests/run.php`, `tests/decoder/decode.mjs` (`--width`, PNG input; default unchanged), `tests/phase3-codes.php`, `tests/phase5-admin.php` (+ the PrintCache scope allowance), `tests/phase6-scan.php`, `tests/phase7-sales.php`
+- `README.md` (plugin), `tests/README.md`, `progress.md`
+
+`Schema`, `Install`, `CodeRepository`, `ProductCodeService`, `ScanUrl`, `QrRenderer`, `ScanRoute`, `SaleService` and `vendor-prefixed/` are unchanged. No schema change (DB_VERSION stays 2), no new capability, no REST/AJAX/nopriv/shortcode.
+
+**Tests.** `php tests/run.php` with `PQBG_TESTS_ALLOW_PRODUCTION=1`, `PQBG_DECODER` and `PQBG_PRINTCHECK` (decoder and print-check installed in the session scratchpad). **Final run: ALL PASSED, 1,135 checks, 0 failed, 0 skipped; AS guard PASS for every suite** (~13 min). **Crash count 139 before and after.**
+
+| Suite | Result |
+|---|---|
+| phase2-main | 83/83 |
+| phase2-lifecycle | 17/17 |
+| phase2-no-woocommerce | 12/12 |
+| phase3-codes | 110/110 (shared AS cleanup) |
+| phase4-rendering | 165/165 |
+| phase5-admin | 158/158 (+1 zero-leak check; PrintCache scope allowance) |
+| phase6-scan | 214/214 (+1 zero-leak check) |
+| phase7-sales | 209/209 (shared AS cleanup) |
+| phase8-printing | 167/167 |
+
+**Phase 8 coverage (highlights):**
+- geometry of every preset (exact spec, sums, every slot), start-at-N across sheets, no trailing blank page, thermal pagination, offsets; 26 invalid custom layouts and 14 invalid options rejected
+- module counts for base URLs of 24/38/39/60/61/82/83/98/99/100 characters (41/41/45/45/49/49/53/53/57/57); the planned module or refusal for every preset; exactly 0.40 mm accepted, 0.01 mm less refused; dot snapping; optional text dropped before refusing
+- **round trip at printed size:** every label's QR (and barcode) rasterised at 300 dpi (A4 3 × 7, 5 × 13) and 203 dpi (thermal 50 × 25, 38 × 25), plus exactly 0.40 mm modules for V4 and V8 URLs at 203/300 dpi — all decoded to `ScanUrl::for_code()` (EC M) / the code
+- **headless Edge and Chrome** (each): zero CSP violations / console errors / page errors / failed requests on the setup, confirmation and print pages; Print → `window.print()` once; print-media geometry equal to `PrintLayout` within 0.06 mm with nothing overlapping and the code text never cut; long names clamped and long SKUs ellipsised; **₹** rendered by Segoe UI (all 9 price glyphs), width 34.5 px = the known-good font vs 41.3 px for a missing-glyph box; every label decoded from screenshots at printed size (18 A4 incl. barcodes, 5 × 13, 3 thermal, 0.40 mm at 203 dpi, 2 TEST labels); PDF page count and size, and every code text at its layout position (x ±0.3 mm)
+- TEST mark and confirmation (in-process and HTTP), no mark for https, http warning; fields on/off; code wrapping; dropped-fields notice; retired code never printed after regeneration; barcodes off → no Picqer class loaded; on → strips on 3 × 7, notice on 4 × 10
+- cache: cold/warm, 30-day TTL, not autoloaded, base-URL and barcode-argument invalidation, tampered entry rejected, eviction at 2,000 with transients deleted, expired entries dropped, `clear_all()`, and the real default uninstall path (cache gone, data kept)
+- HTTP: every entry point (panel links, bulk action, setup, POST 303, print 200/HEAD, confirmation), invalid options and too-small layouts back on the setup screen with the message, 300 vs 400 labels, 301 products; nonce bound to the selection and the user; POST → 405, GET prepare → 405; admin and shop manager allowed; seller, customer, subscriber refused on setup, POST (403), print (403) and bulk action; logged out → login / no labels; **GET/HEAD/confirmation write nothing** (checksums); POST writes only the user's preferences; escaping of HTML in names/SKUs; headers and CSP nonce
+
+**Timings** (dev machine, final run; A4 3 × 7, all fields, one product per label):
+
+| Labels | In-process cold | In-process warm | HTTP cold | HTTP warm | Page |
+|---|---|---|---|---|---|
+| 100 | 4.47 s | 0.33 s | 4.77 s | 0.78 s | 448 KB |
+| 300 | 14.17 s | 0.82 s | 13.67 s | 1.85 s | 1,340 KB |
+
+(Warm = the next request with the cache filled; in-process warm flushes the in-memory object cache first, like a new request.)
+
+**How the print geometry was verified:** headless Edge 153 and Chrome, driven by `tests/print-check/check.mjs` (puppeteer-core with the installed browsers), logged in as a temporary administrator over the real HTTP flow: DOM geometry under print media, screenshots at 203/300 dpi decoded, and `page.pdf()` read back with pdf.js. Measured PDF page sizes: **A4 → 209.889 × 297.011 mm** (Chromium's 595 × 842 pt), **50 × 25 mm → 50.123 × 25.061 mm** in both browsers; content is anchored top-left, so label positions matched the layout. The physical print (real printer, label stock, phone scan) is the user's manual test.
+
+**Problems found and fixed during development:**
+- Product names went through `wp_strip_all_tags()`, which would cut "Kurta <3 Size" at "<3"; names and SKUs are now printed literally (entities decoded, escaped on output); only WooCommerce's price/attribute HTML is stripped.
+- `uninstall.php` could `require_once` `PrintCache.php` a second time (different path string) when the class was already loaded; now guarded with `class_exists( …, false )`.
+- Warm HTTP time for 300 labels was 3.2 s; priming the post/meta caches for the selection brought it to 1.85 s.
+- Test-tooling bugs: `escapeshellarg()` on Windows replaces double quotes (the guard's JSON mark → a digits-and-commas mark); a 400-ID bulk URL exceeded Apache's 8 KB request line; `curl_close()` is deprecated in PHP 8.5; several expectation errors in the new suite.
+
+**Known limitations:**
+- The print dialog settings (scale, margins, headers/footers) are the user's; the page explains them. Printer hardware margins can clip the edge-to-edge 3 × 8 sheet.
+- Chromium's PDF page size differs from the CSS size by up to ~0.12 mm (above); labels are unaffected.
+- The QR fit assumes one code length (true for `DC-XXXX-XXXX-XXXX`); the page uses the largest version in the job anyway.
+- Cold rendering is ~45 ms per new QR code (bacon's pure-PHP mask scoring): 300 new codes ≈ 14 s.
+- The plugin's WooCommerce log file for today (`wc-logs/product-qrcode-barcode-generator-2026-09-25-…log`) contains only Phase 7's failure-injection warnings from its worker processes (as after Phase 7); nothing from Phase 8. Left in place.
+- No PHPCS run (not installed).
+
+**Open items:**
+- **The user's manual printer test** (plugin README, "Phase 8 checklist"), and their label stock → possibly a new default preset.
+- **Phase 11 (hardening):** the reconciliation check and the concurrency-test items from Phase 7 are still open.
+
+**Next phase (not started):** Phase 9, Seller Dashboard / Sales History. **The production domain is still not final**: printed labels stay TEST labels until it is.
 
 ### Instructions for the next Claude session
 
@@ -1261,13 +1374,21 @@ The live site migrated on its first request after the change; it had 0 sales row
   The `dpc_`/`DPC_`/`Durga\ProductCodes` names in the Phase 2 and Phase 3 sections are pre-rename history. Never reintroduce them.
 - Get codes only through `ProductCodeService::get_or_create()`. Don't call `CodeRepository::create_active()` with hand-made strings, and don't write to `pqbg_codes` directly.
 - Phases 4 and 5 are done. Build scan URLs only through `ScanUrl`, and render only through `QrRenderer`/`BarcodeRenderer`. Never reference the barcode library outside `BarcodeRenderer`, and keep the "barcodes disabled means the library is not loaded" guarantee.
-- **Report the Windows crash count** (`httpd.exe` Application Error events, Event ID 1000) before and after test runs. A crashed run is neither a pass nor a fail of plugin logic: re-run the suite. It was 139 on 2026-09-25 after Phase 7.
+- **Report the Windows crash count** (`httpd.exe` Application Error events, Event ID 1000) before and after test runs. A crashed run is neither a pass nor a fail of plugin logic: re-run the suite. It was 139 on 2026-09-25 after Phase 8.
 - **Run `php tests/run.php` before and after every phase** (see `tests/README.md`). Preferred: `define( 'WP_ENVIRONMENT_TYPE', 'local' );` in the local `wp-config.php`, which the user will add themselves; never edit or commit `wp-config.php`. The fallback is `PQBG_TESTS_ALLOW_PRODUCTION=1`. The round-trip checks need `npm ci` in `tests/decoder`, or `PQBG_DECODER` pointing to a copy outside the web root. Add each new phase's suite to `tests/` and to `run.php`.
 - **Exclude `tests/` and `build/` from any production deployment** (see "Production deployment" in the plugin README).
 - **Never edit `vendor-prefixed/` by hand.** Change `build/` and run `php build/build.php` (see `build/README.md`).
 - The PHP minimum is now **8.2**.
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
-- **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25). **Phase 8 (Printing) is next.** First fix the Phase 3 suite's Action Scheduler leak (see the Phase 7 open items).
+- **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25).
+- **Phase 8 (Printing) is done, approved, committed and pushed** (2026-09-25). The user's printer test is still outstanding. **Phase 9 (Seller Dashboard / Sales History) is next.**
+- **Printing rules** (Phase 8):
+  - Print only ACTIVE codes, read through `CodeRepository::find_active_for_products()`; printing never generates codes.
+  - Payloads only from `ScanUrl::for_code()`, images only from `QrRenderer`/`BarcodeRenderer`, cached only through `PrintCache` (its key must include everything that changes the image; bump `PrintCache::VERSION` if the output changes outside the renderers' constants).
+  - Keep the QR module ≥ `PrintLayout::MIN_MODULE_MM` (0.40 mm); refuse layouts instead of shrinking it.
+  - The print page and setup screen are GET and read-only (only the render cache may be written); options are saved only by the `pqbg_print_prepare` POST. Keep the print CSP: styles only from the nonce'd `<style>` element and `assets/pqbg-print.css`, script only `assets/pqbg-print.js`, no inline style attributes.
+- **Action Scheduler in tests:** every suite uses `pqbg_test_as_mark()` / `pqbg_test_as_cleanup()` / `pqbg_test_as_check()` from `tests/bootstrap.php`, and `run.php` fails a suite that leaks (`tests/as-guard.php`). New suites must do the same.
+- **Browser checks:** install `tests/print-check` outside the web root (copy, `npm ci`) and set `PQBG_PRINTCHECK`; it uses the installed Edge/Chrome (`PQBG_BROWSERS` to override).
 - **Phone testing:** never change Settings → General → WordPress Address for phone tests; use the `wp-config.php` snippet from the plugin README instead.
 - **Don't toggle `woocommerce_coming_soon` with `update_option()` from the CLI.** WooCommerce then re-saves the Cart page as user 0 and re-serializes its content (see the Phase 7 post-review notes).
 - **Selling rules** (Phase 7):
@@ -1392,3 +1513,12 @@ The live site migrated on its first request after the change; it had 0 sales row
   - Removed the manual-test data and 422 leaked Action Scheduler jobs, and restored `home`, `siteurl` and Coming Soon, all with the user's confirmation. Set the timezone to Asia/Kolkata. Reverted the Cart page re-save side effect.
   - Re-run from the clean state: 966 passed, 0 failed, 0 skipped; crash count 139.
   - Approved; committed as `2413698` and pushed to `origin/main`.
+- **Phase 8 (Label printing):**
+  - Re-verified the environment; no differences. Crash count 139; PHP 8.5.6 unchanged.
+  - Baseline: 966 passed, 0 failed, 0 skipped; 36 leaked lookup jobs afterwards.
+  - Traced the Action Scheduler leak to `phase5-admin.php` (not Phase 3, as recorded); wrote the plan. The user approved D1–D12 with three changes (print CSP and a browser test, verify the GS1 figure at the source, the rupee font stack and a glyph test).
+  - Deleted the 108 leaked jobs, 324 logs and 1 orphan log, with approval. Verified GS1 Release 26.0 Table 5-46 (0.396 mm) in the specification PDF.
+  - Fixed the test cleanup (shared helpers, a runner-level guard). Added `PrintLayout`, `PrintJob`, `PrintCache`, `PrintPage`, `PrintAdmin`, the template, CSS and JS, the panel links and bulk action, `BarcodeRenderer` arguments and the uninstall cache clearing. Class files were created before `Plugin.php` referenced them.
+  - Added `tests/phase8-printing.php` (167 checks), `tests/as-guard.php`, and the optional `tests/print-check` (headless Edge and Chrome).
+  - Final run: **1,135 passed, 0 failed, 0 skipped**, AS guard PASS for every suite; crash count 139 before and after every run. The site is back to its clean state.
+  - Approved by the user (before the printer test); committed and pushed to `origin/main`.

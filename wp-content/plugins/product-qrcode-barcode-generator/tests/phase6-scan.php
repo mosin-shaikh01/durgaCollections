@@ -37,7 +37,6 @@ use ProductQrBarcode\{CodeGenerator, CodeRepository, Permissions, Plugin, Produc
 global $wpdb, $wp_rewrite;
 
 $C          = Schema::codes_table();
-$as_table   = $wpdb->prefix . 'actionscheduler_actions';
 $raw_option = static fn( string $name ) => $wpdb->get_row( $wpdb->prepare( "SELECT option_value, autoload FROM {$wpdb->options} WHERE option_name = %s", $name ), ARRAY_A );
 $put_option = static function ( string $name, ?array $row ) use ( $wpdb ) {
 	if ( null === $row ) {
@@ -56,7 +55,7 @@ foreach ( array( Plugin::SETTINGS_OPTION, 'woocommerce_coming_soon', 'permalink_
 	$saved[ $name ] = $raw_option( $name );
 }
 $start_id    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(id), 0) FROM $C" );
-$start_as    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(action_id), 0) FROM $as_table" );
+$as_mark  = pqbg_test_as_mark(); // Action Scheduler cleanup, see bootstrap.php.
 $start_post  = (int) $wpdb->get_var( "SELECT COALESCE(MAX(ID), 0) FROM {$wpdb->posts}" );
 $start_term  = (int) $wpdb->get_var( "SELECT COALESCE(MAX(term_id), 0) FROM {$wpdb->terms}" );
 $base_c      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" );
@@ -838,22 +837,10 @@ try {
 	}
 	$wpdb->query( $wpdb->prepare( "DELETE FROM $C WHERE id > %d", $start_id ) );
 	$wpdb->query( "ALTER TABLE $C AUTO_INCREMENT = 1" );
-	$new_actions = $wpdb->get_results( $wpdb->prepare( "SELECT action_id, hook, args FROM $as_table WHERE action_id > %d", $start_as ), ARRAY_A );
-	$ours_as     = array_filter(
-		$new_actions,
-		static function ( $a ) use ( $all_new ) {
-			foreach ( $all_new as $id ) {
-				if ( preg_match( '/(^|\D)' . $id . '(\D|$)/', (string) $a['args'] ) ) {
-					return true;
-				}
-			}
-			return false;
-		}
-	);
-	foreach ( $ours_as as $a ) {
-		ActionScheduler::store()->delete_action( (int) $a['action_id'] );
-	}
-	echo '   removed ' . count( $ids ) . ' post(s) and ' . count( $ours_as ) . ' Action Scheduler job(s): ' . implode( ', ', array_unique( array_column( $ours_as, 'hook' ) ) ) . "\n";
+	// Every Action Scheduler job for an ID allocated during the suite, including deleted products (bootstrap.php).
+	$removed_as = pqbg_test_as_cleanup( $as_mark );
+	echo '   removed ' . count( $ids ) . ' post(s) and ' . $removed_as . " Action Scheduler job(s)\n";
+	pqbg_test_as_check( $as_mark );
 	$sync();
 	if ( is_dir( $tmp ) ) {
 		array_map( 'unlink', glob( $tmp . '/*' ) );

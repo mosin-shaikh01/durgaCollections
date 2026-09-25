@@ -28,9 +28,8 @@ global $wpdb;
 
 $C         = Schema::codes_table();
 $alphabet  = CodeGenerator::ALPHABET;
-$as_table  = $wpdb->prefix . 'actionscheduler_actions';
 $start_id  = (int) $wpdb->get_var( "SELECT COALESCE(MAX(id), 0) FROM $C" );
-$start_as  = (int) $wpdb->get_var( "SELECT COALESCE(MAX(action_id), 0) FROM $as_table" );
+$as_mark  = pqbg_test_as_mark(); // Action Scheduler cleanup, see bootstrap.php.
 $base_c    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" );
 $base_prod = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type IN ('product','product_variation')" );
 $base_user = (int) count_users()['total_users'];
@@ -431,23 +430,9 @@ try {
 		wp_delete_user( $uid );
 	}
 
-	// Action Scheduler jobs triggered by the test products.
-	$new_actions = $wpdb->get_results( $wpdb->prepare( "SELECT action_id, hook, args FROM $as_table WHERE action_id > %d", $start_as ), ARRAY_A );
-	$ours_as     = array_filter(
-		$new_actions,
-		function ( $a ) use ( $product_ids ) {
-			foreach ( $product_ids as $id ) {
-				if ( preg_match( '/(^|\D)' . $id . '(\D|$)/', (string) $a['args'] ) ) {
-					return true;
-				}
-			}
-			return false;
-		}
-	);
-	foreach ( $ours_as as $a ) {
-		ActionScheduler::store()->delete_action( (int) $a['action_id'] );
-	}
-	echo '   removed ' . count( $ours_as ) . ' Action Scheduler job(s): ' . implode( ', ', array_unique( array_column( $ours_as, 'hook' ) ) ) . "\n";
+	// Every Action Scheduler job for an ID allocated during the suite, including deleted products (bootstrap.php).
+	$removed_as = pqbg_test_as_cleanup( $as_mark );
+	echo '   removed ' . $removed_as . " Action Scheduler job(s)\n";
 
 	$ids_in = implode( ',', array_map( 'intval', array_merge( $product_ids, array( (int) ( $page_id ?? 0 ) ) ) ) );
 	pqbg_t( 'codes table back to its starting row count', $base_c === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" ) );
@@ -455,7 +440,7 @@ try {
 	pqbg_t( 'no posts, meta or term relationships left for test IDs', 0 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE ID IN ($ids_in)" ) + (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE post_id IN ($ids_in)" ) + (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->term_relationships} WHERE object_id IN ($ids_in)" ) );
 	pqbg_t( 'no WooCommerce lookup rows left for test IDs', 0 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}wc_product_meta_lookup WHERE product_id IN ($ids_in)" ) + (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}wc_product_attributes_lookup WHERE product_id IN ($ids_in) OR product_or_parent_id IN ($ids_in)" ) );
 	pqbg_t( 'users back to the starting count', $base_user === (int) count_users()['total_users'] );
-	pqbg_t( 'no test Action Scheduler jobs left', 0 === count( array_filter( $wpdb->get_col( $wpdb->prepare( "SELECT args FROM $as_table WHERE action_id > %d", $start_as ) ), fn( $args ) => (bool) array_filter( $product_ids, fn( $id ) => (bool) preg_match( '/(^|\D)' . $id . '(\D|$)/', (string) $args ) ) ) ) );
+	pqbg_test_as_check( $as_mark );
 }
 
 pqbg_test_done();

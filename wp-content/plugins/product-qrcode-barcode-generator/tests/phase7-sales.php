@@ -89,11 +89,10 @@ global $wpdb;
 
 $C         = Schema::codes_table();
 $S         = Schema::sales_table();
-$as_table  = $wpdb->prefix . 'actionscheduler_actions';
 $max       = static fn( string $table, string $col ) => (int) $wpdb->get_var( "SELECT COALESCE(MAX($col), 0) FROM $table" );
 $start_c   = $max( $C, 'id' );
 $start_s   = $max( $S, 'id' );
-$start_as  = $max( $as_table, 'action_id' );
+$as_mark  = pqbg_test_as_mark(); // Action Scheduler cleanup, see bootstrap.php.
 $start_post = $max( $wpdb->posts, 'ID' );
 $start_cmt = $max( $wpdb->comments, 'comment_ID' );
 $start_ord = $max( $wpdb->prefix . 'wc_orders', 'id' );
@@ -1107,29 +1106,16 @@ try {
 	$wpdb->query( $wpdb->prepare( "DELETE FROM $C WHERE id > %d", $start_c ) );
 	$wpdb->query( "ALTER TABLE $C AUTO_INCREMENT = 1" );
 	$all_new     = range( $start_post + 1, max( $start_post + 1, $end_post ) );
-	$new_actions = $wpdb->get_results( $wpdb->prepare( "SELECT action_id, hook, args FROM $as_table WHERE action_id > %d", $start_as ), ARRAY_A );
-	$ours_as     = array_filter(
-		$new_actions,
-		static function ( $a ) use ( $all_new, $orders ) {
-			foreach ( array_merge( $all_new, $orders ) as $id ) {
-				if ( preg_match( '/(^|\D)' . $id . '(\D|$)/', (string) $a['args'] ) ) {
-					return true;
-				}
-			}
-			return false;
-		}
-	);
-	foreach ( $ours_as as $a ) {
-		ActionScheduler::store()->delete_action( (int) $a['action_id'] );
-	}
-	echo '   removed ' . count( $ids ) . ' post(s), ' . count( $orders ) . ' order(s) and ' . count( $ours_as ) . ' Action Scheduler job(s): ' . implode( ', ', array_unique( array_column( $ours_as, 'hook' ) ) ) . "\n";
+	// Every Action Scheduler job for an ID allocated during the suite, including deleted products (bootstrap.php).
+	$removed_as = pqbg_test_as_cleanup( $as_mark );
+	echo '   removed ' . count( $ids ) . ' post(s), ' . count( $orders ) . ' order(s) and ' . $removed_as . " Action Scheduler job(s)\n";
 	$sync();
 	pqbg_t( 'sales table back to its starting row count (AUTO_INCREMENT reset)', $base_s === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $S" ) );
 	pqbg_t( 'codes table back to its starting row count', $base_c === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" ) );
 	pqbg_t( 'products and variations back to the starting count', $base_prod === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type IN ('product','product_variation')" ) );
 	pqbg_t( 'no posts, meta, term relationships or comments left above the starting IDs', 0 === (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE ID > %d", $start_post ) ) + (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE post_id > %d", $start_post ) ) + (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->term_relationships} WHERE object_id > %d", $start_post ) ) + (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->comments} WHERE comment_ID > %d", $start_cmt ) ) );
 	pqbg_t( 'test orders removed (orders, items, addresses, operational data)', 0 === (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}wc_orders WHERE id > %d", $start_ord ) ) + (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}woocommerce_order_items WHERE order_item_id > %d", $start_oi ) ) + (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}wc_order_addresses WHERE order_id > %d", $start_ord ) ) + (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}wc_order_operational_data WHERE order_id > %d", $start_ord ) ) );
-	pqbg_t( 'no test Action Scheduler jobs left', 0 === count( array_filter( $wpdb->get_col( $wpdb->prepare( "SELECT args FROM $as_table WHERE action_id > %d", $start_as ) ), static fn( $args ) => (bool) array_filter( array_merge( $all_new, $orders ), static fn( $id ) => (bool) preg_match( '/(^|\D)' . $id . '(\D|$)/', (string) $args ) ) ) ) );
+	pqbg_test_as_check( $as_mark );
 	pqbg_t( 'options unchanged (settings, DB version, stock options, Coming Soon, rewrite rules)', array() === array_filter( array_keys( $saved ), static fn( $n ) => $saved[ $n ] !== $raw_option( $n ) ) );
 	pqbg_t( 'temporary migration tables gone', null === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $mig_prefix ) . '%' ) ) );
 	pqbg_t( 'temporary users removed', $base_user === (int) count_users()['total_users'] && ! get_user_by( 'login', 'pqbg_p7_seller' ) );
