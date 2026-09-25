@@ -97,6 +97,7 @@ every other plugin stays ignored. For a future custom theme the pattern is:
 ### Open items
 - [x] Permalinks set to `/%postname%/` (verified 2026-09-24)
 - [ ] Decide on theme approach — customize twentytwentyfive, use a child theme, or build custom
+- [ ] **Must be done BEFORE printing real labels (i.e. before production launch):** Phase 8 physical printer test pending: print on plain paper and on the actual label stock, check size/alignment (use the printer offset if needed), check ₹ and text, and scan several labels with a phone. (No printer was available on 2026-09-25; Phase 8 was approved on the automated print verification. Steps: the "Phase 8 checklist" in the plugin README.)
 
 ### Backlog
 _To be filled in — site structure, pages, content, plugins._
@@ -1359,7 +1360,8 @@ The live site migrated on its first request after the change; it had 0 sales row
 - No PHPCS run (not installed).
 
 **Open items:**
-- **The user's manual printer test** (plugin README, "Phase 8 checklist"), and their label stock → possibly a new default preset.
+- **Must be done BEFORE printing real labels (i.e. before production launch):** Phase 8 physical printer test pending: print on plain paper and on the actual label stock, check size/alignment (use the printer offset if needed), check ₹ and text, and scan several labels with a phone. No printer was available on 2026-09-25, so this is NOT done; Phase 8 was approved on the automated print verification (headless Chrome/Edge geometry, 203/300 dpi decoding, PDF checks). Steps: the "Phase 8 checklist" in the plugin README.
+- The user's label stock → possibly a new default preset (A4 3 × 7 until then).
 - **Phase 11 (hardening):** the reconciliation check and the concurrency-test items from Phase 7 are still open.
 
 **Next phase (not started):** Phase 9, Seller Dashboard / Sales History. **The production domain is still not final**: printed labels stay TEST labels until it is.
@@ -1384,7 +1386,7 @@ The live site migrated on its first request after the change; it had 0 sales row
 - The PHP minimum is now **8.2**.
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
 - **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25).
-- **Phase 8 (Printing) is done, approved, committed as `753613c` and pushed** (2026-09-25). The user's printer test is still outstanding. **Phase 9 (Seller Dashboard / Sales History) is next.**
+- **Phase 8 (Printing) is done, approved, committed as `753613c` and pushed** (2026-09-25). **The physical printer test is NOT done** (no printer was available): it must be done before printing real labels / before production launch (see the Status open items). **Phase 9 (Seller Dashboard / Sales History) is next.**
 - **Printing rules** (Phase 8):
   - Print only ACTIVE codes, read through `CodeRepository::find_active_for_products()`; printing never generates codes.
   - Payloads only from `ScanUrl::for_code()`, images only from `QrRenderer`/`BarcodeRenderer`, cached only through `PrintCache` (its key must include everything that changes the image; bump `PrintCache::VERSION` if the output changes outside the renderers' constants).
