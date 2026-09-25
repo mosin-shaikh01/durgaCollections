@@ -35,6 +35,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 4 was committed as `3654086` ("Phase 4: QR code + optional Code 128 barcode rendering, settings page, tests and build") and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 - Phase 5 was committed as `ff7805c` ("Phase 5: admin code management (auto-assignment, lifecycle, atomic regeneration, product panel, downloads)") and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 - Phase 6 was committed as `381a909` ("Phase 6: scan route and mobile product screen (access control, status matrix, entry box)") and pushed to `origin/main`, with the user's approval after their phone test (normal fast-forward, no force).
+- Phase 7 was committed as `2413698` ("Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2)") and pushed to `origin/main`, with the user's approval after their phone test (normal fast-forward, no force).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -48,6 +49,8 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `2413698` | Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2) |
+| `ee2769b` | Record Phase 6 commit and push in progress log |
 | `381a909` | Phase 6: scan route and mobile product screen (access control, status matrix, entry box) |
 | `7b9cc8f` | Record Phase 5 commit and push in progress log |
 | `ff7805c` | Phase 5: admin code management (auto-assignment, lifecycle, atomic regeneration, product panel, downloads) |
@@ -111,7 +114,7 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **4** | **QR code + optional barcode rendering** | **Done 2026-09-24. Committed `3654086`, pushed.** |
 | **5** | **Admin code management** | **Done 2026-09-25. Committed `ff7805c`, pushed.** |
 | **6** | **Scan/product screen** | **Done 2026-09-25. Committed `381a909`, pushed.** |
-| **7** | **Mark sold + sales** | **Done 2026-09-25. Phone test passed. Approved, committed as a single commit and pushed (the hash is recorded in the next progress update).** |
+| **7** | **Mark sold + sales** | **Done 2026-09-25. Committed `2413698`, pushed.** |
 | 8 | Printing | Next. Not started |
 | 9 → 12 | seller dashboard/history → bulk/CSV → hardening/performance → QA/documentation | Not started |
 
@@ -991,7 +994,7 @@ The variations table primes post and meta caches with one `get_posts()` call. Be
 
 **Status:** implemented and tested. The plugin stays active.
 - The user ran the **phone test** on a real phone, as a Store Seller over the local network, and it **passed**: product screen, sell, stock decrement, undo, zero-stock refusal, draft refusal.
-- After the post-review changes below, Phase 7 was **approved**, committed as a single commit ("Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2)") and pushed to `origin/main` (normal push, no force).
+- After the post-review changes below, Phase 7 was **approved**, committed as a single commit, `2413698` ("Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2)"), and pushed to `origin/main` with a normal push (no force).
 
 **Environment:** re-verified at the start, with no differences.
 - WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6 ZTS (not updated; the user can't update XAMPP on this machine), MariaDB 10.4.32
@@ -1264,7 +1267,7 @@ The live site migrated on its first request after the change; it had 0 sales row
 - **Never edit `vendor-prefixed/` by hand.** Change `build/` and run `php build/build.php` (see `build/README.md`).
 - The PHP minimum is now **8.2**.
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
-- **Phase 7 (Mark as Sold) is done, approved, committed and pushed** (2026-09-25). **Phase 8 (Printing) is next.** First fix the Phase 3 suite's Action Scheduler leak (see the Phase 7 open items).
+- **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25). **Phase 8 (Printing) is next.** First fix the Phase 3 suite's Action Scheduler leak (see the Phase 7 open items).
 - **Phone testing:** never change Settings → General → WordPress Address for phone tests; use the `wp-config.php` snippet from the plugin README instead.
 - **Don't toggle `woocommerce_coming_soon` with `update_option()` from the CLI.** WooCommerce then re-saves the Cart page as user 0 and re-serializes its content (see the Phase 7 post-review notes).
 - **Selling rules** (Phase 7):
@@ -1388,4 +1391,4 @@ The live site migrated on its first request after the change; it had 0 sales row
   - Phone test passed. Reworded the stock-tracking message to WooCommerce's own checkbox labels.
   - Removed the manual-test data and 422 leaked Action Scheduler jobs, and restored `home`, `siteurl` and Coming Soon, all with the user's confirmation. Set the timezone to Asia/Kolkata. Reverted the Cart page re-save side effect.
   - Re-run from the clean state: 966 passed, 0 failed, 0 skipped; crash count 139.
-  - Approved; committed as a single commit and pushed to `origin/main`.
+  - Approved; committed as `2413698` and pushed to `origin/main`.
