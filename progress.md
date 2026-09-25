@@ -36,6 +36,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 5 was committed as `ff7805c` ("Phase 5: admin code management (auto-assignment, lifecycle, atomic regeneration, product panel, downloads)") and pushed to `origin/main`, with the user's approval (normal fast-forward, no force).
 - Phase 6 was committed as `381a909` ("Phase 6: scan route and mobile product screen (access control, status matrix, entry box)") and pushed to `origin/main`, with the user's approval after their phone test (normal fast-forward, no force).
 - Phase 7 was committed as `2413698` ("Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2)") and pushed to `origin/main`, with the user's approval after their phone test (normal fast-forward, no force).
+- Phase 8 was committed as `753613c` ("Phase 8: label printing (A4 sheet and thermal layouts, QR minimum size, render cache, print page) and the Action Scheduler test-leak fix") and pushed to `origin/main`, with the user's approval, before their printer test (normal fast-forward, no force).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -49,6 +50,8 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `753613c` | Phase 8: label printing (A4 sheet and thermal layouts, QR minimum size, render cache, print page) and the Action Scheduler test-leak fix |
+| `647424c` | Record Phase 7 commit and push in progress log |
 | `2413698` | Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2) |
 | `ee2769b` | Record Phase 6 commit and push in progress log |
 | `381a909` | Phase 6: scan route and mobile product screen (access control, status matrix, entry box) |
@@ -115,7 +118,7 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **5** | **Admin code management** | **Done 2026-09-25. Committed `ff7805c`, pushed.** |
 | **6** | **Scan/product screen** | **Done 2026-09-25. Committed `381a909`, pushed.** |
 | **7** | **Mark sold + sales** | **Done 2026-09-25. Committed `2413698`, pushed.** |
-| **8** | **Printing** | **Done 2026-09-25. Approved; committed and pushed (see Repository).** |
+| **8** | **Printing** | **Done 2026-09-25. Committed `753613c`, pushed.** |
 | 9 | Seller dashboard / sales history | Next. Not started |
 | 10 → 12 | bulk/CSV → hardening/performance → QA/documentation | Not started |
 
@@ -1251,7 +1254,7 @@ The live site migrated on its first request after the change; it had 0 sales row
 
 ### Phase 8: Label printing (2026-09-25)
 
-**Status:** implemented and tested. The plugin stays active. **Approved** by the user on 2026-09-25, before their printer test, then committed as a single commit and pushed to `origin/main` with a normal push (no force). The manual printer test (the Phase 8 checklist in the plugin README) is still to be done by the user.
+**Status:** implemented and tested. The plugin stays active. **Approved** by the user on 2026-09-25, before their printer test, then committed as a single commit, `753613c`, and pushed to `origin/main` with a normal push (no force). The manual printer test (the Phase 8 checklist in the plugin README) is still to be done by the user.
 
 **Environment:** re-verified at the start, with no differences.
 - WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6 ZTS (not updated; the user can't update XAMPP), MariaDB 10.4.32
@@ -1381,7 +1384,7 @@ The live site migrated on its first request after the change; it had 0 sales row
 - The PHP minimum is now **8.2**.
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
 - **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25).
-- **Phase 8 (Printing) is done, approved, committed and pushed** (2026-09-25). The user's printer test is still outstanding. **Phase 9 (Seller Dashboard / Sales History) is next.**
+- **Phase 8 (Printing) is done, approved, committed as `753613c` and pushed** (2026-09-25). The user's printer test is still outstanding. **Phase 9 (Seller Dashboard / Sales History) is next.**
 - **Printing rules** (Phase 8):
   - Print only ACTIVE codes, read through `CodeRepository::find_active_for_products()`; printing never generates codes.
   - Payloads only from `ScanUrl::for_code()`, images only from `QrRenderer`/`BarcodeRenderer`, cached only through `PrintCache` (its key must include everything that changes the image; bump `PrintCache::VERSION` if the output changes outside the renderers' constants).
@@ -1521,4 +1524,4 @@ The live site migrated on its first request after the change; it had 0 sales row
   - Fixed the test cleanup (shared helpers, a runner-level guard). Added `PrintLayout`, `PrintJob`, `PrintCache`, `PrintPage`, `PrintAdmin`, the template, CSS and JS, the panel links and bulk action, `BarcodeRenderer` arguments and the uninstall cache clearing. Class files were created before `Plugin.php` referenced them.
   - Added `tests/phase8-printing.php` (167 checks), `tests/as-guard.php`, and the optional `tests/print-check` (headless Edge and Chrome).
   - Final run: **1,135 passed, 0 failed, 0 skipped**, AS guard PASS for every suite; crash count 139 before and after every run. The site is back to its clean state.
-  - Approved by the user (before the printer test); committed and pushed to `origin/main`.
+  - Approved by the user (before the printer test); committed as `753613c` and pushed to `origin/main`.
