@@ -69,6 +69,8 @@ if ( isset( $argv[1] ) && '--worker' === $argv[1] ) {
 				'quantity'   => (int) $argv[4],
 				'request_id' => $argv[5],
 				'seller_id'  => (int) $argv[6],
+				// Phase 9A: every sale needs a payment method.
+				'payment_method' => 'cash',
 			)
 		);
 	} else {
@@ -227,7 +229,7 @@ $get_form = static function ( string $who, string $code ) use ( $http, $url, $fo
 };
 /** Submits a sale form (optionally changed) as $who. */
 $post_form = static function ( string $who, string $code, array $form, $qty = '1', array $override = array() ) use ( $http, $url ): array {
-	$fields = array_merge( $form['fields'], array( 'quantity' => $qty ), $override );
+	$fields = array_merge( $form['fields'], array( 'quantity' => $qty, 'payment_method' => 'cash' ), $override ); // Phase 9A: a payment method is required.
 	$fields = array_filter( $fields, static fn( $v ) => null !== $v );
 	return $http( $who, 'POST', $url( $code ), $fields );
 };
@@ -368,7 +370,7 @@ $logged = static function ( callable $fn ): array {
 };
 $stock_filters = static fn() => has_filter( SaleService::STOCK_QUERY_FILTER );
 $sell_in = static function ( string $code, int $qty, int $seller, array $extra = array() ): array|WP_Error {
-	return SaleService::sell( array_merge( array( 'code' => $code, 'quantity' => $qty, 'request_id' => wp_generate_uuid4(), 'seller_id' => $seller ), $extra ) );
+	return SaleService::sell( array_merge( array( 'code' => $code, 'quantity' => $qty, 'request_id' => wp_generate_uuid4(), 'seller_id' => $seller, 'payment_method' => 'cash' ), $extra ) );
 };
 $median = static function ( array $v ): float {
 	sort( $v );
@@ -389,7 +391,7 @@ try {
 	( new WP_User( $user_ids['nosell'] ) )->add_cap( Permissions::SELL, false );
 	( new WP_User( $user_ids['viewer'] ) )->add_cap( Permissions::VIEW_PRODUCTS );
 	pqbg_t( 'capabilities: seller/sm/admin sell; "nosell" (pqbg_sell removed) and viewer only view; customer neither', Permissions::can_sell( $SE ) && Permissions::can_sell( $SM ) && Permissions::can_sell( $A ) && ! Permissions::can_sell( $user_ids['nosell'] ) && Permissions::can_view_products( $user_ids['nosell'] ) && ! Permissions::can_sell( $user_ids['viewer'] ) && Permissions::can_view_products( $user_ids['viewer'] ) && ! Permissions::can_view_products( $user_ids['customer'] ) );
-	pqbg_t( 'void is manager-only (pqbg_void_sale exists; no new capability)', Permissions::can_void_sale( $SM ) && Permissions::can_void_sale( $A ) && ! Permissions::can_void_sale( $SE ) && 7 === count( Permissions::all_caps() ) );
+	pqbg_t( 'void is manager-only (pqbg_void_sale exists; Phase 7 added no capability, Phase 9A added pqbg_view_costs)', Permissions::can_void_sale( $SM ) && Permissions::can_void_sale( $A ) && ! Permissions::can_void_sale( $SE ) && 8 === count( Permissions::all_caps() ) );
 	foreach ( array_keys( $user_ids ) as $who ) {
 		$login( $who, "pqbg_p7_{$who}", $pw[ $who ] );
 	}
@@ -398,8 +400,8 @@ try {
 
 	pqbg_section( 'schema version 2 and migration' );
 	$cols = $wpdb->get_col( "SHOW COLUMNS FROM $S" );
-	pqbg_t( 'the site is at DB version 2 (Install::DB_VERSION)', 2 === Install::DB_VERSION && 2 === Install::stored_version() );
-	pqbg_t( 'pqbg_sales has stock_holder_id and failure_code, appended after every v1 column', array_slice( $cols, -2 ) === array( 'stock_holder_id', 'failure_code' ) && 27 === count( $cols ) );
+	pqbg_t( 'the site is at Install::DB_VERSION (2 in Phase 7, 3 since Phase 9A)', Install::DB_VERSION >= 2 && Install::DB_VERSION === Install::stored_version() );
+	pqbg_t( 'pqbg_sales has stock_holder_id and failure_code, appended after every v1 column (the v3 columns follow since Phase 9A)', array_slice( $cols, 25, 2 ) === array( 'stock_holder_id', 'failure_code' ) && 30 === count( $cols ) );
 	pqbg_t( 'holder_status index on (stock_holder_id, status)', array( 'stock_holder_id', 'status' ) === $wpdb->get_col( "SELECT Column_name FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$S' AND INDEX_NAME = 'holder_status' ORDER BY SEQ_IN_INDEX" ) );
 	pqbg_t( 'a normal boot does not re-run migrations (maybe_upgrade is a no-op at v2)', ( static function () {
 		$ran = false;
@@ -416,7 +418,8 @@ try {
 	$wpdb->prefix = $mig_prefix;
 	try {
 		$v2_sql = Schema::statements();
-		$v1_sql = array_map( static fn( $sql ) => str_replace( array( "stock_holder_id bigint(20) unsigned NULL DEFAULT NULL,\n", "failure_code varchar(40) NULL DEFAULT NULL,\n", "KEY order_id (order_id),\nKEY holder_status (stock_holder_id,status)\n" ), array( '', '', "KEY order_id (order_id)\n" ), $sql ), $v2_sql );
+		// Phase 9A: Schema::statements() is v3, so the v3 columns and index are removed first.
+		$v1_sql = array_map( static fn( $sql ) => str_replace( array( "payment_method varchar(20) NULL DEFAULT NULL,\n", "unit_cost decimal(26,8) NULL DEFAULT NULL,\n", "seller_name varchar(250) NULL DEFAULT NULL,\n", ",\nKEY method_created (payment_method,created_at_gmt)\n", "stock_holder_id bigint(20) unsigned NULL DEFAULT NULL,\n", "failure_code varchar(40) NULL DEFAULT NULL,\n", "KEY order_id (order_id),\nKEY holder_status (stock_holder_id,status)\n" ), array( '', '', '', "\n", '', '', "KEY order_id (order_id)\n" ), $sql ), $v2_sql );
 		pqbg_t( 'migration: the v1 fixture is v2 without the two columns and the index', $v1_sql[0] === $v2_sql[0] && ! str_contains( $v1_sql[1], 'stock_holder_id' ) && ! str_contains( $v1_sql[1], 'failure_code' ) && str_contains( $v1_sql[1], "KEY order_id (order_id)\n)" ) );
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $v1_sql );
@@ -428,7 +431,7 @@ try {
 		$res  = Install::migrate_2();
 		$v2c  = $wpdb->get_col( "SHOW COLUMNS FROM $mS" );
 		$v2row = $wpdb->get_row( "SELECT * FROM $mS", ARRAY_A );
-		pqbg_t( 'migration: upgrade v1 → v2 adds the columns and index', true === $res && array_slice( $v2c, -2 ) === array( 'stock_holder_id', 'failure_code' ) && 1 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$mS' AND INDEX_NAME = 'holder_status' AND SEQ_IN_INDEX = 1" ) );
+		pqbg_t( 'migration: upgrade v1 → v2 adds the columns and index', true === $res && array_slice( $v2c, 25, 2 ) === array( 'stock_holder_id', 'failure_code' ) /* migrate_2 applies the current (v3) schema, so the v3 columns follow */ && 1 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$mS' AND INDEX_NAME = 'holder_status' AND SEQ_IN_INDEX = 1" ) );
 		pqbg_t( 'migration: the existing row is unchanged, with NULL in the new columns', array_intersect_key( $v2row, $v1row ) === $v1row && null === $v2row['stock_holder_id'] && null === $v2row['failure_code'] );
 		pqbg_t( 'migration: re-running is a no-op (empty dbDelta log, same row)', true === Install::migrate_2() && array() === Schema::create_or_update() && $v2row === $wpdb->get_row( "SELECT * FROM $mS", ARRAY_A ) );
 		Schema::drop_tables();
@@ -869,7 +872,7 @@ try {
 		}
 	};
 	add_action( 'woocommerce_product_before_set_stock', $race2 );
-	$hr = SaleRequest::handle( $code_of( $po2 ), array_merge( array( 'pqbg_action' => 'sell', '_pqbg_nonce' => wp_create_nonce( Permissions::nonce_action( 'sell_' . $crow['id'] ) ), 'quantity' => '2' ), SaleRequest::issue_token( $SE, (int) $crow['id'], '1499.00', 2 ) ) );
+	$hr = SaleRequest::handle( $code_of( $po2 ), array_merge( array( 'pqbg_action' => 'sell', '_pqbg_nonce' => wp_create_nonce( Permissions::nonce_action( 'sell_' . $crow['id'] ) ), 'quantity' => '2', 'payment_method' => 'cash' ), SaleRequest::issue_token( $SE, (int) $crow['id'], '1499.00', 2 ) ) );
 	remove_action( 'woocommerce_product_before_set_stock', $race2 );
 	wp_set_current_user( 0 );
 	pqbg_t( 'the seller sees 409 "This item just sold online. Stock was not changed."', 409 === $hr['status'] && 'This item just sold online. Stock was not changed.' === $hr['view']['notices'][0][1] && 1 === $stock( $po2 ) );
@@ -1036,8 +1039,8 @@ try {
 	$all_src = $src_of( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ) );
 	pqbg_t( 'no transactions in the sale code (no START TRANSACTION, COMMIT or ROLLBACK)', ! preg_match( '/START TRANSACTION|COMMIT|ROLLBACK|wc_transaction_query/i', $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleService.php', PQBG_PLUGIN_DIR . 'includes/SaleRepository.php', PQBG_PLUGIN_DIR . 'includes/SaleRequest.php', PQBG_PLUGIN_DIR . 'includes/StockLock.php' ) ) ) );
 	pqbg_t( 'no WooCommerce order creation, REST routes, AJAX or nopriv handlers anywhere', ! preg_match( '/wc_create_order|new WC_Order|register_rest_route|wp_ajax_|admin_post_nopriv/', $all_src ) );
-	pqbg_t( 'stock is changed only through wc_update_product_stock, only in SaleService', 1 === count( array_filter( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), static fn( $f ) => str_contains( $src_of( array( $f ) ), 'wc_update_product_stock' ) ) ) && str_contains( $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleService.php' ) ), 'wc_update_product_stock' ) && ! preg_match( '/set_stock_quantity|update_post_meta/', $all_src ) );
-	pqbg_t( 'sales rows are written only by SaleRepository (no DELETE of sales anywhere; Install only migrates the table)', ! preg_match( '/DELETE\s+FROM\s+\{?\$table/i', $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleRepository.php' ) ) ) && ! str_contains( $src_of( array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array( PQBG_PLUGIN_DIR . 'includes/SaleRepository.php', PQBG_PLUGIN_DIR . 'includes/Schema.php', PQBG_PLUGIN_DIR . 'includes/Install.php' ) ) ), 'sales_table()' ) );
+	pqbg_t( 'stock is changed only through wc_update_product_stock, only in SaleService (update_post_meta also allowed in CostPrice since Phase 9A: its own cost key only)', 1 === count( array_filter( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), static fn( $f ) => str_contains( $src_of( array( $f ) ), 'wc_update_product_stock' ) ) ) && str_contains( $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleService.php' ) ), 'wc_update_product_stock' ) && ! preg_match( '/set_stock_quantity/', $all_src ) && ! preg_match( '/update_post_meta/', $src_of( array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array( PQBG_PLUGIN_DIR . 'includes/CostPrice.php' ) ) ) ) && ! preg_match( '/update_post_meta\(\s*\$[a-z_]+,\s*+(?!self::META_KEY)/', $src_of( array( PQBG_PLUGIN_DIR . 'includes/CostPrice.php' ) ) ) );
+	pqbg_t( 'sales rows are written only by SaleRepository (no DELETE of sales anywhere; Install only migrates the table; since Phase 9A SalesQuery reads it and never writes)', ! preg_match( '/DELETE\s+FROM\s+\{?\$table/i', $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleRepository.php' ) ) ) && ! str_contains( $src_of( array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array( PQBG_PLUGIN_DIR . 'includes/SaleRepository.php', PQBG_PLUGIN_DIR . 'includes/Schema.php', PQBG_PLUGIN_DIR . 'includes/Install.php', PQBG_PLUGIN_DIR . 'includes/SalesQuery.php' ) ) ), 'sales_table()' ) && ! preg_match( '/\$wpdb->(insert|update|query|delete|replace)\b/', $src_of( array( PQBG_PLUGIN_DIR . 'includes/SalesQuery.php' ) ) ) );
 	pqbg_t( 'the template still has no JavaScript', ! str_contains( (string) file_get_contents( PQBG_PLUGIN_DIR . 'templates/pqbg-scan.php' ), '<script' ) );
 	pqbg_t( 'direct HTTP to the new PHP files: empty output', array() === array_filter( array( 'includes/SaleService.php', 'includes/SaleRepository.php', 'includes/SaleRequest.php', 'includes/StockLock.php' ), static fn( $f ) => '' !== $http( 'anon', 'GET', PQBG_PLUGIN_URL . $f )['body'] ) );
 

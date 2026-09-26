@@ -18,7 +18,9 @@
  *
  * Order: nonce → signature → an existing sale with this request ID (its
  * outcome is returned even for an expired form, so a resubmission never sells
- * twice) → expiry → quantity → SaleService::sell().
+ * twice, whatever payment method it carries) → expiry → quantity → payment
+ * method (Phase 9A: required, and enabled at that moment) → SaleService::sell().
+ * A refused form is shown again with the chosen quantity and method kept.
  *
  * Results: a completed sale answers 303 to /scan/{CODE}/?sale={id} (reloading
  * it is a read-only GET). Errors show the product screen with the message and,
@@ -193,19 +195,32 @@ final class SaleRequest {
 			return self::product_error( $code, 400, __( 'This sale form has expired. Check the item and confirm again.', 'product-qrcode-barcode-generator' ) );
 		}
 
+		$method  = isset( $post['payment_method'] ) && is_string( $post['payment_method'] ) ? $post['payment_method'] : '';
+		$prefill = array(
+			'quantity'       => $quantity,
+			'payment_method' => PaymentMethods::is_enabled( $method ) ? $method : '',
+		);
+
 		if ( null === $quantity ) {
 			/* translators: %s: stock quantity shown on the form. */
-			return self::product_error( $code, 400, sprintf( __( 'Choose a quantity between 1 and %s.', 'product-qrcode-barcode-generator' ), number_format_i18n( max( 1, $token['seen_stock'] ) ) ) );
+			return self::product_error( $code, 400, sprintf( __( 'Choose a quantity between 1 and %s.', 'product-qrcode-barcode-generator' ), number_format_i18n( max( 1, $token['seen_stock'] ) ) ), array(), $prefill );
+		}
+
+		$checked = null !== $existing ? $method : SaleService::check_payment_method( $method );
+
+		if ( is_wp_error( $checked ) ) {
+			return self::product_error( $code, 400, $checked->get_error_message(), array(), $prefill );
 		}
 
 		$result = SaleService::sell(
 			array(
-				'code'       => $code,
-				'quantity'   => $quantity,
-				'request_id' => $token['request_id'],
-				'seller_id'  => $user,
-				'seen_price' => $token['seen_price'],
-				'seen_stock' => $token['seen_stock'],
+				'code'           => $code,
+				'quantity'       => $quantity,
+				'request_id'     => $token['request_id'],
+				'seller_id'      => $user,
+				'payment_method' => $method,
+				'seen_price'     => $token['seen_price'],
+				'seen_stock'     => $token['seen_stock'],
 			)
 		);
 
@@ -283,12 +298,13 @@ final class SaleRequest {
 	 * @param int                   $status  HTTP status.
 	 * @param string                $message Message.
 	 * @param array<string, string> $headers Extra headers.
+	 * @param array<string, mixed>  $prefill Quantity and payment method to keep on the new form.
 	 * @return array<string, mixed>
 	 */
-	private static function product_error( string $code, int $status, string $message, array $headers = array() ): array {
+	private static function product_error( string $code, int $status, string $message, array $headers = array(), array $prefill = array() ): array {
 		return array(
 			'status'  => $status,
-			'view'    => ScanScreen::with_error( ScanScreen::resolve( $code ), $status, $message ),
+			'view'    => ScanScreen::with_error( ScanScreen::resolve( $code, $prefill ), $status, $message ),
 			'headers' => $headers,
 		);
 	}
@@ -337,6 +353,8 @@ final class SaleRequest {
 			'pqbg_not_own_sale'        => 403,
 			'pqbg_bad_request'         => 400,
 			'pqbg_invalid_quantity'    => 400,
+			'pqbg_payment_required'    => 400,
+			'pqbg_payment_invalid'     => 400,
 			'pqbg_insufficient_stock'  => 400,
 			'pqbg_code_not_found'      => 404,
 			'pqbg_sale_not_found'      => 404,

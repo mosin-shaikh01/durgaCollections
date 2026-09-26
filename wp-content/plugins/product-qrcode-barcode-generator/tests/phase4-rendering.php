@@ -165,7 +165,7 @@ try {
 
 	pqbg_section( 'defaults and requirements' );
 	pqbg_t( 'libraries not loaded at start (lazy loading)', 0 === $bacon_at_start && 0 === $picqer_at_start );
-	pqbg_t( 'default settings', array( 'settings_version' => 1, 'barcodes_enabled' => false, 'scan_base_url' => '' ) === Plugin::default_settings() );
+	pqbg_t( 'default settings (payment_methods since Phase 9A)', array( 'settings_version' => 1, 'barcodes_enabled' => false, 'scan_base_url' => '', 'payment_methods' => array( 'cash', 'upi', 'card' ) ) === Plugin::default_settings() );
 	pqbg_t( 'barcodes off by default', false === Settings::is_barcode_enabled() );
 	pqbg_t( 'default scan base URL is the site URL', $home === Settings::get_scan_base_url() && ! Settings::has_scan_base_url_override(), Settings::get_scan_base_url() );
 	pqbg_t( 'PHP minimum is 8.2 (Requirements and plugin header)', '8.2' === Requirements::MIN_PHP && '8.2' === get_plugin_data( PQBG_PLUGIN_FILE, false, false )['RequiresPHP'] );

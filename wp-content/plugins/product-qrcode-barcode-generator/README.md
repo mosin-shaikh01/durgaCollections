@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–8 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing)
+## Current scope: Phases 2–9A (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history)
 
 Implemented:
 
@@ -21,10 +21,12 @@ Implemented:
 - **Phase 6:** the front-end scan page `/scan/{CODE}/` and the entry page `/scan/`: login round trip, access control, the status → screen matrix, live product details, a standalone mobile template. See [Scan page](#scan-page).
 - **Phase 7:** Mark as Sold from the scan page: quantity, "Confirm sale", WooCommerce stock decrement, a permanent `pqbg_sales` record with snapshots, a 10-minute Undo for the seller, and `SaleService::void_sale()` for managers (service only). See [Mark as Sold](#mark-as-sold).
 - **Phase 8:** label printing from wp-admin: "Print label" on the product panel, "Print QR labels" on the products list, a print setup screen (A4 sheet and thermal presets, custom layouts, start position, copies, fields), and a standalone print-ready page with exact millimetre geometry, plus a render cache. See [Label printing](#label-printing).
+- **Phase 9A:** the payment method on every sale (required, chosen by the seller), an optional cost price per product/variation (administrators only) snapshotted on every sale, the seller's name snapshot, the managers' **In-store sales** history (filters, totals, profit, sale detail, CSV export, void), and the sellers' **My sales** page. Schema version 3 and the `pqbg_view_costs` capability. See [Sales history](#sales-history).
 
 **Not implemented yet (later phases):**
-- sales history, the manager void UI and the seller dashboard (Phase 9)
-- CSV import/export of codes, bulk code generation and bulk tools (Phase 10)
+- reports, charts and the owner dashboard (Phase 9B)
+- CSV import/export of codes, bulk code generation, bulk cost import and bulk tools (Phase 10)
+- split/mixed payments, receipts/invoices, returns/exchanges, discounts, GST/tax, customer data
 - PDF output, print history, a label designer, direct printer drivers
 - in-browser camera scanning
 - REST/AJAX endpoints and shortcodes, and support for WooCommerce's block-based product editor
@@ -33,6 +35,8 @@ The plugin adds **no REST routes, AJAX handlers or shortcodes**. Its request han
 - the authenticated `admin-post.php` actions of Phase 5, for users with `pqbg_manage_codes` (see [Admin handlers](#admin-handlers))
 - the Phase 8 print setup screen (a hidden wp-admin page), its `admin-post.php` POST, and the print page (`admin-post.php`, GET/HEAD), all for users with `pqbg_manage_codes` (see [Label printing](#label-printing))
 - the scan page of Phase 6, which requires a login and `pqbg_view_products` before it shows anything (see [Scan page](#scan-page)); since Phase 7 it also accepts POST (sell, undo) on code URLs from users with `pqbg_sell`, with a nonce and a signed form token (see [Mark as Sold](#mark-as-sold))
+- Phase 9A (see [Sales history](#sales-history)): the **In-store sales** screens (a wp-admin page, GET, `pqbg_view_all_sales`), the void POST (`admin-post.php`, nonce, `pqbg_void_sale`), the CSV download (`admin-post.php`, GET, nonce, `pqbg_view_all_sales`), and **My sales** at `/scan/my-sales/` (GET/HEAD, `pqbg_view_own_sales`)
+- Phase 9A cost price: two WooCommerce product-editor save actions for users with `pqbg_view_costs`, and filters that keep the cost out of WooCommerce's meta data, REST, exports and imports (see [Cost price](#cost-price))
 
 ## QR codes and barcodes
 
@@ -106,6 +110,7 @@ It uses the WordPress Settings API:
 |---|---|---|
 | Enable barcodes (for hardware scanners) | `barcodes_enabled` (bool) | `false`. Only a stored boolean `true` enables barcodes. |
 | Scan base URL | `scan_base_url` (string) | `''`, meaning use the site URL (`home_url()`). The effective URL and an example payload are shown on the page. |
+| Payment methods offered (section "In-store sales", Phase 9A) | `payment_methods` (list of `cash`, `upi`, `card`, `other`) | `cash`, `upi`, `card`. At least one must stay enabled: unticking all of them is refused with "At least one payment method must stay enabled. The previous choice was kept." |
 
 No new option was added, and no migration was needed: defaults are merged on read.
 
@@ -651,6 +656,20 @@ Use two or three test products with codes, one with a price (to check the ₹ si
 
 **To revert:** clear the Scan base URL field and save, stop the tunnel, and remove the snippet. Throw away labels printed with the tunnel URL: they stop working when the tunnel stops.
 
+**Phase 9A checklist (payment method, My sales, cost price, sales history).** Set up the tunnel and the `wp-config.php` snippet as in steps 1–3 above for the phone parts. Use two test products with **Manage stock** on (stock at least 5), one of them variable.
+
+1. **Payment methods:** as an administrator, open **WooCommerce → QR & Barcodes**. Under "In-store sales", Cash, UPI and Card are ticked and Other is not. Untick all four and save: the page says "At least one payment method must stay enabled" and keeps them. Leave the defaults.
+2. **Sell with each method (phone, as a Store Seller):** scan the first product. Under **Paid by**, nothing is selected. Tap **Confirm sale** without choosing: the browser asks you to choose one (or the page says "Choose how the customer paid."). Choose **Cash** and confirm: the sale page shows "Paid by: Cash". Sell again with **UPI**, then with **Card**.
+3. **My sales (phone):** tap **My sales** at the top of the scan page. Today's three sales are listed with time, item, "quantity × price = total", the method and "Completed". The summary shows Cash, UPI and Card with their totals, and a Total line. Tap **Yesterday** and **Last 7 days**. Undo one sale from its sale page and check that My sales shows it as voided and counts "Voided: 1" (the summary no longer includes it). There is no cost or profit anywhere.
+4. **Cost price (laptop, as an administrator):** edit the simple product. On the General tab, under the prices, fill **Cost price (₹)** (e.g. 900) and update. On the variable product, fill **Default cost price (₹)** (General tab) and, for one variation, its own **Cost price (₹)** (its placeholder shows the default). Update. Enter something invalid (e.g. `-5` or `1,499.00`) once: an error appears and the previous value stays.
+5. **Sell the variations (phone):** sell one variation with its own cost and one without.
+6. **History (laptop, administrator): WooCommerce → In-store sales** (right after Orders). Today's sales are listed with date/time, sale #, product, SKU, qty, unit price, total, "Paid by", seller, status, unit cost and profit. The earlier sales (before step 4) show cost "unknown". The totals bar shows the revenue per method, then "Cost … · Profit … — excludes N lines with unknown cost". Try the presets (Yesterday, This month) and the filters (seller, Paid by, status, search by SKU or by the product code). Copy the address and open it in a new tab: the same view appears.
+7. **Shop Manager cannot see cost:** log in as a Shop Manager. On the product edit screen there is no cost field; in **In-store sales** there is no Unit cost or Profit column and no cost in the totals; the exported CSV has no cost columns.
+8. **Void (as a Shop Manager or administrator):** open a sale (click its date or number) → **Void sale**. Submit without a reason: "Enter a reason for voiding this sale." Enter a reason, keep **Return 1 to stock** ticked, and click **Void sale**: "Sale voided. The quantity was returned to stock." The timeline shows who voided it, when and why. The product's stock in wp-admin is back up by 1. The sale stays in the list as Voided and is no longer in the totals.
+9. **CSV:** click **Export CSV** and open the file in **Excel**: the ₹ sign in the headers shows correctly, dates are in Indian time, and there is one line per sale in the view.
+
+Undo the test sales or leave them (they are real rows in `pqbg_sales` and cannot be deleted from the UI); restore the test products' stock afterwards.
+
 ### Limitations
 
 - **The scan base URL must reach this site.** The route answers only on this site's own `/scan/` path. A base URL on another host needs that host to forward to this site, as the tunnel does.
@@ -758,7 +777,7 @@ Every response carries the Phase 6 security headers. There is still no JavaScrip
   - Under the lock of the recorded `stock_holder_id`, one statement puts the quantity back and sets `voided`, `voided_by`, `voided_at_gmt`, `void_reason = 'undo'`, only if the row is still `completed`. A second undo changes nothing ("This sale was already undone.").
   - The row is never deleted. GET cannot undo.
   - Refused if stock tracking was turned off or moved (parent ↔ variation) since the sale.
-- **Void** (`SaleService::void_sale( $sale_id, $user_id, $reason, $restock = true )`): needs `pqbg_void_sale` (Shop Manager, Administrator). Any `completed` sale, any age; with or without restock. It has **no UI yet** (Phase 9).
+- **Void** (`SaleService::void_sale( $sale_id, $user_id, $reason, $restock = true )`): needs `pqbg_void_sale` (Shop Manager, Administrator). Any `completed` sale, any age; with or without restock. Its UI is the Phase 9A void screen (see [Void](#void)).
 
 ### Timings (dev machine)
 
@@ -877,6 +896,109 @@ Cold time is almost all QR encoding (about 45 ms per new code, in bacon's pure-P
 - Prices on labels are a snapshot; the QR always opens the live price.
 - No PDF output, print history, label designer or printer drivers (out of scope).
 
+## Sales history
+
+Phase 9A: how each in-store sale was paid, what the item cost, and who sold it; a history for managers and a "My sales" page for sellers. Reports, charts and the owner dashboard are Phase 9B.
+
+### Payment method
+
+- Every sale records one payment method: `cash`, `upi`, `card` or `other` (labels "Cash", "UPI", "Card", "Other"), in `pqbg_sales.payment_method`. Sales made before schema version 3 have NULL, shown as **"Not recorded"**.
+- Administrators choose the methods offered (see [Settings](#settings)); default Cash, UPI and Card.
+- The sale form has a **required "Paid by" radio group with nothing selected** (large tap targets, no JavaScript). Only when exactly one method is offered is it pre-selected.
+- The server checks the method against the methods offered **at the moment of sale** (`SaleRequest`, then `SaleService::sell()`): missing → 400 "Choose how the customer paid."; unknown or disabled (also: disabled after the form was opened) → 400 "That payment method is not available. Choose another." The form is shown again with the chosen quantity (and a still-valid method) kept; nothing is recorded.
+- **Idempotency is unchanged:** a request ID that already has a sale returns that sale, whatever method the resubmission carries (and even if that method was disabled since).
+- The method is written in the **pending journal row**, with the other snapshots, before the stock changes (the Phase 7 atomicity).
+- The sale page shows "Paid by: …".
+- **Not supported:** split or mixed payments (record the main method), and changing the method after the sale (void it and sell again).
+
+### Cost price
+
+- An optional **Cost price (₹)**, for administrators only (`pqbg_view_costs`):
+  - simple product: General tab, under the prices (`woocommerce_product_options_pricing`)
+  - variable product: **Default cost price (₹)** on the General tab, used by variations without their own (`woocommerce_product_options_general_product_data`)
+  - each variation: **Cost price (₹)** after its prices, with the default as placeholder (`woocommerce_variation_options_pricing`)
+- Stored in post meta **`_pqbg_cost_price`** (protected), normalised to the store's price decimals. Empty = unknown (the meta is deleted). Valid: a number ≥ 0 with at most 2 decimals (the store's), the store's decimal separator, no thousands separators, at most 12 integer digits. An invalid value keeps the previous one and shows an admin error.
+- Saved through `woocommerce_admin_process_product_object` / `woocommerce_admin_process_variation_object` (classic form and the variations AJAX save, after WooCommerce's own nonce and capability checks), **only for `pqbg_view_costs` and only when the field was on the form**: a Shop Manager's save never touches it.
+- **Snapshot:** every sale records the effective cost at that moment in `pqbg_sales.unit_cost` (a variation's own cost, else its parent's default; NULL when unknown — never 0). Changing a cost later never changes past sales.
+- **Never exposed to anyone else** (decision D6: not even to administrators outside the edit screen and the history):
+  - `woocommerce_data_store_wp_post_read_meta` keeps the key out of every WooCommerce object's `meta_data`, so it is not in the WC REST API (products, variations; WooCommerce does not filter protected meta there), the product CSV export, Duplicate (which therefore does not copy the cost), or anything else built on WooCommerce meta.
+  - `add_post_metadata` / `update_post_metadata` accept the key only from `CostPrice::set()`: REST `meta_data`, the product CSV importer and the WordPress importer (WXR) cannot write it.
+  - `delete_post_metadata`: a logged-in user without `pqbg_view_costs` cannot delete one item's cost through the meta API. **Never blocked:** permanent deletion of products/variations (WordPress deletes meta by ID, `delete_post_metadata_by_mid`, which is not hooked), bulk removal (`$delete_all`, e.g. uninstall), and requests without a user (cron, CLI).
+  - `wxr_export_skip_postmeta`: Tools → Export never includes the cost, for anyone (the importer could not write it back anyway, so an exported cost could only leak).
+  - The Store API, storefront, scan screens, labels and My sales never read it; the history, detail and CSV show it only to `pqbg_view_costs`.
+- Deleting a product, removing a variation or changing variable → simple (WooCommerce deletes the variations) leaves no orphaned cost meta; after variable → simple the parent's default becomes the simple product's cost.
+
+### Seller name
+
+`pqbg_sales.seller_name` snapshots the seller's display name at the moment of sale. The history shows the snapshot; for older rows without one, the current display name. A deleted user is shown as "Name (deleted user)", or "User #ID (deleted)" without a snapshot; `voided_by = 0` is "System".
+
+### In-store sales (managers)
+
+**WooCommerce → In-store sales** (`admin.php?page=pqbg-sales`), right after Orders, for `pqbg_view_all_sales` (Shop Manager, Administrator). Every filter is in the URL, so a view can be bookmarked or shared. Everything is read-only GET.
+
+- **Columns:** date/time (site timezone), sale #, product (with variation attributes), SKU, qty, unit price, total, paid by, seller, status (Completed / Voided / Failed; In progress for a sale being recorded). For `pqbg_view_costs` also unit cost and profit (total − qty × cost; "unknown" without a cost; "—" for rows that are not completed).
+- **Date range:** Today (default), Yesterday, Last 7 days (today and the 6 days before), This month, Last month, or From/To (both inclusive; swapped if reversed). Whole days in the **site timezone** (Asia/Kolkata: a day starts at 18:30 UTC the day before).
+- **Filters:** seller (everyone who has sold), paid by (including "Not recorded"), status, and search by product name or SKU (substring) or by a product code (typed, or a pasted scan URL; retired codes too).
+- **Sorting** by date, sale #, product, qty or total (with the sale # as tie-break); **50 per page**.
+- **Totals bar** for the filtered view, **completed sales only**: number of sales, items, revenue, and revenue per payment method; for `pqbg_view_costs` also cost and profit, **excluding lines with an unknown cost** ("excludes N lines with unknown cost (₹…)"), never counting them as zero; plus how many voided and failed rows the view contains.
+- **Sale detail** (click the date or number): every snapshot (product, SKU, code, quantity, unit and regular price, total, currency, paid by, stock before → after and the stock holder; unit cost and profit for `pqbg_view_costs`), a link to the product while it exists, and the timeline: sold at/by, voided at/by with the reason ("Undone by the seller" for an undo), and the failure code.
+
+### Void
+
+From the sale detail, **Void sale** (for `pqbg_void_sale`) opens a confirmation page: a **required reason** (at most 500 characters) and **Return N to stock** (ticked by default). The POST (`admin-post.php?action=pqbg_void_sale`, nonce `pqbg_void_sale_{id}`) calls `SaleService::void_sale()` (the stock holder's lock and the atomic statement, as in Phase 7), then answers 303 to the detail with a message. Any age. A second void is refused ("already voided"); a busy lock, or stock tracking turned off since the sale (untick "Return to stock" then), is refused with an explanation and nothing changes. Voided rows stay in the history with who, when and why.
+
+### CSV export
+
+**Export CSV** exports the **current filtered view** (same filters and order): `admin-post.php?action=pqbg_sales_csv&_wpnonce=…&{filters}`, GET, `pqbg_view_all_sales`, no side effects.
+
+- UTF-8 **with a byte order mark** (Excel shows ₹ correctly); `text/csv; charset=utf-8`, attachment `in-store-sales-{from}[-to-{to}].csv`, `nosniff`, `no-store`.
+- Columns: date (site timezone, `Y-m-d H:i:s`), sale #, status, product, attributes, SKU, code, quantity, unit price, total, currency, paid by, seller, voided at/by, void reason, failure; for `pqbg_view_costs` also unit cost, cost, profit. Amounts are plain decimals.
+- **Formula injection:** a text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading apostrophe; plain numbers we generate (such as a negative profit `-60.00`) stay numbers.
+- **Streamed:** IDs are read by keyset paging (5,000 at a time, continuing after the last sort value and ID) and rows fetched 1,000 at a time by primary key, written and flushed; memory stays flat and a sale recorded during the export never shifts a page.
+
+### My sales (sellers)
+
+`/scan/my-sales/` (and `?range=yesterday`, `?range=7d`), linked from the scan page header, for `pqbg_view_own_sales`. The same standalone mobile template, security headers and access flow as the scan page (logged out → login and back; no `pqbg_view_products` → the scan page's identical 403; no `pqbg_view_own_sales` → 403), GET/HEAD only (POST → 405), and other query strings redirect (301) to the canonical URL.
+
+- **Only the logged-in user's own sales:** the seller comes from the session, never from the request.
+- Tabs Today / Yesterday / Last 7 days; lines newest first (time, item, "qty × price = total", paid by, status; each links to its sale page), completed and voided (failed attempts changed no stock and are not listed); at most 300 lines, the summary always covers the whole range.
+- **Summary (completed sales):** per payment method (every method offered, even without sales) and a total, plus the number of voided sales.
+- Never shows cost or profit.
+- The route reuses the scan rewrite rule: `my-sales` is lowercase and has no `DC-` prefix, so it can never be a product code. `ScanUrl::my_sales_url()` builds the URL. No new rewrite rule.
+
+### Indexes and timings (dev machine, 50,000 sales)
+
+Schema v3 adds `method_created (payment_method, created_at_gmt)` for the payment filter. EXPLAIN on 50,000 rows over 90 days (the Phase 9A suite prints it):
+
+| Query | Without the index | With it |
+|---|---|---|
+| Count, this month + card | full scan (49,440 rows), 42.5 ms | `method_created` (2,032 rows), 2.5 ms |
+| Totals, 90 days + card | `status_created`, 219 ms | `method_created`, 37 ms |
+| List, 90 days + other | `created_at_gmt` (24,720 rows), 13.8 ms | `method_created` (1,558 rows), 1.1 ms |
+
+A covering index for the totals (`status, created_at_gmt, payment_method, quantity, line_total, unit_cost`) was measured too (90-day totals 485 → 175 ms) and **not added**: the totals already stay under the target without it, and it would make every sale write a six-column index. The totals are one pass grouped by status and payment method (faster than totals plus a separate status count).
+
+Measured by the Phase 9A suite (50,000 synthetic sales over 90 days, 10 sellers; best of 3 in-process with the object cache flushed; HTTP medians of 3):
+
+| Measurement | Result |
+|---|---|
+| List page (rows + count), this month / 90 days / 90 days + card / + seller | 10.5 / 30 / 8 / 6 ms |
+| List, 90 days + search / sorted by total | 179 / 169 ms |
+| Totals bar, this month / 90 days / 90 days + card / + seller | 116 / 232 / 73 / 36 ms |
+| History page over HTTP (admin): empty range (wp-admin itself) / this month / 90 days / 90 days + card | 685 / 631 / 773 / 543 ms (another run: 1,115 / 1,076 / 1,428 / 1,243 ms; the machine's load varies, the page adds at most ~0.1–0.3 s to an empty wp-admin page) |
+| My sales over HTTP, last 7 days (~370 sales of that seller) | 241 ms |
+| CSV of 50,018 rows, in-process / over HTTP | 3.7 s / 3.3 s, 6.9 MB; memory peak +7 MB |
+
+The first CSV version took 31 s for the same export (OFFSET chunks alone 23.6 s); see the Phase 9A notes in `progress.md`.
+
+### Limitations
+
+- One payment method per sale; no split payments, no editing after the sale (void and sell again).
+- Cost prices can be set only on the classic product edit screen by administrators (bulk/CSV cost import is Phase 10); Duplicate does not copy the cost.
+- Profit ignores taxes, discounts and returns (out of scope). Unknown-cost lines are excluded from cost and profit and counted separately.
+- The seller filter lists everyone who has ever sold; a deleted seller appears by the name snapshot.
+- The history page's time is mostly wp-admin itself on this machine (0.7–1.1 s for an empty page, depending on load).
+
 ## Requirements
 
 | | Minimum | Tested |
@@ -944,8 +1066,9 @@ Main columns:
 - `source` (default `scan`), `status`: `pending`, `completed`, `voided` or `failed`
 - void fields (`void_reason`, `voided_by`, `voided_at_gmt`), `note`, `created_at_gmt`
 - **schema v2 (Phase 7):** `stock_holder_id` (the product whose stock the sale changed: the parent when a variation uses parent-level stock; undo restores exactly this one) and `failure_code` (`sold_online`, `error`, `interrupted`)
+- **schema v3 (Phase 9A):** `payment_method` varchar(20) (`cash`, `upi`, `card`, `other`; NULL = not recorded), `unit_cost` decimal(26,8) (the effective cost price at the moment of sale; NULL = unknown), `seller_name` varchar(250) (the seller's display name at the moment of sale). All three are NULL on older rows and are written in the pending row.
 
-Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`, `status_created`, `created_at_gmt`, `order_id`, and (v2) `holder_status (stock_holder_id,status)`.
+Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`, `status_created`, `created_at_gmt`, `order_id`, (v2) `holder_status (stock_holder_id,status)` and (v3) `method_created (payment_method,created_at_gmt)`.
 
 **Rules (Phase 7):**
 
@@ -958,14 +1081,16 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 
 | Option | Autoload | Purpose |
 |---|---|---|
-| `pqbg_db_version` | yes | integer schema version (currently `2`) |
-| `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
+| `pqbg_db_version` | yes | integer schema version (currently `3`) |
+| `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`, `payment_methods`); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 | `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
 | `pqbg_svg_cache_index` | no | Phase 8 render cache index: `{transient key} => last used`, at most 2,000 entries. Not data; removed on every uninstall. |
 | `_transient_pqbg_svg_{md5}` (+ `_transient_timeout_…`) | no | Phase 8 cached QR/barcode SVGs, 30-day expiry (in the object cache instead when the host has a persistent one). Not data; removed on every uninstall. |
 
 User meta `pqbg_print_prefs` (Phase 8) holds each user's last-used print options; it is removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`.
+
+Post meta `_pqbg_cost_price` (Phase 9A) holds a product's or variation's cost price (on a variable product: the default for its variations); see [Cost price](#cost-price). It is removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`.
 
 ## Migrations
 
@@ -988,6 +1113,7 @@ Migrations never drop tables or delete rows.
 |---|---|
 | 1 | `migrate_1`: the `pqbg_codes` and `pqbg_sales` tables, and the optional CHECK constraint |
 | 2 | `migrate_2` (Phase 7): adds `pqbg_sales.stock_holder_id`, `pqbg_sales.failure_code` and the `holder_status` index. Additive (dbDelta): existing rows keep their values and get NULL; re-running changes nothing. |
+| 3 | `migrate_3` (Phase 9A): adds `pqbg_sales.payment_method`, `pqbg_sales.unit_cost`, `pqbg_sales.seller_name` and the `method_created` index. Additive (dbDelta): existing rows keep their values and get NULL ("Not recorded" / unknown cost); re-running changes nothing. `install()` then syncs roles, which grants the new `pqbg_view_costs` to administrators. |
 
 **The install lock** is an atomic `INSERT IGNORE` row in the options table. `add_option()` is not used because it runs `INSERT … ON DUPLICATE KEY UPDATE` and is therefore not atomic.
 The lock expires after 5 minutes, so a crashed request cannot block upgrades permanently.
@@ -1004,6 +1130,9 @@ The lock is released in a `finally` block, using a compare-and-delete on its own
 | `pqbg_void_sale` | | ✔ | ✔ |
 | `pqbg_manage_codes` | | ✔ | ✔ |
 | `pqbg_manage_settings` | | | ✔ |
+| `pqbg_view_costs` (Phase 9A) | | | ✔ |
+
+`pqbg_view_costs`: see and edit cost prices, and see cost and profit in the sales history and its CSV. Nobody else sees costs anywhere (see [Cost price](#cost-price)).
 
 The Store Seller role also has `read`. It has nothing else: no `edit_products`, `manage_woocommerce` or `edit_posts`.
 
@@ -1022,6 +1151,7 @@ WooCommerce only lets Shop Managers assign the `customer` role, so only Administ
   - A nonce check is always paired with a capability check.
 - `CodeRepository` does not check capabilities itself. Callers must check `Permissions::can_manage_codes()` first.
 - Phase 7 mapping: selling and undo need `pqbg_sell` (undo also: own sale, 10 minutes); the sale page needs `can_view_sale()`; `SaleService::void_sale()` needs `pqbg_void_sale`. No new capability was added.
+- Phase 9A mapping: the In-store sales history, sale detail and CSV need `pqbg_view_all_sales`; the void screen and handler `pqbg_void_sale`; My sales `pqbg_view_own_sales` (after the scan page's `pqbg_view_products` gate); cost fields, cost and profit `pqbg_view_costs` (new, administrators only).
 
 ## HPOS
 
@@ -1042,7 +1172,7 @@ To permanently delete all plugin data, add this to `wp-config.php` **before** de
 define( 'PQBG_UNINSTALL_DELETE_ALL_DATA', true );
 ```
 
-This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_version` and every user's remembered print options (`pqbg_print_prefs` user meta), removes every `pqbg_*` capability, and deletes the Store Seller role. Affected users keep their accounts.
+This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_version`, every user's remembered print options (`pqbg_print_prefs` user meta) and every cost price (`_pqbg_cost_price` post meta, Phase 9A), removes every `pqbg_*` capability (including `pqbg_view_costs`), and deletes the Store Seller role. Affected users keep their accounts.
 **This cannot be undone. Back up the database first.** On multisite, only the site running the uninstall is affected.
 
 ## Operational notes

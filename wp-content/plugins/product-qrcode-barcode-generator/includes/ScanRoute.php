@@ -12,6 +12,8 @@
  *   POST to /scan/{CODE}/ (sell, undo; Phase 7)      → SaleRequest::handle(); 400 unless the URL is canonical
  *   /scan/{CODE}/?sale={id} (sale result page)       → SaleRequest::sale_page(), or 303 to the code URL
  *                                                      when the sale is not the user's to see
+ *   /scan/my-sales/ (Phase 9A, GET/HEAD only)         → the seller's own sales, or 403 without
+ *                                                      pqbg_view_own_sales; 301 to the canonical URL
  *   non-canonical path or query string               → 301 to the canonical URL
  *   entry box ?code=                                 → 302 to /scan/{CODE}/, or 400 "Not a valid product code."
  *   otherwise                                        → ScanScreen::resolve()
@@ -175,13 +177,14 @@ final class ScanRoute {
 	 * @return array{status: int, location?: string, view?: array<string, mixed>, headers?: array<string, string>}
 	 */
 	public static function decide( string $method, string $request_uri, ?string $code, ?string $box, array $post = array() ): array {
-		$is_post = 'POST' === $method && null !== $code;
+		$is_mine = ScanUrl::MY_SALES === $code;
+		$is_post = 'POST' === $method && null !== $code && ! $is_mine;
 
 		if ( ! in_array( $method, array( 'GET', 'HEAD' ), true ) && ! $is_post ) {
 			return array(
 				'status'  => 405,
 				'view'    => ScanScreen::method_not_allowed(),
-				'headers' => array( 'Allow' => null === $code ? 'GET, HEAD' : 'GET, HEAD, POST' ),
+				'headers' => array( 'Allow' => null === $code || $is_mine ? 'GET, HEAD' : 'GET, HEAD, POST' ),
 			);
 		}
 
@@ -192,7 +195,7 @@ final class ScanRoute {
 			// The login page returns to the canonical code URL, or to the entry page. Existence is never checked here.
 			return array(
 				'status'   => 302,
-				'location' => wp_login_url( ScanUrl::site_url( $valid ? $candidate : '' ) ),
+				'location' => wp_login_url( $is_mine ? ScanUrl::my_sales_url() : ScanUrl::site_url( $valid ? $candidate : '' ) ),
 			);
 		}
 
@@ -205,6 +208,10 @@ final class ScanRoute {
 
 		$path  = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
 		$query = (string) wp_parse_url( $request_uri, PHP_URL_QUERY );
+
+		if ( $is_mine ) {
+			return self::my_sales( $path, $query );
+		}
 
 		if ( null === $code ) {
 			$entry = ScanUrl::site_url();
@@ -289,6 +296,41 @@ final class ScanRoute {
 		return array(
 			'status' => (int) $view['status'],
 			'view'   => $view,
+		);
+	}
+
+	/**
+	 * The My sales page: the canonical URL is /scan/my-sales/ (today) or with
+	 * ?range=yesterday|7d; anything else is redirected there (301).
+	 *
+	 * @param string $path  Request path.
+	 * @param string $query Query string.
+	 * @return array{status: int, location?: string, view?: array<string, mixed>}
+	 */
+	private static function my_sales( string $path, string $query ): array {
+		$args = array();
+		wp_parse_str( $query, $args );
+
+		$range     = isset( $args['range'] ) && is_string( $args['range'] ) && array_key_exists( $args['range'], ScanScreen::MY_SALES_RANGES ) ? $args['range'] : 'today';
+		$canonical = ScanUrl::my_sales_url( $range );
+
+		if ( (string) wp_parse_url( $canonical, PHP_URL_PATH ) !== $path || (string) wp_parse_url( $canonical, PHP_URL_QUERY ) !== $query ) {
+			return array(
+				'status'   => 301,
+				'location' => $canonical,
+			);
+		}
+
+		if ( ! Permissions::can_view_own_sales() ) {
+			return array(
+				'status' => 403,
+				'view'   => ScanScreen::sales_forbidden(),
+			);
+		}
+
+		return array(
+			'status' => 200,
+			'view'   => ScanScreen::my_sales( get_current_user_id(), $range ),
 		);
 	}
 

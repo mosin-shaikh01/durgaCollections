@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
 final class Install {
 
 	/** Current schema version. Must equal the highest key in migrations(). */
-	const DB_VERSION = 2;
+	const DB_VERSION = 3;
 
 	const DB_VERSION_OPTION = 'pqbg_db_version';
 	const LOCK_OPTION       = 'pqbg_install_lock';
@@ -41,6 +41,7 @@ final class Install {
 		return array(
 			1 => array( __CLASS__, 'migrate_1' ),
 			2 => array( __CLASS__, 'migrate_2' ),
+			3 => array( __CLASS__, 'migrate_3' ),
 		);
 	}
 
@@ -191,6 +192,33 @@ final class Install {
 
 		if ( ! in_array( 'stock_holder_id', $columns, true ) || ! in_array( 'failure_code', $columns, true ) ) {
 			return new WP_Error( 'pqbg_schema_failed', __( 'Product QR Code and Barcode Generator could not update its database tables.', 'product-qrcode-barcode-generator' ) . ' ' . $wpdb->last_error );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Schema version 3 (Phase 9A, sales history): adds pqbg_sales.payment_method,
+	 * pqbg_sales.unit_cost, pqbg_sales.seller_name and the method_created index.
+	 * Additive only (dbDelta): existing rows keep their values and get NULL
+	 * ("not recorded" / "unknown") in the new columns; re-running changes nothing.
+	 * The new pqbg_view_costs capability is granted by Permissions::sync_roles(),
+	 * which install() runs after every migration.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function migrate_3() {
+		global $wpdb;
+
+		Schema::create_or_update();
+
+		$table   = Schema::sales_table();
+		$columns = $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
+
+		foreach ( array( 'payment_method', 'unit_cost', 'seller_name' ) as $column ) {
+			if ( ! in_array( $column, $columns, true ) ) {
+				return new WP_Error( 'pqbg_schema_failed', __( 'Product QR Code and Barcode Generator could not update its database tables.', 'product-qrcode-barcode-generator' ) . ' ' . $wpdb->last_error );
+			}
 		}
 
 		return true;

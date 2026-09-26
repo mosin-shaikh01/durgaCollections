@@ -44,6 +44,9 @@ require_once __DIR__ . '/includes/Permissions.php';
 delete_option( 'pqbg_settings' );
 delete_option( 'pqbg_db_version' );
 
+// Cost prices of products and variations (Phase 9A). Bulk removal: never blocked by CostPrice's guard.
+delete_metadata( 'post', 0, '_pqbg_cost_price', '', true );
+
 // Each user's remembered label-printing options.
 delete_metadata( 'user', 0, 'pqbg_print_prefs', '', true );
 

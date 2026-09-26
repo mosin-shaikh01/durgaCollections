@@ -257,3 +257,129 @@
 	clip: rect(0, 0, 0, 0);
 	white-space: nowrap;
 }
+
+/* Phase 9A: header link, payment method and My sales. */
+
+.pqbg-scan__nav {
+	display: inline-flex;
+	align-items: center;
+	min-height: 48px;
+	margin-left: auto;
+	padding: 0 8px;
+	color: #fff;
+	font-weight: 600;
+}
+
+.pqbg-scan__payment {
+	margin: 16px 0;
+	padding: 0;
+	border: 0;
+}
+
+.pqbg-scan__method {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 52px;
+	margin-bottom: 8px;
+	padding: 0 14px;
+	border: 2px solid #111;
+	border-radius: 6px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.pqbg-scan__method input {
+	width: 24px;
+	height: 24px;
+	margin: 0;
+}
+
+.pqbg-scan__method:has(input:checked) {
+	background: #e7f0ff;
+	border-color: #0a58ca;
+}
+
+.pqbg-scan__tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 16px 0;
+}
+
+.pqbg-scan__tab {
+	display: inline-flex;
+	align-items: center;
+	min-height: 48px;
+	padding: 0 14px;
+	border: 2px solid #111;
+	border-radius: 6px;
+	color: #111;
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.pqbg-scan__tab--current {
+	background: #111;
+	color: #fff;
+}
+
+.pqbg-scan__table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.pqbg-scan__table th,
+.pqbg-scan__table td {
+	padding: 8px 4px;
+	border-bottom: 1px solid #ccc;
+	text-align: left;
+	vertical-align: top;
+}
+
+.pqbg-scan__table .pqbg-scan__amount {
+	text-align: right;
+	white-space: nowrap;
+}
+
+.pqbg-scan__total-row th,
+.pqbg-scan__total-row td {
+	border-bottom: 0;
+	border-top: 2px solid #111;
+	font-weight: 700;
+}
+
+.pqbg-scan__list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.pqbg-scan__line {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 2px 12px;
+	padding: 10px 0;
+	border-bottom: 1px solid #ccc;
+}
+
+.pqbg-scan__line-time {
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.pqbg-scan__line-item {
+	color: #0a58ca;
+	font-weight: 600;
+}
+
+.pqbg-scan__line-detail {
+	grid-column: 2;
+	color: #333;
+	font-size: 16px;
+}
+
+.pqbg-scan__line--voided .pqbg-scan__line-item {
+	color: #666;
+	text-decoration: line-through;
+}

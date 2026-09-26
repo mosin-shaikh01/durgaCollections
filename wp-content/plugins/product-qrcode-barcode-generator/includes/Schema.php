@@ -46,6 +46,11 @@ final class Schema {
 	 * Schema version 2 added stock_holder_id (the product whose stock the sale
 	 * changed: the parent when a variation uses parent-level stock) and
 	 * failure_code. Statuses: pending, completed, voided, failed. See SaleRepository.
+	 *
+	 * Schema version 3 (Phase 9A) added payment_method (PaymentMethods keys; NULL =
+	 * not recorded), unit_cost (the effective cost price at the moment of sale; NULL =
+	 * unknown, never zero), seller_name (the seller's display name at the moment of
+	 * sale) and the method_created index for the sales history's payment filter.
 	 */
 	public static function sales_table(): string {
 		global $wpdb;
@@ -120,6 +125,9 @@ note text NULL,
 created_at_gmt datetime NOT NULL,
 stock_holder_id bigint(20) unsigned NULL DEFAULT NULL,
 failure_code varchar(40) NULL DEFAULT NULL,
+payment_method varchar(20) NULL DEFAULT NULL,
+unit_cost decimal(26,8) NULL DEFAULT NULL,
+seller_name varchar(250) NULL DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY request_id (request_id),
 KEY code_id (code_id),
@@ -128,7 +136,8 @@ KEY seller_created (seller_id,created_at_gmt),
 KEY status_created (status,created_at_gmt),
 KEY created_at_gmt (created_at_gmt),
 KEY order_id (order_id),
-KEY holder_status (stock_holder_id,status)
+KEY holder_status (stock_holder_id,status),
+KEY method_created (payment_method,created_at_gmt)
 ) {$collate};",
 		);
 	}

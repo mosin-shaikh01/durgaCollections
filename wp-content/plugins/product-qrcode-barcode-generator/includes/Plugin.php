@@ -32,7 +32,10 @@ final class Plugin {
 		// Every request: products are also saved over REST, by the importer and by cron.
 		CodeLifecycle::register();
 
-		// Front-end scan page /scan/{CODE}/, and the login redirects back to it.
+		// Cost price: kept out of WooCommerce meta_data, REST, exports and imports on every request (Phase 9A).
+		CostPrice::register();
+
+		// Front-end scan page /scan/{CODE}/ and /scan/my-sales/, and the login redirects back to it.
 		ScanRoute::register();
 
 		if ( is_admin() ) {
@@ -44,6 +47,10 @@ final class Plugin {
 			// Label printing: setup screen, bulk action and the print page (admin-post.php only).
 			PrintAdmin::register();
 			PrintPage::register();
+
+			// In-store sales history, sale detail, void and CSV (Phase 9A); cost price fields.
+			SalesAdmin::register();
+			CostPrice::register_admin();
 		}
 	}
 
@@ -60,6 +67,7 @@ final class Plugin {
 	 *
 	 * - barcodes_enabled: render Code 128 barcodes for hardware scanners (QR codes are always on).
 	 * - scan_base_url:    absolute base for scan URLs; '' means use home_url(). See Settings.
+	 * - payment_methods:  payment methods the sale form offers (Phase 9A). See PaymentMethods.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -68,6 +76,7 @@ final class Plugin {
 			'settings_version' => 1,
 			'barcodes_enabled' => false,
 			'scan_base_url'    => '',
+			'payment_methods'  => PaymentMethods::DEFAULT_ENABLED,
 		);
 	}
 

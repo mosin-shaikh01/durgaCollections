@@ -30,6 +30,9 @@ final class Permissions {
 	const MANAGE_CODES    = 'pqbg_manage_codes';
 	const MANAGE_SETTINGS = 'pqbg_manage_settings';
 
+	/** Cost prices and profit (Phase 9A). Administrators only. */
+	const VIEW_COSTS = 'pqbg_view_costs';
+
 	const SELLER_ROLE = 'pqbg_seller';
 
 	const NONCE_FIELD = '_pqbg_nonce';
@@ -48,6 +51,7 @@ final class Permissions {
 			self::VOID_SALE,
 			self::MANAGE_CODES,
 			self::MANAGE_SETTINGS,
+			self::VIEW_COSTS,
 		);
 	}
 
@@ -64,7 +68,7 @@ final class Permissions {
 		return array(
 			self::SELLER_ROLE => $seller,
 			'shop_manager'    => $operations,                                              // No settings access.
-			'administrator'   => array_merge( $operations, array( self::MANAGE_SETTINGS ) ),
+			'administrator'   => array_merge( $operations, array( self::MANAGE_SETTINGS, self::VIEW_COSTS ) ), // Costs: administrators only.
 		);
 	}
 
@@ -144,6 +148,24 @@ final class Permissions {
 	}
 
 	/**
+	 * Whether the user may see their own sales (My sales).
+	 *
+	 * @param int|null $user_id User ID, or null for the current user.
+	 */
+	public static function can_view_own_sales( ?int $user_id = null ): bool {
+		return self::user_can( self::VIEW_OWN_SALES, $user_id );
+	}
+
+	/**
+	 * Whether the user may see every seller's sales (the sales history).
+	 *
+	 * @param int|null $user_id User ID, or null for the current user.
+	 */
+	public static function can_view_all_sales( ?int $user_id = null ): bool {
+		return self::user_can( self::VIEW_ALL_SALES, $user_id );
+	}
+
+	/**
 	 * Whether the user may view a sale recorded by $seller_id.
 	 *
 	 * @param int      $seller_id Seller who recorded the sale.
@@ -184,6 +206,15 @@ final class Permissions {
 	 */
 	public static function can_manage_settings( ?int $user_id = null ): bool {
 		return self::user_can( self::MANAGE_SETTINGS, $user_id );
+	}
+
+	/**
+	 * Whether the user may see and edit cost prices and profit (administrators only).
+	 *
+	 * @param int|null $user_id User ID, or null for the current user.
+	 */
+	public static function can_view_costs( ?int $user_id = null ): bool {
+		return self::user_can( self::VIEW_COSTS, $user_id );
 	}
 
 	/**

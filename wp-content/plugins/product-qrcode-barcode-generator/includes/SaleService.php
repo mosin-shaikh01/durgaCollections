@@ -14,6 +14,10 @@
  *     or private. Never trash, draft, pending, scheduled, retired or unknown.
  *   - No WooCommerce order is created. Every attempt that reaches the stock is
  *     journalled in pqbg_sales with snapshots (see SaleRepository).
+ *   - Phase 9A: every sale needs a payment method that is enabled at that moment
+ *     (PaymentMethods). The pending row also snapshots the method, the effective
+ *     cost price (CostPrice; NULL when unknown) and the seller's display name.
+ *     A repeated request ID returns the original sale, whatever method it carries.
  *
  * Sale sequence, under StockLock for the stock holder (the object that holds
  * the stock: the parent when a variation uses parent-level stock):
@@ -169,7 +173,7 @@ final class SaleService {
 	/**
 	 * Sells an item.
 	 *
-	 * @param array{code: string, quantity: int, request_id: string, seller_id: int, seen_price?: ?string, seen_stock?: ?int} $args Request.
+	 * @param array{code: string, quantity: int, request_id: string, seller_id: int, payment_method: string, seen_price?: ?string, seen_stock?: ?int} $args Request.
 	 * @return array{status: string, sale: array<string, string>}|WP_Error
 	 *         status 'completed' or 'failed' (the row says why); a WP_Error when nothing was journalled.
 	 */
@@ -198,6 +202,12 @@ final class SaleService {
 
 		if ( null !== $existing ) {
 			return self::outcome( $existing, $seller );
+		}
+
+		$method = self::check_payment_method( $args['payment_method'] ?? null );
+
+		if ( is_wp_error( $method ) ) {
+			return $method;
 		}
 
 		$row  = CodeRepository::find_by_code( (string) $args['code'] );
@@ -266,6 +276,10 @@ final class SaleService {
 
 		$product = $item['product'];
 		$parent  = $item['parent'];
+
+		// The parent holds the default cost; with variation-level stock it was not refreshed above.
+		self::forget( array( $parent ? $parent->get_id() : 0 ) );
+
 		$stock   = SaleRepository::read_stock( $holder_id );
 		$stock   = null === $stock ? 0 : $stock;
 		$seen    = isset( $args['seen_stock'] ) && null !== $args['seen_stock'] ? (int) $args['seen_stock'] : null;
@@ -308,6 +322,9 @@ final class SaleService {
 				'attributes_json' => array() === $attrs ? null : wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE ),
 				'stock_before'    => (int) $stock,
 				'stock_holder_id' => $holder_id,
+				'payment_method'  => (string) $args['payment_method'],
+				'unit_cost'       => CostPrice::effective( $product, $parent ),
+				'seller_name'     => self::seller_name( $seller ),
 				// source: the column default ('scan').
 			)
 		);
@@ -347,6 +364,24 @@ final class SaleService {
 			'sale'   => SaleRepository::find( $sale_id ) ?? $sale,
 			'notify' => true,
 		);
+	}
+
+	/**
+	 * A submitted payment method, if it is one the sale form offers now.
+	 *
+	 * @param mixed $method Submitted value.
+	 * @return string|WP_Error
+	 */
+	public static function check_payment_method( $method ) {
+		if ( ! is_string( $method ) || '' === $method ) {
+			return self::error( 'pqbg_payment_required', __( 'Choose how the customer paid.', 'product-qrcode-barcode-generator' ) );
+		}
+
+		if ( ! PaymentMethods::is_enabled( $method ) ) {
+			return self::error( 'pqbg_payment_invalid', __( 'That payment method is not available. Choose another.', 'product-qrcode-barcode-generator' ) );
+		}
+
+		return $method;
 	}
 
 	/**
@@ -754,6 +789,17 @@ final class SaleService {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * The seller's display name for the snapshot (NULL when the user does not exist).
+	 *
+	 * @param int $seller User ID.
+	 */
+	private static function seller_name( int $seller ): ?string {
+		$user = get_userdata( $seller );
+
+		return $user ? mb_substr( (string) $user->display_name, 0, 250 ) : null;
 	}
 
 	/**

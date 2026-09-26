@@ -13,7 +13,11 @@
  * in the box (or a scanner that types a code and Enter) only looks up a code
  * and never submits a sale.
  *
- * Loaded by ScanScreen::render() with $view, $entry_url and $logout_url in scope.
+ * The header links to My sales for users who may see their own sales (Phase 9A),
+ * and back to the scan page from My sales.
+ *
+ * Loaded by ScanScreen::render() with $view, $entry_url, $logout_url and
+ * $sales_url ('' when the user may not see My sales) in scope.
  *
  * @package ProductQrBarcode
  */
@@ -23,7 +27,9 @@ defined( 'ABSPATH' ) || exit;
 /** @var array<string, mixed> $view */
 /** @var string $entry_url */
 /** @var string $logout_url */
+/** @var string $sales_url */
 
+$pqbg_mine    = $view['mine'];
 $pqbg_product = $view['product'];
 $pqbg_summary = $view['summary'];
 $pqbg_sell    = $view['sell'];
@@ -42,6 +48,11 @@ $pqbg_undo    = $view['undo'];
 <body class="pqbg-scan">
 <header class="pqbg-scan__bar">
 	<span class="pqbg-scan__site"><?php echo esc_html( get_bloginfo( 'name' ) ); ?></span>
+	<?php if ( is_array( $pqbg_mine ) ) : ?>
+		<a class="pqbg-scan__nav" href="<?php echo esc_url( $entry_url ); ?>"><?php esc_html_e( 'Scan', 'product-qrcode-barcode-generator' ); ?></a>
+	<?php elseif ( '' !== $sales_url ) : ?>
+		<a class="pqbg-scan__nav" href="<?php echo esc_url( $sales_url ); ?>"><?php esc_html_e( 'My sales', 'product-qrcode-barcode-generator' ); ?></a>
+	<?php endif; ?>
 	<a class="pqbg-scan__logout" href="<?php echo esc_url( $logout_url ); ?>"><?php esc_html_e( 'Log out', 'product-qrcode-barcode-generator' ); ?></a>
 </header>
 <main class="pqbg-scan__main">
@@ -59,7 +70,59 @@ $pqbg_undo    = $view['undo'];
 	<p class="pqbg-scan__notice pqbg-scan__notice--<?php echo esc_attr( $pqbg_notice[0] ); ?>" role="alert"><?php echo esc_html( $pqbg_notice[1] ); ?></p>
 <?php endforeach; ?>
 
-<?php if ( is_array( $pqbg_product ) ) : ?>
+<?php if ( is_array( $pqbg_mine ) ) : ?>
+	<nav class="pqbg-scan__tabs">
+		<?php foreach ( $pqbg_mine['tabs'] as $pqbg_tab ) : ?>
+			<a class="pqbg-scan__tab<?php echo $pqbg_tab[2] ? ' pqbg-scan__tab--current' : ''; ?>" href="<?php echo esc_url( $pqbg_tab[0] ); ?>"<?php echo $pqbg_tab[2] ? ' aria-current="page"' : ''; ?>><?php echo esc_html( $pqbg_tab[1] ); ?></a>
+		<?php endforeach; ?>
+	</nav>
+	<h1 class="pqbg-scan__name"><?php echo esc_html( $pqbg_mine['title'] ); ?></h1>
+	<section class="pqbg-scan__summary">
+		<h2 class="pqbg-scan__sell-title"><?php esc_html_e( 'Summary (completed sales)', 'product-qrcode-barcode-generator' ); ?></h2>
+		<table class="pqbg-scan__table">
+			<?php foreach ( array_merge( $pqbg_mine['summary'], array( $pqbg_mine['total'] ) ) as $pqbg_i => $pqbg_line ) : ?>
+				<tr<?php echo count( $pqbg_mine['summary'] ) === $pqbg_i ? ' class="pqbg-scan__total-row"' : ''; ?>>
+					<th scope="row"><?php echo esc_html( $pqbg_line[0] ); ?></th>
+					<td><?php echo esc_html( $pqbg_line[1] ); ?></td>
+					<td class="pqbg-scan__amount"><?php echo esc_html( $pqbg_line[2] ); ?></td>
+				</tr>
+			<?php endforeach; ?>
+		</table>
+		<p class="pqbg-scan__hint">
+			<?php
+			/* translators: %s: number of voided sales. */
+			echo esc_html( sprintf( __( 'Voided: %s', 'product-qrcode-barcode-generator' ), number_format_i18n( $pqbg_mine['voided'] ) ) );
+			?>
+		</p>
+	</section>
+	<section class="pqbg-scan__lines">
+		<h2 class="pqbg-scan__sell-title"><?php esc_html_e( 'Sales', 'product-qrcode-barcode-generator' ); ?></h2>
+		<?php if ( array() === $pqbg_mine['lines'] ) : ?>
+			<p class="pqbg-scan__hint"><?php esc_html_e( 'No sales in this period.', 'product-qrcode-barcode-generator' ); ?></p>
+		<?php endif; ?>
+		<ol class="pqbg-scan__list">
+			<?php foreach ( $pqbg_mine['lines'] as $pqbg_line ) : ?>
+				<li class="pqbg-scan__line pqbg-scan__line--<?php echo esc_attr( $pqbg_line['status'] ); ?>">
+					<span class="pqbg-scan__line-time"><?php echo esc_html( $pqbg_line['time'] ); ?></span>
+					<?php if ( '' !== $pqbg_line['url'] ) : ?>
+						<a class="pqbg-scan__line-item" href="<?php echo esc_url( $pqbg_line['url'] ); ?>"><?php echo esc_html( $pqbg_line['item'] ); ?></a>
+					<?php else : ?>
+						<span class="pqbg-scan__line-item"><?php echo esc_html( $pqbg_line['item'] ); ?></span>
+					<?php endif; ?>
+					<span class="pqbg-scan__line-detail"><?php echo esc_html( $pqbg_line['amount'] . ' · ' . $pqbg_line['method'] . ' · ' . $pqbg_line['label'] ); ?></span>
+				</li>
+			<?php endforeach; ?>
+		</ol>
+		<?php if ( $pqbg_mine['more'] > 0 ) : ?>
+			<p class="pqbg-scan__hint">
+				<?php
+				/* translators: %s: number of older sales not listed. */
+				echo esc_html( sprintf( __( '%s older sales in this period are not listed. The summary includes them.', 'product-qrcode-barcode-generator' ), number_format_i18n( $pqbg_mine['more'] ) ) );
+				?>
+			</p>
+		<?php endif; ?>
+	</section>
+<?php elseif ( is_array( $pqbg_product ) ) : ?>
 	<article class="pqbg-scan__product">
 		<?php if ( '' !== $pqbg_product['image_html'] ) : ?>
 			<div class="pqbg-scan__media"><?php echo $pqbg_product['image_html']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_get_attachment_image() escapes its output. ?></div>
@@ -110,11 +173,11 @@ $pqbg_undo    = $view['undo'];
 			<?php if ( array() !== $pqbg_sell['options'] ) : ?>
 				<select class="pqbg-scan__quantity" id="pqbg-quantity" name="quantity">
 					<?php foreach ( $pqbg_sell['options'] as $pqbg_qty => $pqbg_label ) : ?>
-						<option value="<?php echo esc_attr( (string) $pqbg_qty ); ?>"<?php selected( 1, $pqbg_qty ); ?>><?php echo esc_html( $pqbg_label ); ?></option>
+						<option value="<?php echo esc_attr( (string) $pqbg_qty ); ?>"<?php selected( $pqbg_sell['quantity'], $pqbg_qty ); ?>><?php echo esc_html( $pqbg_label ); ?></option>
 					<?php endforeach; ?>
 				</select>
 			<?php else : ?>
-				<input class="pqbg-scan__quantity" id="pqbg-quantity" name="quantity" type="number" inputmode="numeric" min="1" max="<?php echo esc_attr( (string) $pqbg_sell['max'] ); ?>" step="1" value="1" required>
+				<input class="pqbg-scan__quantity" id="pqbg-quantity" name="quantity" type="number" inputmode="numeric" min="1" max="<?php echo esc_attr( (string) $pqbg_sell['max'] ); ?>" step="1" value="<?php echo esc_attr( (string) $pqbg_sell['quantity'] ); ?>" required>
 				<p class="pqbg-scan__hint">
 					<?php
 					/* translators: %s: unit price. */
@@ -122,6 +185,12 @@ $pqbg_undo    = $view['undo'];
 					?>
 				</p>
 			<?php endif; ?>
+			<fieldset class="pqbg-scan__payment">
+				<legend class="pqbg-scan__label"><?php esc_html_e( 'Paid by', 'product-qrcode-barcode-generator' ); ?></legend>
+				<?php foreach ( $pqbg_sell['methods'] as $pqbg_key => $pqbg_method ) : ?>
+					<label class="pqbg-scan__method"><input type="radio" name="payment_method" value="<?php echo esc_attr( $pqbg_key ); ?>"<?php checked( $pqbg_sell['method'], $pqbg_key ); ?> required> <?php echo esc_html( $pqbg_method ); ?></label>
+				<?php endforeach; ?>
+			</fieldset>
 			<button class="pqbg-scan__button pqbg-scan__button--sell" type="submit"><?php esc_html_e( 'Confirm sale', 'product-qrcode-barcode-generator' ); ?></button>
 		</form>
 	<?php endif; ?>
@@ -136,6 +205,8 @@ $pqbg_undo    = $view['undo'];
 			<dd><?php echo esc_html( $pqbg_sale['quantity'] . ' × ' . $pqbg_sale['unit'] ); ?></dd>
 			<dt><?php esc_html_e( 'Total', 'product-qrcode-barcode-generator' ); ?></dt>
 			<dd class="pqbg-scan__total"><?php echo esc_html( $pqbg_sale['total'] ); ?></dd>
+			<dt><?php esc_html_e( 'Paid by', 'product-qrcode-barcode-generator' ); ?></dt>
+			<dd><?php echo esc_html( $pqbg_sale['payment'] ); ?></dd>
 			<?php if ( '' !== $pqbg_sale['stock'] ) : ?>
 				<dt><?php esc_html_e( 'Stock now', 'product-qrcode-barcode-generator' ); ?></dt>
 				<dd><?php echo esc_html( $pqbg_sale['stock'] ); ?></dd>

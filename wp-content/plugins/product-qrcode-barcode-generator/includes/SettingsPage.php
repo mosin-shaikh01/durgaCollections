@@ -27,6 +27,9 @@ final class SettingsPage {
 	const SLUG    = 'pqbg-settings';
 	const SECTION = 'pqbg_codes_section';
 
+	/** Phase 9A: in-store sales settings. */
+	const SALES_SECTION = 'pqbg_sales_section';
+
 	/** Settings API option group; equals the option name so options.php uses "pqbg_settings-options" as the nonce action. */
 	const GROUP = Plugin::SETTINGS_OPTION;
 
@@ -94,6 +97,16 @@ final class SettingsPage {
 			self::SECTION,
 			array( 'label_for' => 'pqbg_scan_base_url' )
 		);
+
+		add_settings_section( self::SALES_SECTION, __( 'In-store sales', 'product-qrcode-barcode-generator' ), '__return_null', self::SLUG );
+
+		add_settings_field(
+			'pqbg_payment_methods',
+			__( 'Payment methods offered', 'product-qrcode-barcode-generator' ),
+			array( __CLASS__, 'render_payment_methods_field' ),
+			self::SLUG,
+			self::SALES_SECTION
+		);
 	}
 
 	/**
@@ -134,6 +147,23 @@ final class SettingsPage {
 		echo '<label><input type="checkbox" id="pqbg_barcodes_enabled" name="' . esc_attr( $name ) . '" value="1"' . checked( Settings::is_barcode_enabled(), true, false ) . ' /> ';
 		echo esc_html__( 'Also produce Code 128 barcodes', 'product-qrcode-barcode-generator' ) . '</label>';
 		echo '<p class="description">' . esc_html__( 'Off by default. Turn this on only if staff use hardware barcode scanners. The barcode holds the same product code as the QR code, so no codes need to be regenerated.', 'product-qrcode-barcode-generator' ) . '</p>';
+	}
+
+	/**
+	 * Payment method checkboxes. The hidden marker tells Settings::sanitize() that the field was on the form.
+	 */
+	public static function render_payment_methods_field(): void {
+		$name    = Plugin::SETTINGS_OPTION . '[payment_methods][]';
+		$enabled = PaymentMethods::enabled();
+
+		echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Payment methods offered', 'product-qrcode-barcode-generator' ) . '</legend>';
+		echo '<input type="hidden" name="' . esc_attr( Plugin::SETTINGS_OPTION . '[payment_methods_present]' ) . '" value="1" />';
+
+		foreach ( PaymentMethods::all() as $key => $label ) {
+			echo '<label style="margin-right:1.5em"><input type="checkbox" id="pqbg_payment_' . esc_attr( $key ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $key ) . '"' . checked( in_array( $key, $enabled, true ), true, false ) . ' /> ' . esc_html( $label ) . '</label>';
+		}
+
+		echo '</fieldset><p class="description">' . esc_html__( 'The sale form asks the seller to choose one of these. At least one must stay enabled. Split or mixed payments are not supported: record the sale under the main method.', 'product-qrcode-barcode-generator' ) . '</p>';
 	}
 
 	/**

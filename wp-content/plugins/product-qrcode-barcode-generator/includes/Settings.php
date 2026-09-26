@@ -5,6 +5,7 @@
  * Keys (defaults in Plugin::default_settings()):
  *   barcodes_enabled  bool    Code 128 barcodes for hardware scanners. Off by default.
  *   scan_base_url     string  Absolute http(s) base for scan URLs. '' means home_url().
+ *   payment_methods   array   Payment methods the sale form offers (PaymentMethods keys, at least one).
  *
  * Only the scan base URL is stored, never a full scan URL. Codes live in
  * pqbg_codes, so changing the base URL never touches any code.
@@ -223,6 +224,19 @@ final class Settings {
 				} else {
 					$output['scan_base_url'] = $valid;
 				}
+			}
+		}
+
+		// Checkboxes send nothing when unticked, so the form also sends a marker that the field was on it.
+		if ( array_key_exists( 'payment_methods_present', $input ) ) {
+			$methods = PaymentMethods::clean( isset( $input['payment_methods'] ) && is_array( $input['payment_methods'] ) ? $input['payment_methods'] : array() );
+
+			if ( array() === $methods ) {
+				if ( function_exists( 'add_settings_error' ) ) {
+					add_settings_error( Plugin::SETTINGS_OPTION, 'pqbg_no_payment_method', __( 'At least one payment method must stay enabled. The previous choice was kept.', 'product-qrcode-barcode-generator' ) );
+				}
+			} else {
+				$output['payment_methods'] = $methods;
 			}
 		}
 

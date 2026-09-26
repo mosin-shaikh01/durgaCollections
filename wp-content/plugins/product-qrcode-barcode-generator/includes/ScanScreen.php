@@ -24,6 +24,7 @@
  *   sale     ?array   a recorded sale (see sale())
  *   undo     ?array   the Undo form for that sale
  *   box_label string  label of the box; '' for the default
+ *   mine     ?array   the seller's own sales (see my_sales(); Phase 9A)
  *
  * @package ProductQrBarcode
  */
@@ -50,13 +51,24 @@ final class ScanScreen {
 	/** Sale refusals shown as a notice on the product screen (the status ones already have their own). */
 	const SELL_NOTICES = array( 'pqbg_stock_unmanaged', 'pqbg_no_price', 'pqbg_zero_price' );
 
+	/** My sales ranges: URL value => SalesQuery preset. 'today' is the canonical page without an argument. */
+	const MY_SALES_RANGES = array(
+		'today'     => 'today',
+		'yesterday' => 'yesterday',
+		'7d'        => 'last7',
+	);
+
+	/** At most this many lines on My sales (the summary always covers the whole range). */
+	const MY_SALES_LINES = 300;
+
 	/**
 	 * The screen for a well-formed code.
 	 *
-	 * @param string $code Code matching CodeGenerator::FORMAT_PATTERN.
+	 * @param string               $code    Code matching CodeGenerator::FORMAT_PATTERN.
+	 * @param array<string, mixed> $prefill Quantity and payment method to keep on a sale form shown again.
 	 * @return array<string, mixed>
 	 */
-	public static function resolve( string $code ): array {
+	public static function resolve( string $code, array $prefill = array() ): array {
 		if ( ! CodeGenerator::is_valid_format( $code ) ) {
 			return self::invalid( $code );
 		}
@@ -139,7 +151,7 @@ final class ScanScreen {
 				if ( null === $stock || $stock <= 0 ) {
 					$notices[] = array( 'warning', __( 'Out of stock – cannot be sold.', 'product-qrcode-barcode-generator' ) );
 				} else {
-					$sell = self::sell_form( $code, $row, $item['product'], (int) $stock );
+					$sell = self::sell_form( $code, $row, $item['product'], (int) $stock, $prefill );
 				}
 			}
 		}
@@ -233,6 +245,7 @@ final class ScanScreen {
 					'unit'       => self::plain_price( $sale['unit_price'], $args ),
 					'total'      => self::plain_price( $sale['line_total'], $args ),
 					'stock'      => SaleRepository::STATUS_COMPLETED === $sale['status'] && null !== $sale['stock_after'] ? number_format_i18n( (int) $sale['stock_after'] ) : '',
+					'payment'    => PaymentMethods::label( $sale['payment_method'] ?? null ),
 					'time'       => wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), SaleService::created_ts( $sale ) ),
 				),
 				'undo'      => $undo,
@@ -248,9 +261,10 @@ final class ScanScreen {
 	 * @param array<string, string> $row     Code row.
 	 * @param WC_Product            $product Item.
 	 * @param int                   $stock   The holder's stock, read from the database.
+	 * @param array<string, mixed>  $prefill Quantity and payment method to keep (a form shown again).
 	 * @return array<string, mixed>
 	 */
-	private static function sell_form( string $code, array $row, WC_Product $product, int $stock ): array {
+	private static function sell_form( string $code, array $row, WC_Product $product, int $stock, array $prefill = array() ): array {
 		$price   = SaleService::normalize_price( $product->get_price() );
 		$unit    = self::plain_price( $price );
 		$options = array();
@@ -262,13 +276,21 @@ final class ScanScreen {
 			}
 		}
 
+		// Payment: required, nothing pre-selected unless only one method is offered (or the seller chose one before an error).
+		$methods  = array_intersect_key( PaymentMethods::all(), array_flip( PaymentMethods::enabled() ) );
+		$chosen   = isset( $prefill['payment_method'] ) && PaymentMethods::is_enabled( $prefill['payment_method'] ) ? (string) $prefill['payment_method'] : '';
+		$quantity = isset( $prefill['quantity'] ) && is_int( $prefill['quantity'] ) && $prefill['quantity'] >= 1 && $prefill['quantity'] <= $stock ? $prefill['quantity'] : 1;
+
 		return array(
-			'action'  => ScanUrl::site_url( $code ),
-			'nonce'   => wp_create_nonce( Permissions::nonce_action( 'sell_' . $row['id'] ) ),
-			'fields'  => SaleRequest::issue_token( get_current_user_id(), (int) $row['id'], $price, $stock ),
-			'options' => $options,
-			'max'     => $stock,
-			'unit'    => $unit,
+			'action'   => ScanUrl::site_url( $code ),
+			'nonce'    => wp_create_nonce( Permissions::nonce_action( 'sell_' . $row['id'] ) ),
+			'fields'   => SaleRequest::issue_token( get_current_user_id(), (int) $row['id'], $price, $stock ),
+			'options'  => $options,
+			'max'      => $stock,
+			'unit'     => $unit,
+			'quantity' => $quantity,
+			'methods'  => $methods,
+			'method'   => 1 === count( $methods ) ? (string) key( $methods ) : $chosen,
 		);
 	}
 
@@ -322,6 +344,115 @@ final class ScanScreen {
 	}
 
 	/**
+	 * My sales without pqbg_view_own_sales.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function sales_forbidden(): array {
+		return self::view( 403, array( array( 'error', __( 'You do not have permission to view sales.', 'product-qrcode-barcode-generator' ) ) ), array( 'box' => false ) );
+	}
+
+	/**
+	 * The seller's own sales for a range: completed and voided lines (failed
+	 * attempts changed no stock and are left out), newest first, and a summary of
+	 * completed sales per payment method. Never shows cost or profit. The seller
+	 * is the logged-in user, never a value from the request.
+	 *
+	 * @param int    $user_id Current user.
+	 * @param string $range   Key of MY_SALES_RANGES.
+	 * @return array<string, mixed>
+	 */
+	public static function my_sales( int $user_id, string $range ): array {
+		$range   = array_key_exists( $range, self::MY_SALES_RANGES ) ? $range : 'today';
+		$dates   = SalesQuery::range( self::MY_SALES_RANGES[ $range ] );
+		$filters = array(
+			'start'    => $dates['start'],
+			'end'      => $dates['end'],
+			'seller'   => max( 1, $user_id ),
+			'statuses' => array( SaleRepository::STATUS_COMPLETED, SaleRepository::STATUS_VOIDED ),
+			'orderby'  => 'date',
+			'order'    => 'desc',
+		);
+		$labels  = array(
+			'today'     => __( 'Today', 'product-qrcode-barcode-generator' ),
+			'yesterday' => __( 'Yesterday', 'product-qrcode-barcode-generator' ),
+			'7d'        => __( 'Last 7 days', 'product-qrcode-barcode-generator' ),
+		);
+		$totals  = SalesQuery::totals( $filters );
+		$count   = SalesQuery::count( $filters );
+		$time    = '7d' === $range ? 'M j, ' . get_option( 'time_format' ) : get_option( 'time_format' );
+		$lines   = array();
+
+		foreach ( SalesQuery::rows( $filters, self::MY_SALES_LINES ) as $sale ) {
+			$code    = (string) ( $sale['code'] ?? '' );
+			$lines[] = array(
+				'time'   => SalePresenter::datetime( $sale['created_at_gmt'], $time ),
+				'item'   => SalePresenter::item( $sale ),
+				/* translators: 1: quantity, 2: unit price, 3: total. */
+				'amount' => sprintf( __( '%1$s × %2$s = %3$s', 'product-qrcode-barcode-generator' ), number_format_i18n( (int) $sale['quantity'] ), SalePresenter::money( $sale['unit_price'], (string) $sale['currency'] ), SalePresenter::money( $sale['line_total'], (string) $sale['currency'] ) ),
+				'method' => PaymentMethods::label( $sale['payment_method'] ),
+				'status' => (string) $sale['status'],
+				'label'  => SalePresenter::status( (string) $sale['status'] ),
+				'url'    => CodeGenerator::is_valid_format( $code ) ? SaleRequest::sale_url( $code, (int) $sale['id'] ) : '',
+			);
+		}
+
+		// Every offered method (even without sales), then any other method that has sales, then "Not recorded".
+		$shown   = array_merge( array_fill_keys( PaymentMethods::enabled(), null ), $totals['methods'] );
+		$summary = array();
+
+		foreach ( array_merge( array_keys( PaymentMethods::all() ), array( '' ) ) as $key ) {
+			if ( array_key_exists( $key, $shown ) ) {
+				$summary[] = self::summary_line( PaymentMethods::label( '' === $key ? null : $key ), $shown[ $key ] );
+			}
+		}
+
+		$day   = static fn( string $ymd ): string => (string) wp_date( get_option( 'date_format' ), ( new \DateTimeImmutable( $ymd . ' 12:00:00', wp_timezone() ) )->getTimestamp() );
+		$title = $dates['from'] === $dates['to'] ? $day( $dates['from'] ) : $day( $dates['from'] ) . ' – ' . $day( $dates['to'] );
+		$tabs  = array();
+
+		foreach ( $labels as $key => $label ) {
+			$tabs[] = array( ScanUrl::my_sales_url( $key ), $label, $key === $range );
+		}
+
+		return self::view(
+			200,
+			array(),
+			array(
+				'mine' => array(
+					'tabs'    => $tabs,
+					'title'   => $labels[ $range ] . ' – ' . $title,
+					'summary' => $summary,
+					'total'   => self::summary_line( __( 'Total', 'product-qrcode-barcode-generator' ), $totals['all'] ),
+					'voided'  => (int) $totals['voided'],
+					'lines'   => $lines,
+					'more'    => max( 0, $count - count( $lines ) ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * One summary line: label, "3 sales · 4 items" and the amount ('–' when none).
+	 *
+	 * @param string                    $label Label.
+	 * @param array<string, mixed>|null $total A total from SalesQuery::totals(), or null.
+	 * @return array{0: string, 1: string, 2: string}
+	 */
+	private static function summary_line( string $label, ?array $total ): array {
+		if ( null === $total || 0 === $total['count'] ) {
+			return array( $label, '', '–' );
+		}
+
+		/* translators: %s: number of sales. */
+		$sales = sprintf( _n( '%s sale', '%s sales', $total['count'], 'product-qrcode-barcode-generator' ), number_format_i18n( $total['count'] ) );
+		/* translators: %s: number of items. */
+		$items = sprintf( _n( '%s item', '%s items', $total['items'], 'product-qrcode-barcode-generator' ), number_format_i18n( $total['items'] ) );
+
+		return array( $label, $sales . ' · ' . $items, SalePresenter::money( $total['revenue'] ) );
+	}
+
+	/**
 	 * Answer to a request method other than GET or HEAD.
 	 *
 	 * @return array<string, mixed>
@@ -340,6 +471,7 @@ final class ScanScreen {
 
 		$entry_url  = ScanUrl::site_url();
 		$logout_url = wp_logout_url( $entry_url );
+		$sales_url  = Permissions::can_view_own_sales() ? ScanUrl::my_sales_url() : '';
 
 		ob_start();
 		require PQBG_PLUGIN_DIR . 'templates/pqbg-scan.php';
@@ -499,6 +631,7 @@ final class ScanScreen {
 				'sale'      => null,
 				'undo'      => null,
 				'box_label' => '',
+				'mine'      => null,
 			),
 			$extra
 		);

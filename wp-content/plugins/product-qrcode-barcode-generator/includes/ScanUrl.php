@@ -30,6 +30,13 @@ final class ScanUrl {
 
 	const PATH = 'scan';
 
+	/**
+	 * The seller's "My sales" page, {home}/scan/my-sales/ (Phase 9A). Served by the
+	 * existing scan rule; lowercase and without the DC- prefix, so it can never be a
+	 * product code (CodeGenerator::FORMAT_PATTERN).
+	 */
+	const MY_SALES = 'my-sales';
+
 	/** Placeholder shown in the admin UI in place of a real code. */
 	const EXAMPLE_CODE = 'DC-XXXX-XXXX-XXXX';
 
@@ -79,6 +86,17 @@ final class ScanUrl {
 		}
 
 		return home_url( '/' . self::PATH . '/' . ( '' === $code ? '' : $code . '/' ) );
+	}
+
+	/**
+	 * The My sales page on this site, optionally for a range other than today.
+	 *
+	 * @param string $range '' or 'today' (canonical, no argument), or another range key.
+	 */
+	public static function my_sales_url( string $range = '' ): string {
+		$url = home_url( '/' . self::PATH . '/' . self::MY_SALES . '/' );
+
+		return '' === $range || 'today' === $range ? $url : add_query_arg( 'range', rawurlencode( $range ), $url );
 	}
 
 	/**
