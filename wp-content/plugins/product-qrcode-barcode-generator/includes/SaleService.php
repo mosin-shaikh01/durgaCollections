@@ -201,6 +201,22 @@ final class SaleService {
 		$existing = SaleRepository::find_by_request_id( $request );
 
 		if ( null !== $existing ) {
+			// A pending row seen here may belong to a duplicate of this request that is still selling
+			// under the stock holder's lock: wait for that lock, then answer with the row's final state.
+			if ( SaleRepository::STATUS_PENDING === $existing['status'] && (int) $existing['seller_id'] === $seller && (int) $existing['stock_holder_id'] > 0 ) {
+				$holder_id = (int) $existing['stock_holder_id'];
+
+				if ( ! StockLock::acquire( $holder_id ) ) {
+					return self::error( 'pqbg_busy', __( 'Someone else is selling this item right now. Try again.', 'product-qrcode-barcode-generator' ) );
+				}
+
+				try {
+					$existing = SaleRepository::find_by_request_id( $request ) ?? $existing;
+				} finally {
+					StockLock::release( $holder_id );
+				}
+			}
+
 			return self::outcome( $existing, $seller );
 		}
 
@@ -743,7 +759,8 @@ final class SaleService {
 			return self::error( 'pqbg_bad_request', __( 'This form is not valid. Check the item and confirm again.', 'product-qrcode-barcode-generator' ) );
 		}
 
-		// A pending row of a finished request can only be one whose process died; it never changed stock.
+		// Callers read the row under the stock holder's lock (or after waiting for it), so a pending
+		// row here can only be one whose process died; it never changed stock.
 		$status = SaleRepository::STATUS_PENDING === $sale['status'] ? SaleRepository::STATUS_FAILED : $sale['status'];
 
 		return array(

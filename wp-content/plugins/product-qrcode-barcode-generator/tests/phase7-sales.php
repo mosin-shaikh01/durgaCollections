@@ -47,6 +47,17 @@ if ( isset( $argv[1] ) && '--worker' === $argv[1] ) {
 		exit( 0 );
 	}
 
+	if ( 'finish' === $mode ) {
+		// Plays a sale that is still running: holds the stock lock, then completes its pending row.
+		$ok = ProductQrBarcode\StockLock::acquire( (int) $argv[3], 0 );
+		echo $ok ? "held\n" : "not held\n";
+		fflush( STDOUT );
+		usleep( (int) ( (float) $argv[5] * 1000000 ) );
+		ProductQrBarcode\SaleRepository::transition( (int) $argv[4], ProductQrBarcode\SaleRepository::STATUS_PENDING, array( 'status' => ProductQrBarcode\SaleRepository::STATUS_COMPLETED ) );
+		ProductQrBarcode\StockLock::release( (int) $argv[3] );
+		exit( 0 );
+	}
+
 	if ( 'online' === $mode ) {
 		$product = wc_get_product( (int) $argv[3] );
 		$order   = wc_create_order( array( 'status' => 'pending' ) );
@@ -822,6 +833,48 @@ try {
 	pqbg_t( '...one row, one decrement (5 → 4)', 1 === count( $rows_for( $pi ) ) && 4 === $stock( $pi ) );
 	$reuse = $sell_in( $code_of( $pi ), 1, $S2, array( 'request_id' => $rid ) );
 	pqbg_t( 'another seller replaying that request_id → pqbg_bad_request, nothing changed', is_wp_error( $reuse ) && 'pqbg_bad_request' === $reuse->get_error_code() && 4 === $stock( $pi ) );
+
+	// Deterministic version of the race above (fixed after the Phase 9B baseline): the duplicate
+	// arrives while the first submission's row is still pending and its process holds the lock.
+	$pending_row = static function ( int $product, string $rid, int $seller ) use ( $code_of ): int {
+		return (int) SaleRepository::insert_pending(
+			array(
+				'request_id'      => $rid,
+				'code_id'         => (int) CodeRepository::find_active_for_product( $product )['id'],
+				'product_id'      => $product,
+				'variation_id'    => 0,
+				'seller_id'       => $seller,
+				'quantity'        => 1,
+				'unit_price'      => '1499.00',
+				'line_total'      => '1499.00',
+				'currency'        => 'INR',
+				'product_name'    => 'Pending race fixture',
+				'stock_holder_id' => $product,
+				'payment_method'  => 'cash',
+			)
+		);
+	};
+	$rid2 = wp_generate_uuid4();
+	$pid2 = $pending_row( $pi, $rid2, $SE );
+	$fin  = array();
+	$fp   = proc_open( array( PHP_BINARY, __FILE__, '--worker', 'finish', (string) $pi, (string) $pid2, '1.5' ), array( 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $fin );
+	$held = 'held' === trim( (string) fgets( $fin[1] ) );
+	$t0   = microtime( true );
+	$dup  = $sell_in( $code_of( $pi ), 1, $SE, array( 'request_id' => $rid2 ) );
+	$wait = microtime( true ) - $t0;
+	stream_get_contents( $fin[1] );
+	stream_get_contents( $fin[2] );
+	proc_close( $fp );
+	pqbg_t( 'a duplicate that finds the row still pending while the first submission holds the lock waits for it and gets the same completed sale (not "failed")', $held && is_array( $dup ) && 'completed' === $dup['status'] && $pid2 === (int) $dup['sale']['id'] && 'completed' === $dup['sale']['status'] && $wait >= 1.0, sprintf( 'waited %.2f s; %s', $wait, wp_json_encode( is_wp_error( $dup ) ? $dup->get_error_code() : $dup['status'] ) ) );
+	pqbg_t( '...the duplicate changed no stock and wrote no row (4)', 4 === $stock( $pi ) && 2 === count( $rows_for( $pi ) ) );
+	$rid3 = wp_generate_uuid4();
+	$pid3 = $pending_row( $pi, $rid3, $SE );
+	$t0   = microtime( true );
+	$dead = $sell_in( $code_of( $pi ), 1, $SE, array( 'request_id' => $rid3 ) );
+	pqbg_t( 'a pending row whose process died (lock free) → "failed" at once, stock unchanged', is_array( $dead ) && 'failed' === $dead['status'] && $pid3 === (int) $dead['sale']['id'] && microtime( true ) - $t0 < 1.0 && 4 === $stock( $pi ) );
+	$other = $sell_in( $code_of( $pi ), 1, $S2, array( 'request_id' => $rid3 ) );
+	pqbg_t( '...another seller replaying a pending request_id → pqbg_bad_request without waiting', is_wp_error( $other ) && 'pqbg_bad_request' === $other->get_error_code() );
+	$wpdb->update( $S, array( 'status' => SaleRepository::STATUS_FAILED, 'failure_code' => SaleRepository::FAILURE_INTERRUPTED ), array( 'id' => $pid3 ) ); // Leave no pending fixture behind.
 
 	pqbg_section( 'concurrency: N workers selling the last K items' );
 	$pk  = $make_simple( $A, array( 'stock_quantity' => 3 ) );
