@@ -51,6 +51,10 @@ final class Schema {
 	 * not recorded), unit_cost (the effective cost price at the moment of sale; NULL =
 	 * unknown, never zero), seller_name (the seller's display name at the moment of
 	 * sale) and the method_created index for the sales history's payment filter.
+	 *
+	 * Schema version 4 (Phase 9B) added void_restock: whether a void returned the
+	 * quantity to stock (1) or not (0); NULL for voids recorded before version 4 and
+	 * for rows that were never voided.
 	 */
 	public static function sales_table(): string {
 		global $wpdb;
@@ -128,6 +132,7 @@ failure_code varchar(40) NULL DEFAULT NULL,
 payment_method varchar(20) NULL DEFAULT NULL,
 unit_cost decimal(26,8) NULL DEFAULT NULL,
 seller_name varchar(250) NULL DEFAULT NULL,
+void_restock tinyint(1) NULL DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY request_id (request_id),
 KEY code_id (code_id),

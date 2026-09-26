@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–9A (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history)
+## Current scope: Phases 2–9B (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports)
 
 Implemented:
 
@@ -22,11 +22,12 @@ Implemented:
 - **Phase 7:** Mark as Sold from the scan page: quantity, "Confirm sale", WooCommerce stock decrement, a permanent `pqbg_sales` record with snapshots, a 10-minute Undo for the seller, and `SaleService::void_sale()` for managers (service only). See [Mark as Sold](#mark-as-sold).
 - **Phase 8:** label printing from wp-admin: "Print label" on the product panel, "Print QR labels" on the products list, a print setup screen (A4 sheet and thermal presets, custom layouts, start position, copies, fields), and a standalone print-ready page with exact millimetre geometry, plus a render cache. See [Label printing](#label-printing).
 - **Phase 9A:** the payment method on every sale (required, chosen by the seller), an optional cost price per product/variation (administrators only) snapshotted on every sale, the seller's name snapshot, the managers' **In-store sales** history (filters, totals, profit, sale detail, CSV export, void), and the sellers' **My sales** page. Schema version 3 and the `pqbg_view_costs` capability. See [Sales history](#sales-history).
+- **Phase 9B:** **In-store reports**: the owner dashboard and ten reports (sales over time, products, categories, sellers, peak times, end of day / payments with "Cash expected in drawer", profit & margin, voids & failed, stock, dead stock), server-rendered SVG charts, CSV exports and a print-friendly end of day. Schema version 4 (`void_restock`). Also the fix of a Phase 7 idempotency race (a duplicate submission arriving mid-sale was answered "failed"). See [In-store reports](#in-store-reports).
 
 **Not implemented yet (later phases):**
-- reports, charts and the owner dashboard (Phase 9B)
 - CSV import/export of codes, bulk code generation, bulk cost import and bulk tools (Phase 10)
 - split/mixed payments, receipts/invoices, returns/exchanges, discounts, GST/tax, customer data
+- GST/tax reports, scheduled or e-mailed reports, combined online + in-store revenue reports, forecasting, multi-store
 - PDF output, print history, a label designer, direct printer drivers
 - in-browser camera scanning
 - REST/AJAX endpoints and shortcodes, and support for WooCommerce's block-based product editor
@@ -37,6 +38,7 @@ The plugin adds **no REST routes, AJAX handlers or shortcodes**. Its request han
 - the scan page of Phase 6, which requires a login and `pqbg_view_products` before it shows anything (see [Scan page](#scan-page)); since Phase 7 it also accepts POST (sell, undo) on code URLs from users with `pqbg_sell`, with a nonce and a signed form token (see [Mark as Sold](#mark-as-sold))
 - Phase 9A (see [Sales history](#sales-history)): the **In-store sales** screens (a wp-admin page, GET, `pqbg_view_all_sales`), the void POST (`admin-post.php`, nonce, `pqbg_void_sale`), the CSV download (`admin-post.php`, GET, nonce, `pqbg_view_all_sales`), and **My sales** at `/scan/my-sales/` (GET/HEAD, `pqbg_view_own_sales`)
 - Phase 9A cost price: two WooCommerce product-editor save actions for users with `pqbg_view_costs`, and filters that keep the cost out of WooCommerce's meta data, REST, exports and imports (see [Cost price](#cost-price))
+- Phase 9B (see [In-store reports](#in-store-reports)): the **In-store reports** page (a wp-admin page, GET, `pqbg_view_all_sales`; cost parts `pqbg_view_costs`), the report CSV (`admin-post.php?action=pqbg_report_csv`, GET/HEAD, nonce) and the end-of-day print page (`admin-post.php?action=pqbg_report_print`, GET/HEAD, nonce)
 
 ## QR codes and barcodes
 
@@ -670,6 +672,15 @@ Use two or three test products with codes, one with a price (to check the ₹ si
 
 Undo the test sales or leave them (they are real rows in `pqbg_sales` and cannot be deleted from the UI); restore the test products' stock afterwards.
 
+**Phase 9B checklist (reports and the owner dashboard).** Part of the pre-launch acceptance checklist in `progress.md`: do it once before launch, on a copy with a few days of real-looking sales (the Phase 9A checklist leaves some). No phone is needed.
+
+1. **Dashboard (laptop, as an administrator): WooCommerce → In-store reports** (right after In-store sales). With **Today**, check that Revenue, Sales, Items sold and Average sale match what you sold today (compare with **In-store sales** filtered to Today: the same completed total). Each card shows ↑/↓ % against the comparison period named under the dates ("Compared with … (up to HH:MM, the same point in time)"). Gross profit and Margin appear, with "Profit and margin leave out N sales … with an unknown cost" when some sales had no cost price. Try **This week** and **This month**.
+2. **Payment split and alerts:** "Paid by" lists Cash / UPI / Card / Other (and Not recorded, if any) with amounts that add up to the revenue. The alerts link to the low/out-of-stock items, the voids and the items without a QR code; open each link.
+3. **End of day and print:** open **End of day** (today). "Cash expected in drawer" = today's cash sales minus the cash amounts of earlier sales voided today. Void one of yesterday's cash sales (In-store sales → the sale → Void sale) and reload: the cash figure drops by that amount, and "Voided in this period by <you>" lists it. Click **Print**: a clean page opens; print it (or save as PDF) and check it fits A4 and ₹ shows correctly.
+4. **A CSV in Excel:** on **Products** (or any report) click **Export CSV** and open it in **Excel**: ₹ in the headers, Indian dates, the same rows as on screen, the Total row last.
+5. **Shop manager sees no profit:** log in as a Shop Manager and open **In-store reports**: no Profit & margin tab; no Gross profit or Margin card; no profit, margin or cost columns on any report; **Stock** has no "Value at cost"; the exported CSVs have no cost columns. Adding `&tab=profit` to the address gives "Sorry, you are not allowed to see costs and profit."
+6. **Stock and dead stock:** **Stock** lists the items that manage stock with their state and value; filter by a category and by Low stock. **Dead stock** (30 days) lists items in stock that have not sold, in store or online.
+
 ### Limitations
 
 - **The scan base URL must reach this site.** The route answers only on this site's own `/scan/` path. A base URL on another host needs that host to forward to this site, as the tunnel does.
@@ -999,6 +1010,91 @@ The first CSV version took 31 s for the same export (OFFSET chunks alone 23.6 s)
 - The seller filter lists everyone who has ever sold; a deleted seller appears by the name snapshot.
 - The history page's time is mostly wp-admin itself on this machine (0.7–1.1 s for an empty page, depending on load).
 
+## In-store reports
+
+Phase 9B: **WooCommerce → In-store reports** (`admin.php?page=pqbg-reports`), right after In-store sales, for `pqbg_view_all_sales` (Shop Manager, Administrator). Every view is a plain GET with its options in the URL (bookmarkable); nothing on these pages writes.
+
+### Counting rules (stated on every screen)
+
+- **In-store (scan) sales only.** Online orders are in WooCommerce → Analytics.
+- A "sale" is one row of `pqbg_sales`: one scanned item with its quantity. Sales = rows, items = sum of quantities, revenue = sum of `line_total`, average sale = revenue ÷ sales.
+- **Revenue, items and sales count completed sales only.** Voided and failed sales are never in revenue; they appear in Voids & failed, End of day, the dashboard alert and the sellers' void columns.
+- **Amounts are the sale's snapshots** (`line_total`, `unit_price`, `quantity`, `unit_cost`), never current prices (Stock and Dead stock excepted: they are about current stock).
+- **Profit** = `line_total − quantity × unit_cost`, only where the cost was known at the moment of sale. **Margin** = profit ÷ revenue *of the sales with a known cost*. Sales with an unknown cost are left out of cost, profit and margin (never counted as zero) and always disclosed ("N sales, ₹X with unknown cost").
+- **Days are site-timezone days** (Asia/Kolkata: a day starts at 18:30 UTC the day before); weeks start on Settings → General → "Week starts on". Every report filters on the **sale date**, like the sales history, so the totals reconcile with it.
+
+### Periods and comparison
+
+Presets: Today, Yesterday, This week, Last week, This month, Last month, Last 7 / 30 / 90 days, Last 12 months, and custom From/To (both inclusive, at most 1,830 days; swapped if reversed). The dashboard offers Today, This week, This month and custom. End of day defaults to today.
+
+The dashboard compares with the previous period **up to the same point in time**: today vs yesterday up to the same time of day; this week vs last week up to the same weekday and time; this month vs last month up to the same day and time, clamped to that month's length (on 31 March: the whole of February). Finished periods compare with the whole period before; last-N-days and custom ranges with the same number of days immediately before. The comparison dates are printed under the period. Changes are ↑/↓ % ("— nothing to compare with" when the previous value is 0); margin changes in percentage points.
+
+### Dashboard
+
+- Cards: revenue, sales, items sold, average sale, each with its change; for `pqbg_view_costs` also gross profit and margin, with the unknown-cost disclosure.
+- Paid by: Cash / UPI / Card / Other / Not recorded.
+- Sales over time (by hour for one day, by day up to 62 days, then by week or month).
+- Top 5 products and top sellers.
+- Alerts: low-stock and out-of-stock items (WooCommerce thresholds; published and private items), voided sales in the period, and active items without a QR code (linked to the Stock report's "without a QR code" list and to the Products list).
+
+### Reports
+
+| Report | What it shows |
+|---|---|
+| Sales over time | By hour (one day), day, week or month: sales, items, revenue, average, voided, failed; profit, margin and unknown cost for `pqbg_view_costs`. Chart: revenue per period. |
+| Products | **Best sellers** by item (each variation) or by product: items, revenue, share of revenue, sales, average; profit and margin for `pqbg_view_costs`. A deleted product appears from its latest name snapshot with "(deleted)". **Slow sellers**: every item in stock now, fewest sold in the period first (zero included). |
+| Categories | Current categories of each product (a variation counts under its product). A parent category includes its sub-categories, each product counted once there; a product in several categories counts fully in each, so category totals can add up to more than the total (the page says so, with the number of such products, and shows a "Total (each sale once)"). Deleted products form their own row. |
+| Sellers | Per seller (the name snapshot, "(deleted user)" when gone): sales, items, revenue, average, voided (and how many were undone by the seller), **void rate = voided ÷ (completed + voided)**, failed; profit for `pqbg_view_costs`. |
+| Peak times | Hour of day × day of week heatmap (site timezone) of sales count or revenue, the busiest three hours, the busiest day and the busiest hour; the numbers in a table. |
+| End of day | For a day (default today) or a range: per payment method sales, items, revenue, refunds of earlier sales and **net collected** ("Cash expected in drawer" for cash); per seller (who sold) per method; "Voided in this period by <user>" for the refunds; the voided sales of the period and the earlier sales voided in it. **Net collected = revenue of the period's completed sales − the amounts of EARLIER sales voided in the period**, assuming refunds are paid back in the original payment method (stated on screen). A sale made and voided in the same period is already not in revenue, so it is never subtracted twice. **Print** opens a standalone, print-friendly page (A4). |
+| Profit & margin | `pqbg_view_costs` only: by period, item or category: revenue, revenue with a known cost, cost, profit, margin, unknown-cost sales and revenue. |
+| Voids & failed | Every voided and failed sale made in the period: sold at/by, voided at/by, reason ("Undone by the seller"), returned to stock (Yes / No / Yes (undo) / Not recorded), failure code; counts per seller and per failure code. |
+| Stock | Items that manage their own stock (published, private, draft, pending): simple products, variations with their own stock, and variable products with product-level stock (one line, shared by its variations). Stock, state (WooCommerce's out-of-stock threshold and low-stock amount: the item's, else its parent's, else the store's), price, value at price; cost and value at cost for `pqbg_view_costs`. Shared stock is valued only when all its variations have the same price (and cost); below-zero stock is valued at 0; items left out of a value are disclosed. Filters: category (with sub-categories), low, out, in stock, below zero, **active items without a QR code**. |
+| Dead stock | Items in stock with no sale in the last 30 / 60 / 90 days, or never sold. **Counts in-store sales and online orders (processing, completed, on hold)**, so an item that sells online is not dead (decision D4). Items added less than the window ago are not called dead (they are counted as new); the never-sold list shows every item's age. |
+
+### Charts
+
+Server-rendered inline SVG (`ReportChart`), no JavaScript and no library: columns with a 4 px rounded data end, horizontal bars, a heatmap on a one-hue blue ramp; losses in red. Each chart has `role="img"`, a title and a description; every mark is focusable with its own tooltip (`<title>`); the same numbers are always in a table. Cost charts are never built for users without `pqbg_view_costs`.
+
+### CSV
+
+**Export CSV** on every report: `admin-post.php?action=pqbg_report_csv&_wpnonce=…&{the report's options}`, GET/HEAD, `pqbg_view_all_sales` (cost columns and the profit report `pqbg_view_costs`; refused with 403 otherwise). The same rows and columns as the screen, in its order, not paged, with the totals row last. The Phase 9A rules: UTF-8 with a byte order mark, dates in the site timezone, plain decimals, formula injection neutralised (`SalesExport::put()`), streamed, `nosniff`, `no-store`. File name `in-store-report-{report}-{from}[-to-{to}].csv` (stock reports: today's date).
+
+### Print page
+
+`admin-post.php?action=pqbg_report_print` (GET/HEAD, nonce, `pqbg_view_all_sales`): a standalone document (no wp-admin chrome, no `wp_head()`), `assets/pqbg-report-print.css` and the Phase 8 `assets/pqbg-print.js` (the Print button; Ctrl+P works without it). Headers: `ScanRoute::security_headers()` with `Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`.
+
+### Classes
+
+`ReportPeriod` (presets, comparison, buckets), `ReportsQuery` (read-only aggregates over `pqbg_sales`; time buckets with `INTERVAL()` over the sale's Unix time and local boundaries computed in PHP, the peak grid from 15-minute UTC slots mapped in PHP, so any timezone is exact), `StockQuery` (stock holders, dead stock, online last sale, missing codes; costs only through `CostPrice::get_many()`), `ReportData` (one dataset per report for the screen, CSV and print), `ReportsAdmin` (menu, tabs, screens, permission gates), `ReportTable` (`WP_List_Table`), `ReportChart`, `ReportsExport`, `ReportPrint` and `templates/pqbg-report-print.php`. No caching of results.
+
+### Performance (dev machine)
+
+Measured by the Phase 9B suite in-process (best of 3, object cache flushed) and over HTTP, with 1,000 sellable items. **Realistic volume, 5,000 sales over 90 days (~55 a day): the dashboard and every report meet the targets (under 1 s for 90 days, under 2 s for 12 months).** At the stress volume of the Phase 9A dataset, **50,000 sales in 90 days (~550 a day), the dashboard misses the 1 s target for 90 days** (about 1.4–1.55 s in-process with the machine under load; every other report under about 1 s; everything under 2 s for both ranges, which the suite asserts as a regression guard). Both ranges contain the same rows, so 90 days and 12 months cost about the same.
+
+Final run (2026-09-26, in-process, best of 3):
+
+| Measurement | 5,000 sales, 90 days | 5,000 sales, 12 months | 50,000 sales, 90 days | 50,000 sales, 12 months |
+|---|---|---|---|---|
+| Dashboard | 205 ms | 204 ms | **1,499 ms** | 1,374 ms |
+| Sales over time / categories / sellers / peak / end of day / voids | 39–79 ms | 49–162 ms | 301–632 ms | 317–509 ms |
+| Products / profit (by item) | 296 / 314 ms | 529 / 337 ms | 582 / 609 ms | 570 / 571 ms |
+| Slow sellers / stock / dead stock (1,000 items) | 344 / 326 / 144 ms | 386 / 484 / 278 ms | 962 / 534 / 564 ms | 690 / 325 / 434 ms |
+| Target | under 1 s: **met** | under 2 s: **met** | under 1 s: **dashboard not met** | under 2 s: met |
+
+Over HTTP at 50,000 sales (median of 3), an empty wp-admin page took 800 ms and the report pages added −70 to +870 ms (the dashboard +690 ms, products +870 ms).
+
+Why, and what was measured: grouping 50,000 rows costs 350–450 ms per query in MariaDB 10.4 (a temporary table), and the dashboard needs two such scans (the period with its payment split, chart and sellers in one; the top products in the other) plus the stock counts. PHP overhead was removed first (amounts summed once, meta read by key, costs in one query). A covering index `(created_at_gmt, status, payment_method, seller_id, product_id, variation_id, quantity, line_total, unit_cost)` was measured on a temporary copy: products and peak times about 40 % faster, the dashboard scan unchanged, +0.4 ms per sale insert, 14 s to build per 50,000 rows: **not added**. A daily roll-up table or a permission-keyed result cache would meet the target; they are deferred (see the Phase 11 open item in `progress.md`) and the sale path is unchanged.
+
+### Limitations
+
+- Categories are the products' current categories (sales do not snapshot them); a deleted product has none.
+- Stock and dead stock use current stock, prices and costs; the value of shared stock with mixed prices or costs is not computed (disclosed).
+- The refund assumption of End of day (refunds in the original payment method) is stated, not recorded; split payments and partial refunds do not exist.
+- Voids before schema v4 show "Returned to stock: Not recorded" (an old undo: "Yes (undo)").
+- Online orders are read only for dead stock; there is no combined online + in-store revenue report.
+- The dashboard's 90-day target is not met at 50,000 sales in 90 days (above).
+
 ## Requirements
 
 | | Minimum | Tested |
@@ -1067,8 +1163,9 @@ Main columns:
 - void fields (`void_reason`, `voided_by`, `voided_at_gmt`), `note`, `created_at_gmt`
 - **schema v2 (Phase 7):** `stock_holder_id` (the product whose stock the sale changed: the parent when a variation uses parent-level stock; undo restores exactly this one) and `failure_code` (`sold_online`, `error`, `interrupted`)
 - **schema v3 (Phase 9A):** `payment_method` varchar(20) (`cash`, `upi`, `card`, `other`; NULL = not recorded), `unit_cost` decimal(26,8) (the effective cost price at the moment of sale; NULL = unknown), `seller_name` varchar(250) (the seller's display name at the moment of sale). All three are NULL on older rows and are written in the pending row.
+- **schema v4 (Phase 9B):** `void_restock` tinyint(1): whether a void returned the quantity to stock (1: a void with "Return to stock", or an undo; 0: a void without). NULL for sales that were never voided and for voids recorded before v4 (shown as "Not recorded", or "Yes (undo)" for an old undo).
 
-Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`, `status_created`, `created_at_gmt`, `order_id`, (v2) `holder_status (stock_holder_id,status)` and (v3) `method_created (payment_method,created_at_gmt)`.
+Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`, `status_created`, `created_at_gmt`, `order_id`, (v2) `holder_status (stock_holder_id,status)` and (v3) `method_created (payment_method,created_at_gmt)`. Schema v4 added no index (a covering index for the reports was measured and rejected; see [In-store reports](#in-store-reports)).
 
 **Rules (Phase 7):**
 
@@ -1081,7 +1178,7 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 
 | Option | Autoload | Purpose |
 |---|---|---|
-| `pqbg_db_version` | yes | integer schema version (currently `3`) |
+| `pqbg_db_version` | yes | integer schema version (currently `4`) |
 | `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`, `payment_methods`); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 | `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
@@ -1114,6 +1211,7 @@ Migrations never drop tables or delete rows.
 | 1 | `migrate_1`: the `pqbg_codes` and `pqbg_sales` tables, and the optional CHECK constraint |
 | 2 | `migrate_2` (Phase 7): adds `pqbg_sales.stock_holder_id`, `pqbg_sales.failure_code` and the `holder_status` index. Additive (dbDelta): existing rows keep their values and get NULL; re-running changes nothing. |
 | 3 | `migrate_3` (Phase 9A): adds `pqbg_sales.payment_method`, `pqbg_sales.unit_cost`, `pqbg_sales.seller_name` and the `method_created` index. Additive (dbDelta): existing rows keep their values and get NULL ("Not recorded" / unknown cost); re-running changes nothing. `install()` then syncs roles, which grants the new `pqbg_view_costs` to administrators. |
+| 4 | `migrate_4` (Phase 9B): adds `pqbg_sales.void_restock`. Additive (dbDelta): existing rows get NULL ("not recorded"); re-running changes nothing. |
 
 **The install lock** is an atomic `INSERT IGNORE` row in the options table. `add_option()` is not used because it runs `INSERT … ON DUPLICATE KEY UPDATE` and is therefore not atomic.
 The lock expires after 5 minutes, so a crashed request cannot block upgrades permanently.
@@ -1152,11 +1250,12 @@ WooCommerce only lets Shop Managers assign the `customer` role, so only Administ
 - `CodeRepository` does not check capabilities itself. Callers must check `Permissions::can_manage_codes()` first.
 - Phase 7 mapping: selling and undo need `pqbg_sell` (undo also: own sale, 10 minutes); the sale page needs `can_view_sale()`; `SaleService::void_sale()` needs `pqbg_void_sale`. No new capability was added.
 - Phase 9A mapping: the In-store sales history, sale detail and CSV need `pqbg_view_all_sales`; the void screen and handler `pqbg_void_sale`; My sales `pqbg_view_own_sales` (after the scan page's `pqbg_view_products` gate); cost fields, cost and profit `pqbg_view_costs` (new, administrators only).
+- Phase 9B mapping: In-store reports, their CSVs and the end-of-day print page need `pqbg_view_all_sales`; the Profit & margin report and every cost, profit, margin and value-at-cost card, column, chart or CSV column need `pqbg_view_costs`. For other users they are not built at all, and asking for them (the profit tab or CSV, sorting by a cost column) is refused with 403. No new capability.
 
 ## HPOS
 
 The plugin declares compatibility with the `custom_order_tables` feature through `FeaturesUtil::declare_compatibility()` on `before_woocommerce_init`.
-It never reads, creates or writes orders or the legacy order tables. Sales go to `pqbg_sales` only.
+It never creates or writes orders. Sales go to `pqbg_sales` only. Since Phase 9B, the **dead stock** report *reads* order line items (`woocommerce_order_items` / `woocommerce_order_itemmeta`) joined to the table `OrderUtil::get_table_for_orders()` names (the HPOS `wc_orders` table here, or posts), for orders that are processing, completed or on hold, so an item that sells online is not called dead. Nothing else reads orders.
 
 ## Deactivation
 
@@ -1182,4 +1281,4 @@ This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_v
 - WooCommerce "Coming Soon" mode is on for the whole site. The scan page works with it (see [WooCommerce Coming Soon](#woocommerce-coming-soon)). Logged-out staff log in through `wp-login.php`, because Coming Soon hides the My Account login form.
 - Scan URLs need pretty permalinks (see [Permalinks](#permalinks)).
 - Mail is not configured on this local XAMPP, so the low/no-stock e-mails sent after scan sales fail locally (about 2 s each, after the stock lock is released). Configure mail on the production server.
-- Scan sales are not in WooCommerce reports or Analytics. Use `pqbg_sales` (Phase 9 adds the history UI).
+- Scan sales are not in WooCommerce reports or Analytics: use **In-store sales** (history) and **In-store reports** (Phase 9B). Online orders are only in WooCommerce Analytics; there is no combined report yet.

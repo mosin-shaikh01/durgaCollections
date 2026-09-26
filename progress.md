@@ -22,7 +22,7 @@ Repo: https://github.com/mosin-shaikh01/durgaCollections
 | Active plugins | classic-editor, woocommerce, product-qrcode-barcode-generator (Product QR Code and Barcode Generator; installed in Phase 2 under its former name) |
 | Admin user | Dev-admin |
 
-_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, and on 2026-09-25 at the start of Phases 6, 7, 8 and 9A. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
+_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, on 2026-09-25 at the start of Phases 6, 7, 8 and 9A, and on 2026-09-26 at the start of Phase 9B. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
 
 ---
 
@@ -37,7 +37,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 6 was committed as `381a909` ("Phase 6: scan route and mobile product screen (access control, status matrix, entry box)") and pushed to `origin/main`, with the user's approval after their phone test (normal fast-forward, no force).
 - Phase 7 was committed as `2413698` ("Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2)") and pushed to `origin/main`, with the user's approval after their phone test (normal fast-forward, no force).
 - Phase 8 was committed as `753613c` ("Phase 8: label printing (A4 sheet and thermal layouts, QR minimum size, render cache, print page) and the Action Scheduler test-leak fix") and pushed to `origin/main`, with the user's approval, before their printer test (normal fast-forward, no force).
-- Phase 9A was committed as a single commit ("Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3)"; this commit, see `git log`) and pushed to `origin/main`, with the user's approval on the automated tests, before their manual test (normal fast-forward, no force).
+- Phase 9A was committed as a single commit as `5495b05` ("Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3)") and pushed to `origin/main`, with the user's approval on the automated tests, before their manual test (normal fast-forward, no force).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -51,6 +51,9 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `5495b05` | Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3) |
+| `6c6dbc8` | Record Phase 8 printer-test open item (Phase 8: label printing, presets, QR min-size fitting, print page, SVG cache, AS leak fix) |
+| `2861b15` | Record Phase 8 commit and push in progress log |
 | `753613c` | Phase 8: label printing (A4 sheet and thermal layouts, QR minimum size, render cache, print page) and the Action Scheduler test-leak fix |
 | `647424c` | Record Phase 7 commit and push in progress log |
 | `2413698` | Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2) |
@@ -98,8 +101,18 @@ every other plugin stays ignored. For a future custom theme the pattern is:
 ### Open items
 - [x] Permalinks set to `/%postname%/` (verified 2026-09-24)
 - [ ] Decide on theme approach — customize twentytwentyfive, use a child theme, or build custom
-- [ ] **Must be done BEFORE printing real labels (i.e. before production launch):** Phase 8 physical printer test pending: print on plain paper and on the actual label stock, check size/alignment (use the printer offset if needed), check ₹ and text, and scan several labels with a phone. (No printer was available on 2026-09-25; Phase 8 was approved on the automated print verification. Steps: the "Phase 8 checklist" in the plugin README.)
-- [ ] **Must be done BEFORE launch:** Phase 9A manual test pending: sell with each payment method (required, none pre-selected), check My sales on the phone, set a cost price, check history/totals/profit as admin, confirm a shop manager sees no cost anywhere, void a sale with a reason, and open the CSV export in Excel. (Phase 9A was approved on the automated tests on 2026-09-26. Steps: the "Phase 9A checklist" in the plugin README.)
+- [ ] The manual checks that must pass before launch are in the **Pre-launch acceptance checklist** below (Phase 8 printer test, Phase 9A and Phase 9B manual checks).
+- [ ] The user's label stock → possibly a new default print preset (A4 3 × 7 until then).
+- [ ] **Phase 11 (hardening):** the reconciliation check and the concurrency-test items from Phase 7.
+- [ ] **Phase 11 (performance):** If the dashboard exceeds 2 s on real data, or in-store sales exceed ~300/day, implement a daily roll-up table (option B) or a permission-keyed result cache (option C). Do not change the sale path for this before then. (Phase 9B measured the dashboard at about 1.4–1.55 s for 90 days with 50,000 sales in 90 days; every report meets the 1 s / 2 s targets at 5,000 sales in 90 days. See the Phase 9B section.)
+
+### Pre-launch acceptance checklist
+
+All pending. Each item must pass before production launch; the detailed steps are in the plugin README. Per-phase manual tests are no longer asked for at the end of each phase (see the next-session instructions).
+
+- [ ] **Phase 8 physical printer test** (must be done before printing real labels): print on plain paper and on the actual label stock, check size/alignment (use the printer offset if needed), check ₹ and text, and scan several labels with a phone. No printer was available on 2026-09-25; Phase 8 was approved on the automated print verification. Steps: the "Phase 8 checklist" in the plugin README.
+- [ ] **Phase 9A manual test:** sell with each payment method (required, none pre-selected), check My sales on the phone, set a cost price, check history/totals/profit as admin, confirm a shop manager sees no cost anywhere, void a sale with a reason, and open the CSV export in Excel. Phase 9A was approved on the automated tests on 2026-09-26. Steps: the "Phase 9A checklist" in the plugin README.
+- [ ] **Phase 9B manual checks:** the dashboard figures look right (against In-store sales for the same day), the end-of-day "Cash expected in drawer" and its print page, a report CSV opened in Excel, and a shop manager sees no profit, margin or cost anywhere in the reports. Steps: the "Phase 9B checklist" in the plugin README.
 
 ### Backlog
 _To be filled in — site structure, pages, content, plugins._
@@ -122,9 +135,10 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **6** | **Scan/product screen** | **Done 2026-09-25. Committed `381a909`, pushed.** |
 | **7** | **Mark sold + sales** | **Done 2026-09-25. Committed `2413698`, pushed.** |
 | **8** | **Printing** | **Done 2026-09-25. Committed `753613c`, pushed.** |
-| **9A** | **Sales history, payment method & cost price** | **Done 2026-09-26. Approved on the automated tests; committed as a single commit and pushed. Manual test pending (open item).** |
-| 9B | Reports & owner dashboard | Next. Not started |
-| 10 → 12 | bulk/CSV → hardening/performance → QA/documentation | Not started |
+| **9A** | **Sales history, payment method & cost price** | **Done 2026-09-26. Approved on the automated tests; committed `5495b05`, pushed. Manual check pending (pre-launch acceptance checklist).** |
+| **9B** | **Reports & owner dashboard** | **Implemented and tested 2026-09-26; waiting for the user's approval. Not committed.** Two commits after approval: the Phase 7 race fix, then Phase 9B. Manual checks in the pre-launch acceptance checklist. |
+| 10 | Bulk / CSV tools | Next. Not started |
+| 11 → 12 | hardening/performance → QA/documentation | Not started |
 
 > **Pre-rename records.**
 >
@@ -1371,7 +1385,7 @@ The live site migrated on its first request after the change; it had 0 sales row
 
 ### Phase 9A: Sales history, payment method & cost price (2026-09-25 → 2026-09-26)
 
-**Status:** implemented and tested. **Approved by the user on 2026-09-26 on the automated tests** (the manual test is NOT done yet: it is an open item, to be done before launch), then committed as a single commit, "Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3)", and pushed to `origin/main` with a normal push (no force); the hash is in the session report and `git log`. The plugin stays active; the live site migrated to schema v3 with 0 sales rows.
+**Status:** implemented and tested. **Approved by the user on 2026-09-26 on the automated tests** (the manual test is NOT done yet: it is an open item, to be done before launch), then committed as a single commit, `5495b05` ("Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3)"), and pushed to `origin/main` with a normal push (no force). The plugin stays active; the live site migrated to schema v3 with 0 sales rows.
 
 **Environment:** re-verified at the start, with no differences: WP 7.1.2, WC 11.1.2 (HPOS on), PHP 8.5.6 ZTS, MariaDB 10.4.32; 0 codes, 0 sales, 0 products, 0 orders, 1 user; DB_VERSION 2; Asia/Kolkata; INR, 2 decimals; Coming Soon on; `WP_ENVIRONMENT_TYPE` unset (tests use `PQBG_TESTS_ALLOW_PRODUCTION=1`). `HEAD` = `origin/main` = `6c6dbc8`, clean.
 
@@ -1467,11 +1481,114 @@ A covering index for the totals (`status, created_at_gmt, payment_method, quanti
 - **Pre-commit run** (2026-09-26 12:08–12:24): **ALL PASSED, 1,388 checks, 0 failed, 0 skipped; AS guard PASS for every suite**; crash count **139 before and after** (same Apache processes). Same per-suite counts as the final run above; timings in line with it (list this month 16 ms, 90-day totals 221 ms, HTTP history 537–757 ms with wp-admin alone at 689 ms, CSV of 50,018 rows 3.1 s over HTTP). The site is clean afterwards.
 - **Approved** by the user on the automated tests; committed and pushed (see Status).
 
-**Next phase (not started):** Phase 9B, Reports & owner dashboard. **The production domain is still not final** and the Phase 8 printer test is still open.
+**Next phase (not started):** Phase 9B, Reports & owner dashboard (since done; see below). **The production domain is still not final** and the Phase 8 printer test is still open.
+
+### Phase 9B: Reports & owner dashboard (2026-09-26)
+
+**Status:** implemented and tested; **NOT committed, waiting for the user's approval.** After approval: two commits, first the Phase 7 race fix ("Fix Phase 7 idempotency race: duplicate request mid-sale reported failed": the `SaleService` change, its comment correction and the new deterministic Phase 7 checks), then Phase 9B. The plugin stays active; the live site migrated to schema v4 with 0 sales rows.
+
+**Environment:** re-verified at the start, with no differences: WP 7.1.2, WC 11.1.2 (HPOS on, sync off), PHP 8.5.6 ZTS, MariaDB 10.4.32; 0 codes, 0 sales, 0 products, 0 orders, 1 user; DB_VERSION 3; Asia/Kolkata, week starts Monday; INR, 2 decimals; Coming Soon on; WooCommerce Analytics on with scheduled import (12-hour lookup-table lag); low-stock threshold 2, out-of-stock 0. `HEAD` = `origin/main` = `5495b05`, clean.
+
+**Database backup:** `C:\xampp\backups\sharayu\sharayu-20260926-123420-before-phase9b.sql` (1.7 MB, 53 tables, "Dump completed"), outside the web root and the repository.
+
+**Windows crash count** (`httpd.exe`, Event ID 1000): **139 before and after every run** in this phase (baseline, Phase 7 re-runs, 9B development runs, profiling, the final 9B run and the final full run). No Apache restarts (PIDs 220 and 14284 throughout).
+
+**Baseline before any change** (decoder, print-check and WXR importer from the session scratchpad): **1,387 passed, 1 failed, 0 skipped**, AS guard PASS for every suite. The failure was genuine, not a crash: Phase 7 "the same request_id from 4 processes at once → all get the same completed sale" got one "failed" with the row still pending. Cause: `SaleService::sell()` checked for an existing request *before* taking the stock lock and, finding the winning process's row still pending, `outcome()` treated it as a dead process. Data was right (one row, one decrement); the duplicate's answer was wrong. Phase 7 alone passed 209/209 on a re-run (intermittent).
+
+**Approved plan:** D1–D15 as recommended (D1 WooCommerce → In-store reports after In-store sales; D2 comparison to the same point in time; D3 categories counted in each category with sub-categories rolled up once, deleted products in their own row; D4 dead stock reads online order line items, read-only, HPOS-safe; D5 migration 4 `void_restock`; D6 fix the Phase 7 race now; D7 no index, no persistent cache, stop if a target is missed; D8 in-process timing asserts; D9 no new capability, cost requests 403; D10 the no-code alert links to the Stock report's list; D11 new items are not dead; D12 shared stock valued only with one price/cost; D13 voids by sale date plus "voided today, sold earlier"; D14 presets; D15 the false-by-design updates). The user's additions: **the D6 fix as a separate commit before Phase 9B**, and **"Cash expected in drawer" / net collected** on the end of day (per method, per seller who sold, "Voided today by <user>", in the print page and the CSV).
+
+**Performance decision (2026-09-26, after the D7 stop):** the dashboard missed "under 1 s for 90 days" at 50,000 sales in 90 days. The user chose option A: accept and document; keep the 50,000-sale checks as a 2 s regression guard; add a realistic-volume check (5,000 sales over 90 days) held to the original targets; record the miss here and in the README; add the Phase 11 open item (roll-up table or permission-keyed result cache if the dashboard exceeds 2 s on real data or sales exceed ~300/day; do not change the sale path before then). Options B (roll-up), C (result cache) and D (covering index) were **not** implemented.
+
+**Design:**
+- **Counting rules** (on every screen): in-store sales only; a sale is one row; revenue/items/sales count completed rows only; amounts are the snapshots; profit only where `unit_cost` is known, margin = profit ÷ revenue with a known cost, unknown cost always disclosed and never zero; site-timezone days; everything by sale date (reconciles with the history).
+- `ReportPeriod` (presets, comparison, buckets), `ReportsQuery` (read-only aggregates: `INTERVAL()` buckets over the sale's Unix time with local boundaries from PHP; the peak grid from 15-minute UTC slots mapped in PHP; one scan for the dashboard's cards, payment split, chart, voids and top sellers), `StockQuery` (stock holders, dead stock, online last sale, missing codes), `ReportData` (one dataset per report, shared by the screen, the CSV and the print page), `ReportsAdmin` (menu, tabs, screens, the cost-refusal gate in `load-`), `ReportTable` (`WP_List_Table`), `ReportChart` (inline SVG, no JavaScript), `ReportsExport` (CSV), `ReportPrint` + `templates/pqbg-report-print.php` (standalone print page with the Phase 8 approach and a strict CSP), `assets/pqbg-reports.css`, `assets/pqbg-report-print.css`.
+- `CostPrice::get_many()` (costs of many items in one query, the same values as `get()`); `SalesExport::put()` made public (shared CSV writer).
+- **Schema v4** (`migrate_4`, additive): `pqbg_sales.void_restock tinyint(1) NULL`; `SaleService::void_fields()` writes 1 for a restocking void or an undo, 0 for a void without restock (`SaleRepository` allows the column in the stock statement).
+- **D6 fix:** in `SaleService::sell()`, an existing row that is still `pending` (same seller, known stock holder) is re-read after waiting for the holder's lock; the `outcome()` comment now says why a pending row there can only be a dead process.
+- Hooks: only `admin_menu`, `admin_enqueue_scripts`, the page's `load-` hook and two `admin_post_` handlers (CSV, print), admin requests only. No REST/AJAX/nopriv/shortcode, no new capability, no cache.
+
+**Files created** (plugin-relative): `includes/ReportPeriod.php`, `ReportsQuery.php`, `StockQuery.php`, `ReportData.php`, `ReportsAdmin.php`, `ReportTable.php`, `ReportChart.php`, `ReportsExport.php`, `ReportPrint.php`; `templates/pqbg-report-print.php`; `assets/pqbg-reports.css`, `assets/pqbg-report-print.css`; `tests/phase9b-reports.php`.
+
+**Files modified:** `includes/SaleService.php` (D6 fix; `void_restock`), `SaleRepository.php`, `Schema.php`, `Install.php` (v4), `CostPrice.php` (`get_many()`), `SalesExport.php` (`put()` public), `Plugin.php` (wiring, after the class files existed); `tests/run.php`, `tests/phase2-main.php`, `tests/phase7-sales.php` (D6 checks and the `finish` worker; v4 fixture; the `ReportsQuery` scope allowance), `tests/phase9a-sales-history.php` (v4-aware checks), `tests/README.md`; `README.md` (plugin); `progress.md`.
+
+**Tests.** `php tests/run.php` with `PQBG_TESTS_ALLOW_PRODUCTION=1`, `PQBG_DECODER`, `PQBG_PRINTCHECK` and `PQBG_WXR_IMPORTER` (all from the session scratchpad). **Final Phase 9B suite run** (2026-09-26 17:05–17:17): **ALL PASSED, 148 checks, 0 failed; AS guard PASS**; crash count 139 before and after. **Final full run (2026-09-26 17:18, interrupted):** Claude Code stopped the runner because the machine ran critically low on memory (about 0.8 GB free of 8 GB, with other applications open) while the Phase 9B suite was in its cleanup; it was not a test failure and there was no Apache crash (139 before and after, the same processes). Every earlier suite had finished: Phases 2–6, 8 and 9A all passed; **Phase 7 had 212 passed, 1 failed**, a check made false by design by schema v4 and missed in the earlier updates ("pqbg_sales has stock_holder_id and failure_code, appended after every v1 column" expected 30 columns; there are now 31). It is fixed (31 columns) and passed in the final suite-by-suite run below. The interrupted cleanup left test data, which was listed, verified as that run's only (products "PQBG 9B …" with IDs 12680–13341, all 1,017 codes (the site had none), 5 `pqbg9b_*` users, 14 "PQBG9B" categories, 4 cost rows on those products, 1,096 lookup jobs of those products and 8 orphaned log rows of four of them) and removed; the site is back to its clean state (0 codes, 0 sales, 0 products, 0 orders, 1 user, no cost meta, no orphans, options unchanged). A suite-by-suite re-run followed (below).
+
+**Final regression, suite by suite** (2026-09-26 22:49–23:18, after the user approved a re-run). Free memory was already 1,462 MB (below the agreed 1.5 GB threshold) before starting, so, as instructed, each suite ran on its own through `run.php` (with the AS guard), one at a time. **All 11 suites passed: 1,540 checks, 0 failed, 0 skipped; AS guard PASS for every suite; crash count 139 before and after every suite** (the same Apache processes). Free memory stayed between 1.0 and 1.6 GB.
+
+| Suite | Result | Free memory before → after |
+|---|---|---|
+| phase2-main | 83/83, AS guard PASS | 1,469 → 1,487 MB |
+| phase2-lifecycle | 17/17, AS guard PASS | 1,483 → 1,486 MB |
+| phase2-no-woocommerce | 12/12, AS guard PASS | 1,491 → 1,490 MB |
+| phase3-codes | 110/110, AS guard PASS | 1,481 → 1,469 MB |
+| phase4-rendering | 165/165, AS guard PASS | 1,459 → 1,142 MB |
+| phase5-admin | 158/158, AS guard PASS | 1,159 → 1,609 MB |
+| phase6-scan | 214/214, AS guard PASS | 1,482 → 1,286 MB |
+| phase7-sales | 213/213, AS guard PASS (with the 31-column fix) | 1,269 → 1,491 MB |
+| phase8-printing | 167/167, AS guard PASS | 1,498 → 1,402 MB |
+| phase9a-sales-history | 253/253, AS guard PASS | 1,296 → 1,284 MB |
+| **phase9b-reports** | **148/148, AS guard PASS** | 1,247 → 1,398 MB |
+
+**The race-fix checks, 5 runs in a row** (the whole Phase 7 suite each time, 23:18–23:35): 213/213 every time; the 4-process duplicate check passed every time; the deterministic duplicate waited 1.51 / 1.52 / 1.52 / 1.52 / 1.52 s for the lock and got "completed" every time; AS guard PASS; crash count 139 throughout.
+
+**Evidence for the report** (scratchpad script, everything it created removed afterwards): on 5,000 marked sales over 90 days, every report total (dashboard cards and payment split; the sums of the rows of sales over time, products, sellers, the 168 peak cells; the categories' "each sale once" total; the end-of-day total; the profit total; the voids list) equals the Phase 9A history totals (`SalesQuery::totals()`) for the last 90 days (revenue 24,152,456.00, 4,541 sales, 9,072 items, profit 6,730,952.40, 1,345 sales with unknown cost, 279 voided, 180 failed) and for the last 7 days. A shop manager over real HTTP: every tab 200 with no cost term, no planted cost value and no cost column in any CSV; the print page has none; the profit tab, the profit CSV (even with an administrator's link), sorting by profit and sorting by value at cost all get 403 (the administrator gets 200 and sees them).
+
+**Backups:** `sharayu-20260926-123420-before-phase9b.sql` (start of the phase) and `sharayu-20260926-224829-before-phase9b-final-regression.sql` (927,358 bytes, 53 tables, complete; smaller because WordPress had deleted 14 expired core transients, the dashboard news feeds, events and translations list, about 800 KB). The commit-1 patch is saved as `C:\xampp\backups\sharayu\phase7-race-fix.patch` (6,027 bytes; applies cleanly to `5495b05`); the final report as `C:\xampp\backups\sharayu\phase9b-final-report.txt`.
+
+**D6 verification:** the new deterministic check fails on the pre-fix `SaleService` ("waited 0.00 s; failed") and passes with the fix (waited ~1.5 s for the lock, then the same completed sale).
+
+**Phase 9B suite coverage:** schema v4 and `migrate_4` on a temporary prefix, the flag from real voids and an undo; periods (presets identical to the history's except "This month" running to the end of today, comparison to the same point in time, 31 March vs February in 2024 and 2026, 30/31 May, week start from Settings, buckets); every counting rule on a fixed week (10–16 March 2025) with hand-computed values (₹1,880 completed from 8 sales and 12 items; profit 170 on a known revenue of 1,300, margin 13.1 %; 4 sales / ₹580 with unknown cost; per method, day, item, product, category, seller) reconciled with the Phase 9A totals; 18:29:59 / 18:30:00 UTC boundaries for day, week, month, hour, the peak grid and the end of day; the end of day of 15 April 2025 (cash 1,490 − 1,000 refund = ₹490 expected; UPI −100; the same-day void not subtracted twice; per seller; "voided today by"; the CSV); stock values and thresholds (₹4,740 at price, ₹6,628.25 at cost with 4 uncosted items disclosed); missing codes; dead stock with five real WooCommerce orders; slow sellers; CSV rules; SVG charts; every tab, CSV and the print page over HTTP for five roles (no cost anywhere for the shop manager, 403 on cost requests); escaping; print headers and CSP; GET/HEAD never write; performance; scope; cleanup.
+
+**Timings, final 9B run** (in-process, best of 3, object cache flushed; 1,000 sellable items; the suite removed the 1,098 WooCommerce lookup jobs of its own products first):
+
+| | 5,000 sales, 90 days | 5,000 sales, 12 months | 50,000 sales, 90 days | 50,000 sales, 12 months |
+|---|---|---|---|---|
+| Dashboard | 205 ms | 204 ms | **1,499 ms** | 1,374 ms |
+| Sales over time | 39 ms | 49 ms | 375 ms | 406 ms |
+| Products | 296 ms | 529 ms | 582 ms | 570 ms |
+| Categories | 55 ms | 70 ms | 301 ms | 317 ms |
+| Sellers | 59 ms | 60 ms | 499 ms | 512 ms |
+| Peak times | 79 ms | 162 ms | 419 ms | 439 ms |
+| End of day (whole range) | 51 ms | 83 ms | 491 ms | 509 ms |
+| Profit (by item) | 314 ms | 337 ms | 609 ms | 571 ms |
+| Voids & failed | 40 ms | 50 ms | 632 ms | 394 ms |
+| Slow sellers | 344 ms | 386 ms | 962 ms | 690 ms |
+| Stock | 326 ms | 484 ms | 534 ms | 325 ms |
+| Dead stock | 144 ms | 278 ms | 564 ms | 434 ms |
+| **Target** | **< 1 s: met** | **< 2 s: met** | < 1 s: **dashboard not met** (guard < 2 s: met) | < 2 s: met |
+
+HTTP at 50,000 sales (median of 3): empty wp-admin page 800 ms; dashboard 1,489 / 1,477 ms (+690 / +678 ms over the empty page, 90 days / 12 months), products 1,665 / 1,427 ms, sellers 1,046 / 1,031 ms, peak 928 / 939 ms, sales 810 / 728 ms, profit 733 / 756 ms.
+
+EXPLAIN (50,000 rows): the period scan (status × method × seller) → table scan (the whole range), temporary; products (completed) → `status_created`; end of day for one day → `status_created` (353 rows); refunds of the day → `status_created` (voided rows, 3,054). No new index.
+
+**Why the dashboard misses at 50,000 sales, and what was measured:**
+- Grouping 50,000 rows costs 350–450 ms per query in MariaDB 10.4 (a temporary table); the dashboard needs two scans (the period, with payment split, chart and sellers; the top products) plus the stock counts. The comparison period is usually small.
+- PHP overhead removed first: `wc_get_price_decimals()` read once per request, amounts summed once and rounded at the end (was: rounded per row), stock meta read by key instead of priming every meta row of 1,070 posts, costs in one query (`CostPrice::get_many()`), the dashboard names only its top 5 products, the products report totals from its own rows, slow sellers without names. Dashboard at 90 days: 2.0 s → 1.4–1.5 s; products 1.3 → 0.6–0.9 s; slow sellers 1.9 → 1.0 s.
+- The planning probe ran 1.35–1.6× slower during this work than at planning (CPU 22–50 % busy with other applications); the early suite timings also ran during ~730 WooCommerce background jobs from the test's own product saves (now removed before timing).
+- `ORDER BY NULL` and index hints: no gain. A covering index `(created_at_gmt, status, payment_method, seller_id, product_id, variation_id, quantity, line_total, unit_cost)` on a temporary copy: products and peak about −40 %, the dashboard scan unchanged, +0.4 ms per sale insert, 14 s to build per 50,000 rows → not added (D7; the user's decision).
+
+**Problems found and fixed during development:**
+- The Phase 7 race (above, D6).
+- Line endings: the files edited in this session were written with CRLF; all were normalised to LF (as in the repository) before the final runs.
+- Test-suite fixes (not plugin bugs): the stock and dead-stock builds need no period; "This month" in the reports ends today (by design) while the history's ends at month end; the injection fixture's product ID 1 is not a product, so its name carries "(deleted)"; edit links need a logged-in user in-process; row orders depended on random product names; the "GET never writes" checksum counted every WordPress option (wp-admin writes transients) and now covers the pqbg options only.
+
+**Known limitations:** categories are the products' current ones; stock reports use current stock, prices and costs; shared stock with mixed prices or costs is not valued (disclosed); the end-of-day refund assumption (original payment method) is stated, not recorded; voids before v4 show "Not recorded"; online orders are read only for dead stock (no combined report); the dashboard's 90-day target is not met at 50,000 sales in 90 days (Phase 11 open item); no PHPCS run (not installed).
+
+**Manual checks:** not asked for in this phase; added to the **Pre-launch acceptance checklist** (dashboard figures, end-of-day print, a CSV in Excel, a shop manager sees no profit) with the steps in the plugin README ("Phase 9B checklist").
+
+**Next phase (not started):** Phase 10, Bulk / CSV tools. **The production domain is still not final** and the Phase 8 printer test is still open.
 
 ### Instructions for the next Claude session
 
 - Read this file and `wp-content/plugins/product-qrcode-barcode-generator/README.md` first. Re-verify the environment; don't trust these notes blindly.
+- **Per-phase manual tests are no longer required. Future phases add their manual checks to the Pre-launch acceptance checklist instead of asking the user to test per phase, unless the user's reviewer explicitly asks for an immediate manual test.**
+- **Reports rules** (Phase 9B):
+  - Read reports only through `ReportsQuery` (read-only aggregates over `pqbg_sales`), `StockQuery` (stock, dead stock, missing codes) and `ReportData` (the dataset shared by the screen, the CSV and the print page). Periods only through `ReportPeriod` (site-timezone days, week start from Settings, comparison "to the same point in time").
+  - Revenue counts completed sales only; profit only where `unit_cost` is known, margin = profit ÷ revenue with a known cost; unknown cost always disclosed; everything by sale date.
+  - Anything about cost, profit, margin or value at cost exists only for `pqbg_view_costs`: not built at all otherwise, and a request for it (profit tab/CSV, sorting by a cost column) is a 403. Costs in reports only through `CostPrice::get_many()`.
+  - Orders are only *read* (dead stock: order line items of processing, completed and on-hold orders through `OrderUtil::get_table_for_orders()`); never write orders.
+  - No result cache and no reports index yet; see the Phase 11 performance open item before adding either, and never change the sale path for reporting speed without that decision.
+  - `SaleService::void_fields()` records `void_restock` (schema v4) on every void and undo.
 - **Before running tests in a new session, take a database backup with mysqldump to a folder OUTSIDE the web root (never commit it) and record the file name in the session report.** Use `C:\xampp\backups\sharayu\` (outside `htdocs` and the repository), `C:\xampp\mysql\bin\mysqldump.exe --single-transaction --routines --triggers --default-character-set=utf8mb4`, with the credentials read from `wp-config.php` into a temporary `--defaults-extra-file` in the session scratchpad (never on the command line or in output), deleted afterwards. Check the file ends with "Dump completed". The first one: `sharayu-20260926-120456-before-phase9a-final.sql` (2026-09-26, Phase 9A).
 - **Current names:**
   - plugin "Product QR Code and Barcode Generator"
@@ -1483,7 +1600,7 @@ A covering index for the totals (`status, created_at_gmt, payment_method, quanti
   The `dpc_`/`DPC_`/`Durga\ProductCodes` names in the Phase 2 and Phase 3 sections are pre-rename history. Never reintroduce them.
 - Get codes only through `ProductCodeService::get_or_create()`. Don't call `CodeRepository::create_active()` with hand-made strings, and don't write to `pqbg_codes` directly.
 - Phases 4 and 5 are done. Build scan URLs only through `ScanUrl`, and render only through `QrRenderer`/`BarcodeRenderer`. Never reference the barcode library outside `BarcodeRenderer`, and keep the "barcodes disabled means the library is not loaded" guarantee.
-- **Report the Windows crash count** (`httpd.exe` Application Error events, Event ID 1000) before and after test runs. A crashed run is neither a pass nor a fail of plugin logic: re-run the suite. It was 139 on 2026-09-25 after Phase 8, and still 139 after every Phase 9A run.
+- **Report the Windows crash count** (`httpd.exe` Application Error events, Event ID 1000) before and after test runs. A crashed run is neither a pass nor a fail of plugin logic: re-run the suite. It was 139 on 2026-09-25 after Phase 8, and still 139 after every Phase 9A and Phase 9B run.
 - **In test suites, turn `wp_die()` into an exception** (`wp_die_handler` filter, as the Phase 9A suite does) before calling importers or other WordPress code in-process: `wp_die()` exits, and `finally` cleanup does not run on exit (see the Phase 9A notes).
 - **Run `php tests/run.php` before and after every phase** (see `tests/README.md`). Preferred: `define( 'WP_ENVIRONMENT_TYPE', 'local' );` in the local `wp-config.php`, which the user will add themselves; never edit or commit `wp-config.php`. The fallback is `PQBG_TESTS_ALLOW_PRODUCTION=1`. The round-trip checks need `npm ci` in `tests/decoder`, or `PQBG_DECODER` pointing to a copy outside the web root. Add each new phase's suite to `tests/` and to `run.php`.
 - **Exclude `tests/` and `build/` from any production deployment** (see "Production deployment" in the plugin README).
@@ -1492,14 +1609,15 @@ A covering index for the totals (`status, created_at_gmt, payment_method, quanti
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
 - **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25).
 - **Phase 8 (Printing) is done, approved, committed as `753613c` and pushed** (2026-09-25). **The physical printer test is NOT done** (no printer was available): it must be done before printing real labels / before production launch (see the Status open items).
-- **Phase 9A (Sales history, payment method & cost price) is done, approved on the automated tests, committed and pushed** (2026-09-26; see `git log`). **Its manual test is NOT done** (the "Phase 9A checklist" in the plugin README): it must be done before launch (see the Status open items). **Phase 9B (Reports & owner dashboard) is next.**
+- **Phase 9A (Sales history, payment method & cost price) is done, approved on the automated tests, committed as `5495b05` and pushed** (2026-09-26). **Its manual check is NOT done** (the "Phase 9A checklist" in the plugin README): it is in the pre-launch acceptance checklist.
+- **Phase 9B (Reports & owner dashboard) is implemented and tested, NOT committed** (2026-09-26; waiting for the user's approval; then two commits: the Phase 7 race fix, then Phase 9B). **Phase 10 (Bulk / CSV tools) is next.**
 - **Sales history rules** (Phase 9A):
   - Every sale needs a payment method enabled at that moment (`PaymentMethods`), validated in `SaleRequest` and again in `SaleService::sell()`, after the existing-request check (idempotency first). It, `unit_cost` and `seller_name` are written in the pending row.
   - Reports count `completed` rows only; `voided`/`failed` are counted separately. Unknown cost (`unit_cost` NULL) is never zero: exclude those lines from cost/profit and report how many.
   - Read the history only through `SalesQuery` (read-only; keyset paging for exports) and format through `SalePresenter`. Date ranges are site-timezone days (`SalesQuery::range()`).
   - **Cost is visible only with `pqbg_view_costs` (administrators).** Read it with `CostPrice::get()/effective()`, write it only with `CostPrice::set()` (the guards refuse every other write). Never add it to REST, Store API, exports, scan/My sales pages or labels. Keep `CostPrice`'s hooks (read_meta filter, write/delete guards, WXR skip) and never hook `delete_post_metadata_by_mid`.
   - My sales is `/scan/my-sales/`, built only by `ScanUrl::my_sales_url()`, served by `ScanRoute` through the existing rule; the seller always comes from the session.
-  - Phase 9B reports should reuse `SalesQuery::where()`/`range()`, the totals rules above and the `method_created` index; measure with the 50,000-row dataset of the Phase 9A suite.
+  - The Phase 9B reports reuse `SalesQuery::where()` and the same rules (see the reports rules below).
 - **Printing rules** (Phase 8):
   - Print only ACTIVE codes, read through `CodeRepository::find_active_for_products()`; printing never generates codes.
   - Payloads only from `ScanUrl::for_code()`, images only from `QrRenderer`/`BarcodeRenderer`, cached only through `PrintCache` (its key must include everything that changes the image; bump `PrintCache::VERSION` if the output changes outside the renderers' constants).
@@ -1516,7 +1634,7 @@ A covering index for the totals (`status, created_at_gmt, payment_method, quanti
   - Never wrap the sale code in a DB transaction.
   - Never change stock except through `wc_update_product_stock()` inside `SaleService::change_stock()`.
   - If WooCommerce is upgraded, run the Phase 7 suite: its COMPATIBILITY checks fail loudly if `woocommerce_update_product_stock_query` stops firing or its SQL changes shape.
-- `DB_VERSION` is **3** (Phase 9A). The next schema change is migration 4.
+- `DB_VERSION` is **4** (Phase 9B: `void_restock`). The next schema change is migration 5.
 - **The scan URL format `{base}/scan/{CODE}/` is permanent** (labels will be printed with it). Never change `ScanUrl::for_code()` or the two rewrite rules without a migration plan for printed labels. Bump `ScanRoute::RULES_VERSION` whenever `ScanUrl::rewrite_rules()` changes, so the rules are flushed once.
 - **Scan page rules:**
   - access is checked before any lookup: logged out → login redirect, no `pqbg_view_products` → a fixed 403
@@ -1651,3 +1769,15 @@ A covering index for the totals (`status, created_at_gmt, payment_method, quanti
   - Two test-caused incidents (an importer's `wp_die()`; a WXR `import_id` that moved the posts AUTO_INCREMENT), both cleaned up after listing every row, both prevented in the suite now (see the Phase 9A section).
   - 2026-09-26: reference check clean (no reference to post IDs above 6200); database backup `sharayu-20260926-120456-before-phase9a-final.sql`; the manual test recorded as pending (an earlier message saying it passed was sent by mistake); pre-commit run ALL PASSED, 1,388 checks, 0 skipped, AS guard PASS, crash count 139 before and after.
   - Approved on the automated tests; committed as a single commit and pushed to `origin/main` (normal push).
+
+### 2026-09-26
+- **Phase 9B (Reports & owner dashboard):**
+  - Re-verified the environment; no differences. Backup `sharayu-20260926-123420-before-phase9b.sql`. Crash count 139 throughout.
+  - Baseline: 1,387 passed, 1 failed (a genuine, intermittent Phase 7 race: a duplicate request mid-sale answered "failed"), 0 skipped.
+  - Wrote the plan; the user approved D1–D15 with two additions (the race fix as a separate commit; "Cash expected in drawer" / net collected on the end of day).
+  - Fixed the race (D6) with a deterministic check that fails on the old code; added schema v4 (`void_restock`), the reports classes, the dashboard, ten reports, SVG charts, CSVs and the end-of-day print page; `tests/phase9b-reports.php`.
+  - Performance: the dashboard misses "under 1 s for 90 days" at 50,000 sales in 90 days (about 1.4–1.5 s); the user chose to accept and document it (5,000-sale check at the original targets: met; 50,000-sale check at 2 s as a regression guard; a Phase 11 open item).
+  - Final 9B run: 148/148. The final full run was stopped by Claude Code for low memory during the 9B cleanup (Phase 7 had one false-by-design failure, since fixed); the leftover test data was listed and removed.
+  - Re-run approved: with free memory already below 1.5 GB, every suite ran on its own: all 11 passed, 1,540 checks, AS guard PASS, crash count 139 throughout. The race-fix checks passed 5 times in a row. Reconciliation and shop-manager evidence recorded. Commit-1 patch and a fresh backup saved in `C:\xampp\backups\sharayu\`.
+  - Housekeeping: `5495b05` recorded; the Pre-launch acceptance checklist created (Phase 8 printer test, Phase 9A and 9B manual checks) with the new instruction on manual tests.
+  - Not committed; waiting for the user's approval (then two commits).

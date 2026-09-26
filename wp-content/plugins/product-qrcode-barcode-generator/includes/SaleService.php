@@ -445,7 +445,7 @@ final class SaleService {
 		}
 
 		if ( ! $restock ) {
-			$done = SaleRepository::transition( (int) $sale['id'], SaleRepository::STATUS_COMPLETED, self::void_fields( $user_id, $reason ) );
+			$done = SaleRepository::transition( (int) $sale['id'], SaleRepository::STATUS_COMPLETED, self::void_fields( $user_id, $reason, false ) );
 
 			return $done
 				? array(
@@ -559,7 +559,7 @@ final class SaleService {
 			}
 
 			$before = SaleRepository::read_stock( $holder_id );
-			$fields = self::void_fields( $user_id, $reason );
+			$fields = self::void_fields( $user_id, $reason, true );
 			$change = self::change_stock( $holder, $quantity, 'increase', (int) $fresh['id'], SaleRepository::STATUS_COMPLETED, $fields );
 			$row    = SaleRepository::find( (int) $fresh['id'] );
 
@@ -774,14 +774,16 @@ final class SaleService {
 	 *
 	 * @param int    $user_id User.
 	 * @param string $reason  Reason.
+	 * @param bool   $restock Whether the quantity goes back to stock (schema v4, void_restock).
 	 * @return array<string, mixed>
 	 */
-	private static function void_fields( int $user_id, string $reason ): array {
+	private static function void_fields( int $user_id, string $reason, bool $restock ): array {
 		return array(
 			'status'        => SaleRepository::STATUS_VOIDED,
 			'voided_by'     => $user_id,
 			'voided_at_gmt' => current_time( 'mysql', true ),
 			'void_reason'   => $reason,
+			'void_restock'  => $restock ? 1 : 0,
 		);
 	}
 

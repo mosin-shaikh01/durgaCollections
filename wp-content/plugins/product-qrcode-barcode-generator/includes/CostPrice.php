@@ -94,6 +94,33 @@ final class CostPrice {
 	}
 
 	/**
+	 * The stored costs of many products/variations in one query per 1,000 IDs (reports):
+	 * ID => normalised cost; IDs without a cost are left out. Same values as get().
+	 *
+	 * @param int[] $post_ids Products or variations.
+	 * @return array<int, string>
+	 */
+	public static function get_many( array $post_ids ): array {
+		global $wpdb;
+
+		$ids = array_values( array_unique( array_filter( array_map( 'intval', $post_ids ) ) ) );
+		$out = array();
+
+		foreach ( array_chunk( $ids, 1000 ) as $chunk ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- core table; integer IDs.
+			foreach ( (array) $wpdb->get_results( $wpdb->prepare( "SELECT post_id, meta_value FROM {$wpdb->postmeta} WHERE meta_key = %s AND post_id IN (" . implode( ',', $chunk ) . ') ORDER BY meta_id', self::META_KEY ), ARRAY_A ) as $row ) {
+				$id = (int) $row['post_id'];
+
+				if ( ! isset( $out[ $id ] ) && is_numeric( $row['meta_value'] ) ) {
+					$out[ $id ] = (string) wc_format_decimal( $row['meta_value'], wc_get_price_decimals() );
+				}
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * The effective cost of a sellable item: its own, else (for a variation) the
 	 * parent's default; null when unknown.
 	 *

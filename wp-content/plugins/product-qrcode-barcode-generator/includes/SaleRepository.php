@@ -212,7 +212,7 @@ final class SaleRepository {
 
 		$table   = Schema::sales_table();
 		$assign  = array( $wpdb->prepare( 'pm.meta_value = pm.meta_value %+f', $delta ) );
-		$allowed = array( 'status', 'failure_code', 'voided_by', 'voided_at_gmt', 'void_reason' );
+		$allowed = array( 'status', 'failure_code', 'voided_by', 'voided_at_gmt', 'void_reason', 'void_restock' );
 
 		foreach ( $set as $column => $value ) {
 			if ( ! in_array( $column, $allowed, true ) ) {
@@ -237,7 +237,7 @@ final class SaleRepository {
 	 * @return string[]
 	 */
 	private static function formats( array $data ): array {
-		$ints = array( 'code_id', 'unit_id', 'product_id', 'variation_id', 'order_id', 'seller_id', 'quantity', 'stock_before', 'stock_after', 'voided_by', 'stock_holder_id' );
+		$ints = array( 'code_id', 'unit_id', 'product_id', 'variation_id', 'order_id', 'seller_id', 'quantity', 'stock_before', 'stock_after', 'voided_by', 'stock_holder_id', 'void_restock' );
 
 		return array_map( static fn( $column ) => in_array( $column, $ints, true ) ? '%d' : '%s', array_keys( $data ) );
 	}

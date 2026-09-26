@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
 final class Install {
 
 	/** Current schema version. Must equal the highest key in migrations(). */
-	const DB_VERSION = 3;
+	const DB_VERSION = 4;
 
 	const DB_VERSION_OPTION = 'pqbg_db_version';
 	const LOCK_OPTION       = 'pqbg_install_lock';
@@ -42,6 +42,7 @@ final class Install {
 			1 => array( __CLASS__, 'migrate_1' ),
 			2 => array( __CLASS__, 'migrate_2' ),
 			3 => array( __CLASS__, 'migrate_3' ),
+			4 => array( __CLASS__, 'migrate_4' ),
 		);
 	}
 
@@ -219,6 +220,28 @@ final class Install {
 			if ( ! in_array( $column, $columns, true ) ) {
 				return new WP_Error( 'pqbg_schema_failed', __( 'Product QR Code and Barcode Generator could not update its database tables.', 'product-qrcode-barcode-generator' ) . ' ' . $wpdb->last_error );
 			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Schema version 4 (Phase 9B, reports): adds pqbg_sales.void_restock, whether a
+	 * void returned the quantity to stock. Additive only (dbDelta): existing rows get
+	 * NULL ("not recorded"); re-running changes nothing.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function migrate_4() {
+		global $wpdb;
+
+		Schema::create_or_update();
+
+		$table   = Schema::sales_table();
+		$columns = $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
+
+		if ( ! in_array( 'void_restock', $columns, true ) ) {
+			return new WP_Error( 'pqbg_schema_failed', __( 'Product QR Code and Barcode Generator could not update its database tables.', 'product-qrcode-barcode-generator' ) . ' ' . $wpdb->last_error );
 		}
 
 		return true;

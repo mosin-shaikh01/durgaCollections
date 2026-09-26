@@ -29,6 +29,7 @@ $suites = array(
 	'phase7-sales.php',
 	'phase8-printing.php',
 	'phase9a-sales-history.php',
+	'phase9b-reports.php',
 );
 
 $filters = array_slice( $argv, 1 );

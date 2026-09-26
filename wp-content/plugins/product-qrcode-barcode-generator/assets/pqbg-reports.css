@@ -1,0 +1,83 @@
+/*
+ * In-store reports (Phase 9B). Loaded only on WooCommerce → In-store reports.
+ * Chart colours: one series colour (blue), red for losses (the diverging pair),
+ * a one-hue blue ramp for the heatmap, hairline grids and text in text colours.
+ */
+.pqbg-reports {
+	--pqbg-surface: #fcfcfb;
+	--pqbg-text: #0b0b0b;
+	--pqbg-text-2: #52514e;
+	--pqbg-muted: #898781;
+	--pqbg-grid: #e4e3de;
+	--pqbg-axis: #c3c2b7;
+	--pqbg-series: #2a78d6;
+	--pqbg-negative: #e34948;
+	--pqbg-heat-0: #f0efec;
+	--pqbg-heat-1: #cde2fb;
+	--pqbg-heat-2: #9ec5f4;
+	--pqbg-heat-3: #6da7ec;
+	--pqbg-heat-4: #3987e5;
+	--pqbg-heat-5: #256abf;
+	--pqbg-heat-6: #184f95;
+}
+
+.pqbg-reports__tabs { margin-bottom: 12px; }
+.pqbg-reports__rules p { margin: 6px 0; }
+.pqbg-reports__period { margin: 8px 0 12px; }
+.pqbg-reports__period .subsubsub { float: none; margin: 0 0 6px; }
+.pqbg-reports__custom { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+.pqbg-reports__span { margin: 6px 0; color: var(--pqbg-text-2); }
+.pqbg-reports__switch { margin: 8px 0; }
+.pqbg-reports__unknown { margin-top: 4px; }
+
+.pqbg-cards { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.pqbg-card { background: #fff; border: 1px solid #dcdcde; border-radius: 4px; padding: 12px 16px; min-width: 150px; flex: 1 1 150px; }
+.pqbg-card--main { border-color: var(--pqbg-series); box-shadow: inset 4px 0 0 var(--pqbg-series); }
+.pqbg-card__label { color: var(--pqbg-text-2); font-size: 13px; }
+.pqbg-card__value { color: var(--pqbg-text); font-size: 24px; font-weight: 600; line-height: 1.3; margin: 4px 0; font-variant-numeric: tabular-nums; }
+.pqbg-card__change { color: var(--pqbg-text-2); font-size: 12px; }
+
+.pqbg-reports__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; margin: 12px 0; }
+.pqbg-panel { background: #fff; border: 1px solid #dcdcde; border-radius: 4px; padding: 12px 16px; margin: 12px 0; overflow-x: auto; }
+.pqbg-reports__grid .pqbg-panel { margin: 0; }
+.pqbg-reports__grid .pqbg-panel--wide { grid-column: 1 / -1; }
+.pqbg-panel h2 { margin: 0 0 8px; font-size: 14px; }
+
+.pqbg-chart { display: block; max-width: 100%; height: auto; font-size: 11px; font-variant-numeric: tabular-nums; }
+.pqbg-chart__grid { stroke: var(--pqbg-grid); stroke-width: 1; shape-rendering: crispEdges; }
+.pqbg-chart__grid--zero { stroke: var(--pqbg-axis); }
+.pqbg-chart__tick { fill: var(--pqbg-muted); }
+.pqbg-chart__label, .pqbg-chart__value { fill: var(--pqbg-text); font-size: 12px; }
+.pqbg-chart__mark { fill: var(--pqbg-series); }
+.pqbg-chart__mark--neg { fill: var(--pqbg-negative); }
+.pqbg-chart__hit { fill: transparent; }
+.pqbg-chart__item:hover .pqbg-chart__mark, .pqbg-chart__item:focus .pqbg-chart__mark { opacity: 0.8; }
+.pqbg-chart__item:hover .pqbg-heat, .pqbg-chart__item:focus .pqbg-heat { stroke: var(--pqbg-text); stroke-width: 1.5; }
+.pqbg-chart__item:focus { outline: none; }
+.pqbg-chart__item:focus-visible .pqbg-chart__hit { stroke: var(--pqbg-text); stroke-width: 1; }
+.pqbg-heat--0 { fill: var(--pqbg-heat-0); }
+.pqbg-heat--1 { fill: var(--pqbg-heat-1); }
+.pqbg-heat--2 { fill: var(--pqbg-heat-2); }
+.pqbg-heat--3 { fill: var(--pqbg-heat-3); }
+.pqbg-heat--4 { fill: var(--pqbg-heat-4); }
+.pqbg-heat--5 { fill: var(--pqbg-heat-5); }
+.pqbg-heat--6 { fill: var(--pqbg-heat-6); }
+
+.pqbg-data { margin-top: 8px; }
+.pqbg-data summary { cursor: pointer; color: #2271b1; }
+.pqbg-data-table { margin-top: 6px; }
+.pqbg-top { margin: 0 0 0 20px; }
+.pqbg-alerts ul { margin: 0; }
+.pqbg-alert--on a { font-weight: 600; }
+
+.pqbg-report-table td.pqbg-num, .pqbg-eod .pqbg-num, .pqbg-report-totals .pqbg-num { text-align: right; font-variant-numeric: tabular-nums; }
+.pqbg-report-totals { margin-top: 8px; }
+.pqbg-report-totals td { vertical-align: top; }
+.pqbg-report-totals__label { display: block; color: var(--pqbg-muted); font-size: 11px; }
+.pqbg-eod { margin-bottom: 12px; }
+.pqbg-refunds { margin-left: 20px; list-style: disc; }
+
+@media (max-width: 782px) {
+	.pqbg-reports__grid { grid-template-columns: 1fr; }
+	.pqbg-card__value { font-size: 20px; }
+}

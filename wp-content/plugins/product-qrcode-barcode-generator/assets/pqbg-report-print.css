@@ -1,0 +1,43 @@
+/*
+ * End-of-day print page (Phase 9B, ReportPrint). Screen and print; A4 portrait.
+ */
+@page { size: A4 portrait; margin: 12mm; }
+
+body.pqbg-report-print {
+	margin: 0;
+	padding: 16px;
+	background: #fff;
+	color: #0b0b0b;
+	font: 14px/1.45 "Segoe UI", "Nirmala UI", Roboto, "Noto Sans", Arial, sans-serif;
+}
+
+.pqbg-report-print main { max-width: 190mm; margin: 0 auto; }
+.pqbg-report-print__toolbar { display: flex; gap: 16px; align-items: center; justify-content: space-between; max-width: 190mm; margin: 0 auto 16px; padding: 8px 12px; background: #f0f0f1; border-radius: 4px; }
+.pqbg-report-print__toolbar button { font: inherit; padding: 6px 18px; border: 1px solid #2271b1; background: #2271b1; color: #fff; border-radius: 3px; cursor: pointer; }
+.pqbg-report-print__store, .pqbg-report-print__printed { color: #52514e; font-size: 12px; }
+.pqbg-report-print__error { color: #b32d2e; font-weight: 600; }
+
+.pqbg-report-print h2 { font-size: 20px; margin: 8px 0 12px; }
+.pqbg-report-print h3 { font-size: 15px; margin: 18px 0 6px; }
+.pqbg-report-print .description { color: #52514e; font-size: 12px; }
+
+.pqbg-report-print .pqbg-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.pqbg-report-print .pqbg-card { border: 1px solid #c3c2b7; border-radius: 4px; padding: 8px 12px; flex: 1 1 140px; }
+.pqbg-report-print .pqbg-card--main { border: 2px solid #0b0b0b; }
+.pqbg-report-print .pqbg-card__label { font-size: 12px; color: #52514e; }
+.pqbg-report-print .pqbg-card__value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pqbg-report-print .pqbg-card__change { font-size: 11px; color: #52514e; }
+
+.pqbg-report-print table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pqbg-report-print th, .pqbg-report-print td { border-bottom: 1px solid #c3c2b7; padding: 4px 6px; text-align: left; vertical-align: top; }
+.pqbg-report-print thead th { border-bottom: 2px solid #0b0b0b; }
+.pqbg-report-print tfoot th, .pqbg-report-print tfoot td { border-top: 2px solid #0b0b0b; }
+.pqbg-report-print .pqbg-num { text-align: right; font-variant-numeric: tabular-nums; }
+.pqbg-report-print .pqbg-refunds { padding-left: 20px; }
+
+@media print {
+	body.pqbg-report-print { padding: 0; font-size: 12px; }
+	.pqbg-report-print__toolbar { display: none; }
+	.pqbg-report-print table, .pqbg-report-print .pqbg-card { break-inside: avoid; }
+	.pqbg-report-print h3 { break-after: avoid; }
+}

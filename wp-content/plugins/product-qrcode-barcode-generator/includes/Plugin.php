@@ -51,6 +51,9 @@ final class Plugin {
 			// In-store sales history, sale detail, void and CSV (Phase 9A); cost price fields.
 			SalesAdmin::register();
 			CostPrice::register_admin();
+
+			// In-store reports and the owner dashboard, their CSV and the end-of-day print page (Phase 9B).
+			ReportsAdmin::register();
 		}
 	}
 

@@ -412,13 +412,13 @@ try {
 
 	// ------------------------------------------------------------------ migration
 	pqbg_section( 'schema v3 migration and the pqbg_view_costs capability' );
-	pqbg_t( 'DB_VERSION is 3 and the site is migrated', 3 === Install::DB_VERSION && 3 === Install::stored_version() );
-	pqbg_t( 'migrations() ends with migrate_3', array( 1, 2, 3 ) === array_keys( Install::migrations() ) );
+	pqbg_t( 'DB_VERSION is at least 3 (4 since Phase 9B) and the site is migrated', 3 <= Install::DB_VERSION && Install::DB_VERSION === Install::stored_version() );
+	pqbg_t( 'migrations() has migrate_1..3 in order (migrate_4 follows since Phase 9B)', array( 1, 2, 3 ) === array_slice( array_keys( Install::migrations() ), 0, 3 ) );
 	$cols = $wpdb->get_col( "SHOW COLUMNS FROM $S" );
 	$full = $wpdb->get_results( "SHOW FULL COLUMNS FROM $S", ARRAY_A );
 	$type = array_column( $full, 'Type', 'Field' );
 	$null = array_column( $full, 'Null', 'Field' );
-	pqbg_t( 'v3 columns: payment_method varchar(20), unit_cost decimal(26,8), seller_name varchar(250), all NULL-able and last', array_slice( $cols, -3 ) === array( 'payment_method', 'unit_cost', 'seller_name' ) && 'varchar(20)' === $type['payment_method'] && 'decimal(26,8)' === $type['unit_cost'] && 'varchar(250)' === $type['seller_name'] && 'YES' === $null['payment_method'] && 'YES' === $null['unit_cost'] && 'YES' === $null['seller_name'] );
+	pqbg_t( 'v3 columns: payment_method varchar(20), unit_cost decimal(26,8), seller_name varchar(250), all NULL-able, right after failure_code (v4 adds void_restock after them)', array_slice( $cols, (int) array_search( 'failure_code', $cols, true ) + 1, 3 ) === array( 'payment_method', 'unit_cost', 'seller_name' ) && 'varchar(20)' === $type['payment_method'] && 'decimal(26,8)' === $type['unit_cost'] && 'varchar(250)' === $type['seller_name'] && 'YES' === $null['payment_method'] && 'YES' === $null['unit_cost'] && 'YES' === $null['seller_name'] );
 	$idx = $wpdb->get_col( $wpdb->prepare( "SELECT COLUMN_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = 'method_created' ORDER BY SEQ_IN_INDEX", $S ) );
 	pqbg_t( 'index method_created (payment_method, created_at_gmt)', array( 'payment_method', 'created_at_gmt' ) === $idx );
 
@@ -426,7 +426,8 @@ try {
 	$wpdb->prefix = $mig_prefix;
 	try {
 		$v3_sql = Schema::statements();
-		$v2_sql = array_map( static fn( $sql ) => str_replace( array( "payment_method varchar(20) NULL DEFAULT NULL,\n", "unit_cost decimal(26,8) NULL DEFAULT NULL,\n", "seller_name varchar(250) NULL DEFAULT NULL,\n", "KEY holder_status (stock_holder_id,status),\nKEY method_created (payment_method,created_at_gmt)\n" ), array( '', '', '', "KEY holder_status (stock_holder_id,status)\n" ), $sql ), $v3_sql );
+		// Phase 9B: the v4 column is removed too.
+		$v2_sql = array_map( static fn( $sql ) => str_replace( array( "void_restock tinyint(1) NULL DEFAULT NULL,\n", "payment_method varchar(20) NULL DEFAULT NULL,\n", "unit_cost decimal(26,8) NULL DEFAULT NULL,\n", "seller_name varchar(250) NULL DEFAULT NULL,\n", "KEY holder_status (stock_holder_id,status),\nKEY method_created (payment_method,created_at_gmt)\n" ), array( '', '', '', '', "KEY holder_status (stock_holder_id,status)\n" ), $sql ), $v3_sql );
 		pqbg_t( 'migration: the v2 fixture is v3 without the three columns and the index', $v2_sql[0] === $v3_sql[0] && ! str_contains( $v2_sql[1], 'payment_method' ) && ! str_contains( $v2_sql[1], 'seller_name' ) && ! str_contains( $v2_sql[1], 'unit_cost' ) && str_contains( $v2_sql[1], "KEY holder_status (stock_holder_id,status)\n)" ) );
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $v2_sql );
@@ -438,7 +439,7 @@ try {
 		$res   = Install::migrate_3();
 		$v3c   = $wpdb->get_col( "SHOW COLUMNS FROM $mS" );
 		$v3row = $wpdb->get_row( "SELECT * FROM $mS", ARRAY_A );
-		pqbg_t( 'migration: upgrade v2 → v3 adds the three columns and method_created', true === $res && array_slice( $v3c, -3 ) === array( 'payment_method', 'unit_cost', 'seller_name' ) && 2 === (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = 'method_created'", $mS ) ) );
+		pqbg_t( 'migration: upgrade v2 → v3 adds the three columns and method_created', true === $res && array_slice( $v3c, 27, 3 ) === array( 'payment_method', 'unit_cost', 'seller_name' ) /* migrate_3 applies the current schema, so the v4 column follows */ && 2 === (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = 'method_created'", $mS ) ) );
 		pqbg_t( 'migration: the existing row is unchanged, NULL ("not recorded"/"unknown") in the new columns', array_intersect_key( $v3row, $v2row ) === $v2row && null === $v3row['payment_method'] && null === $v3row['unit_cost'] && null === $v3row['seller_name'] );
 		pqbg_t( 'migration: re-running is a no-op (empty dbDelta log, same row)', true === Install::migrate_3() && array() === Schema::create_or_update() && $v3row === $wpdb->get_row( "SELECT * FROM $mS", ARRAY_A ) );
 		Schema::drop_tables();

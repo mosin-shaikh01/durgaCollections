@@ -240,12 +240,12 @@ final class SalesExport {
 	}
 
 	/**
-	 * Writes one CSV line.
+	 * Writes one CSV line (formula injection neutralised). Also used by ReportsExport.
 	 *
 	 * @param resource $out   Stream.
 	 * @param string[] $cells Cells.
 	 */
-	private static function put( $out, array $cells ): void {
+	public static function put( $out, array $cells ): void {
 		fputcsv( $out, array_map( array( __CLASS__, 'neutralise' ), $cells ), ',', '"', '' );
 	}
 }
