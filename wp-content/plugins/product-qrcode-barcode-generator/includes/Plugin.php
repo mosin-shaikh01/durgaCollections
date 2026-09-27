@@ -54,6 +54,9 @@ final class Plugin {
 
 			// In-store reports and the owner dashboard, their CSV and the end-of-day print page (Phase 9B).
 			ReportsAdmin::register();
+
+			// Bulk tools in the QR & Barcodes tabs: missing codes, codes CSV, cost import (Phase 10).
+			ToolsAdmin::register();
 		}
 	}
 

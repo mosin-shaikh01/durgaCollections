@@ -121,11 +121,14 @@ final class ProductCodeService {
 	 * a second active code. A retired code is never reactivated or reused.
 	 * An item whose code was retired gets a newly generated code.
 	 *
-	 * @param int $product_id Simple product or variation ID.
-	 * @param int $user_id    Acting user; must have the pqbg_manage_codes capability.
+	 * @param int       $product_id Simple product or variation ID.
+	 * @param int       $user_id    Acting user; must have the pqbg_manage_codes capability.
+	 * @param bool|null $created    Set to true only when this call created the code (Phase 10 bulk counts).
 	 * @return array<string, string>|WP_Error The active pqbg_codes row.
 	 */
-	public function get_or_create( int $product_id, int $user_id ) {
+	public function get_or_create( int $product_id, int $user_id, ?bool &$created = null ) {
+		$created = false;
+
 		if ( ! Permissions::can_manage_codes( $user_id ) ) {
 			return new WP_Error( 'pqbg_forbidden', __( 'You are not allowed to manage product codes.', 'product-qrcode-barcode-generator' ) );
 		}
@@ -153,7 +156,8 @@ final class ProductCodeService {
 			$result = CodeRepository::create_active( $code, $item['product_id'], $item['parent_id'], $user_id );
 
 			if ( ! is_wp_error( $result ) ) {
-				$row = CodeRepository::find_by_code( $code );
+				$created = true;
+				$row     = CodeRepository::find_by_code( $code );
 
 				return null !== $row ? $row : new WP_Error( 'pqbg_code_unavailable', __( 'The product code could not be loaded.', 'product-qrcode-barcode-generator' ) );
 			}

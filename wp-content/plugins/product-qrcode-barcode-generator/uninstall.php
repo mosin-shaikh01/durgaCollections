@@ -6,8 +6,9 @@
  * product codes and the sales audit trail, so deleting the plugin from the
  * Plugins screen leaves tables, options, the Seller role and capabilities in
  * place. Reinstalling picks everything up again. Only runtime state is always
- * removed: the install lock, the rewrite flag and the render cache of QR and
- * barcode images (PrintCache), which is not data.
+ * removed: the install lock, the rewrite flag, the render cache of QR and
+ * barcode images (PrintCache), the cost-import previews and the code-generation
+ * run state (Phase 10), none of which is data.
  *
  * To permanently delete all plugin data, the site owner must add
  *     define( 'PQBG_UNINSTALL_DELETE_ALL_DATA', true );
@@ -32,6 +33,11 @@ if ( ! class_exists( '\ProductQrBarcode\PrintCache', false ) ) {
 }
 \ProductQrBarcode\PrintCache::clear_all();
 
+// Phase 10 runtime state, never data: every user's cost-import preview (it holds costs and
+// is temporary anyway) and the code-generation run state (codes already created stay).
+delete_metadata( 'user', 0, 'pqbg_cost_import', '', true );
+delete_option( 'pqbg_bulk_run' );
+
 if ( ! defined( 'PQBG_UNINSTALL_DELETE_ALL_DATA' ) || true !== PQBG_UNINSTALL_DELETE_ALL_DATA ) {
 	return;
 }
@@ -43,6 +49,9 @@ require_once __DIR__ . '/includes/Permissions.php';
 
 delete_option( 'pqbg_settings' );
 delete_option( 'pqbg_db_version' );
+
+// The bulk tools' audit trail (Phase 10).
+delete_option( 'pqbg_bulk_log' );
 
 // Cost prices of products and variations (Phase 9A). Bulk removal: never blocked by CostPrice's guard.
 delete_metadata( 'post', 0, '_pqbg_cost_price', '', true );

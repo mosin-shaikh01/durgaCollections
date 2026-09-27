@@ -502,7 +502,9 @@ try {
 	// options.php redirects (to a site-relative path) with settings-updated; the errors are shown there.
 	$after = $http( 'admin', 'GET', str_starts_with( $r['location'], '/' ) ? preg_replace( '#^(https?://[^/]+).*$#', '$1', home_url() ) . $r['location'] : $r['location'] );
 	pqbg_t( 'settings page: unticking everything is refused, the message is shown and the previous choice kept', 302 === $r['code'] && array( 'cash', 'other' ) === PaymentMethods::enabled() && str_contains( $after['body'], 'At least one payment method must stay enabled' ), $r['code'] . ' ' . $r['location'] . ' ' . wp_json_encode( PaymentMethods::enabled() ) . ' ' . substr( wp_strip_all_tags( $from( $after['body'], '<div class="wrap">' ) ), 0, 300 ) );
-	pqbg_t( 'settings page: shop manager cannot open or save it (capability pqbg_manage_settings)', 200 !== $http( 'sm', 'GET', admin_url( 'admin.php?page=pqbg-settings' ) )['code'] );
+	// Phase 10 (approved): QR & Barcodes opens for shop managers on its Code tools tab; the Settings tab stays pqbg_manage_settings.
+	$sm_settings = $http( 'sm', 'GET', admin_url( 'admin.php?page=pqbg-settings' ) );
+	pqbg_t( 'settings page: shop manager cannot open the Settings tab (403) or see the payment-method fields (capability pqbg_manage_settings)', 403 === $http( 'sm', 'GET', admin_url( 'admin.php?page=pqbg-settings&tab=settings' ) )['code'] && ! str_contains( $sm_settings['body'], 'pqbg_settings[payment_methods]' ) && ! str_contains( $sm_settings['body'], 'pqbg_settings%5Bpayment_methods' ) );
 	$set_methods( null );
 
 	// ------------------------------------------------------------------ products

@@ -1,11 +1,18 @@
 <?php
 /**
- * Admin settings screen: WooCommerce > QR & Barcodes.
+ * Admin screen WooCommerce > QR & Barcodes, with tabs (Phase 10):
  *
- * Administrators only (Permissions::MANAGE_SETTINGS). Shop Managers and Store
- * Sellers get neither the menu item nor the page, including by direct URL.
+ *   Settings            Permissions::MANAGE_SETTINGS (administrators)
+ *   Code tools          Permissions::MANAGE_CODES (administrators, shop managers)  ToolsAdmin
+ *   Import cost prices  Permissions::VIEW_COSTS (administrators)                   ToolsAdmin
  *
- * Uses the Settings API: the form posts to options.php, which checks the
+ * The page itself needs MANAGE_CODES, so Store Sellers get neither the menu item nor
+ * the page. Each tab is checked on its own before any output (ToolsAdmin::load_page()):
+ * a tab the user may not use is not shown and its URL is refused with 403. Without a
+ * tab the page opens the user's first tab (Settings for administrators, Code tools for
+ * shop managers).
+ *
+ * Settings uses the Settings API: the form posts to options.php, which checks the
  * `pqbg_settings-options` nonce and, through the option_page_capability
  * filter below, the MANAGE_SETTINGS capability. Values are cleaned by
  * Settings::sanitize(), which only changes the fields on this form.
@@ -51,17 +58,21 @@ final class SettingsPage {
 	}
 
 	/**
-	 * Adds the page under the WooCommerce menu.
+	 * Adds the page under the WooCommerce menu (for pqbg_manage_codes; the tabs are checked on their own).
 	 */
 	public static function add_menu(): void {
-		add_submenu_page(
+		$hook = add_submenu_page(
 			'woocommerce',
 			__( 'Product QR Code and Barcode Generator', 'product-qrcode-barcode-generator' ),
 			__( 'QR & Barcodes', 'product-qrcode-barcode-generator' ),
-			Permissions::MANAGE_SETTINGS,
+			Permissions::MANAGE_CODES,
 			self::SLUG,
 			array( __CLASS__, 'render' )
 		);
+
+		if ( $hook ) {
+			add_action( 'load-' . $hook, array( ToolsAdmin::class, 'load_page' ) );
+		}
 	}
 
 	/**
@@ -113,11 +124,30 @@ final class SettingsPage {
 	 * Renders the page.
 	 */
 	public static function render(): void {
-		if ( ! Permissions::can_manage_settings() ) {
+		$tab = ToolsAdmin::requested_tab();
+
+		if ( ! in_array( $tab, ToolsAdmin::tabs(), true ) ) {
 			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'product-qrcode-barcode-generator' ), 403 );
 		}
 
 		echo '<div class="wrap"><h1>' . esc_html( get_admin_page_title() ) . '</h1>';
+		ToolsAdmin::render_nav( $tab );
+
+		if ( ToolsAdmin::TAB_TOOLS === $tab ) {
+			ToolsAdmin::render_tools();
+			echo '</div>';
+			return;
+		}
+
+		if ( ToolsAdmin::TAB_COSTS === $tab ) {
+			ToolsAdmin::render_costs();
+			echo '</div>';
+			return;
+		}
+
+		if ( ! Permissions::can_manage_settings() ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'product-qrcode-barcode-generator' ), 403 );
+		}
 
 		// Pages outside Settings must print Settings API messages themselves. No filter:
 		// options.php files "Settings saved." under "general", validation errors under pqbg_settings.

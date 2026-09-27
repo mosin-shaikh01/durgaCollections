@@ -22,7 +22,7 @@ Repo: https://github.com/mosin-shaikh01/durgaCollections
 | Active plugins | classic-editor, woocommerce, product-qrcode-barcode-generator (Product QR Code and Barcode Generator; installed in Phase 2 under its former name) |
 | Admin user | Dev-admin |
 
-_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, on 2026-09-25 at the start of Phases 6, 7, 8 and 9A, and on 2026-09-26 at the start of Phase 9B. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
+_Environment re-verified 2026-09-24 at the start of Phase 2, at the start of Phase 3, at the start of the plugin rename, and at the start of Phases 4 and 5, on 2026-09-25 at the start of Phases 6, 7, 8 and 9A, and on 2026-09-26 at the start of Phases 9B and 10. There were no differences apart from the rename itself. Also recorded in Phase 6: `blog_public = 0` (core sitemaps off), and logged-out visitors to `/my-account/` see the Coming Soon page._
 
 ---
 
@@ -38,6 +38,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 7 was committed as `2413698` ("Phase 7: mark as sold with atomic stock journal, undo, online-race compensation (schema v2)") and pushed to `origin/main`, with the user's approval after their phone test (normal fast-forward, no force).
 - Phase 8 was committed as `753613c` ("Phase 8: label printing (A4 sheet and thermal layouts, QR minimum size, render cache, print page) and the Action Scheduler test-leak fix") and pushed to `origin/main`, with the user's approval, before their printer test (normal fast-forward, no force).
 - Phase 9A was committed as a single commit as `5495b05` ("Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3)") and pushed to `origin/main`, with the user's approval on the automated tests, before their manual test (normal fast-forward, no force).
+- Phase 9B was committed as two commits, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist), and pushed to `origin/main` (normal fast-forward, no force): first the Phase 7 race fix as `072f4d6` ("Fix Phase 7 idempotency race: duplicate request mid-sale reported failed"), then Phase 9B as `716600d` ("Phase 9B: in-store reports and owner dashboard (end of day, profit, stock, dead stock; schema v4)"). Recorded at the start of Phase 10 (2026-09-26).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -51,6 +52,8 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `716600d` | Phase 9B: in-store reports and owner dashboard (end of day, profit, stock, dead stock; schema v4) |
+| `072f4d6` | Fix Phase 7 idempotency race: duplicate request mid-sale reported failed |
 | `5495b05` | Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3) |
 | `6c6dbc8` | Record Phase 8 printer-test open item (Phase 8: label printing, presets, QR min-size fitting, print page, SVG cache, AS leak fix) |
 | `2861b15` | Record Phase 8 commit and push in progress log |
@@ -104,6 +107,7 @@ every other plugin stays ignored. For a future custom theme the pattern is:
 - [ ] The manual checks that must pass before launch are in the **Pre-launch acceptance checklist** below (Phase 8 printer test, Phase 9A and Phase 9B manual checks).
 - [ ] The user's label stock → possibly a new default print preset (A4 3 × 7 until then).
 - [ ] **Phase 11 (hardening):** the reconciliation check and the concurrency-test items from Phase 7.
+- [ ] **MENU RESTRUCTURE (the phase before final plugin QA; added 2026-09-27 at the user's request in Phase 10):** group all plugin screens (In-store sales, In-store reports, QR & Barcodes and its tabs Settings / Code tools / Import cost prices) into one plugin area with a dashboard. Options: **(1) its own top-level "QR & Barcodes" menu with sub-items (the reviewer's recommendation)** or (2) one WooCommerce submenu with tabs. Requirements: keep every per-screen and per-tab capability check; redirect the old admin URLs (`admin.php?page=pqbg-settings`, `pqbg-sales`, `pqbg-reports`, with their tabs and arguments); update the links in CSVs, print pages, notices (e.g. the scan-URL warning) and the README; keep all tests passing.
 - [ ] **Phase 11 (performance):** If the dashboard exceeds 2 s on real data, or in-store sales exceed ~300/day, implement a daily roll-up table (option B) or a permission-keyed result cache (option C). Do not change the sale path for this before then. (Phase 9B measured the dashboard at about 1.4–1.55 s for 90 days with 50,000 sales in 90 days; every report meets the 1 s / 2 s targets at 5,000 sales in 90 days. See the Phase 9B section.)
 
 ### Pre-launch acceptance checklist
@@ -112,6 +116,7 @@ All pending. Each item must pass before production launch; the detailed steps ar
 
 - [ ] **Phase 8 physical printer test** (must be done before printing real labels): print on plain paper and on the actual label stock, check size/alignment (use the printer offset if needed), check ₹ and text, and scan several labels with a phone. No printer was available on 2026-09-25; Phase 8 was approved on the automated print verification. Steps: the "Phase 8 checklist" in the plugin README.
 - [ ] **Phase 9A manual test:** sell with each payment method (required, none pre-selected), check My sales on the phone, set a cost price, check history/totals/profit as admin, confirm a shop manager sees no cost anywhere, void a sale with a reason, and open the CSV export in Excel. Phase 9A was approved on the automated tests on 2026-09-26. Steps: the "Phase 9A checklist" in the plugin README.
+- [ ] **Phase 10 manual checks:** generate the missing codes on the real catalogue (after a backup) and open the first "Print labels" link; open the codes CSV in Excel via Data → From Text/CSV (leading zeros kept, no cost); a cost import with preview (one wrong value shown as an error), apply and report; a shop manager sees only Code tools (no Settings or cost tab, no cost anywhere). Steps: the "Phase 10 checklist" in the plugin README.
 - [ ] **Phase 9B manual checks:** the dashboard figures look right (against In-store sales for the same day), the end-of-day "Cash expected in drawer" and its print page, a report CSV opened in Excel, and a shop manager sees no profit, margin or cost anywhere in the reports. Steps: the "Phase 9B checklist" in the plugin README.
 
 ### Backlog
@@ -136,8 +141,8 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **7** | **Mark sold + sales** | **Done 2026-09-25. Committed `2413698`, pushed.** |
 | **8** | **Printing** | **Done 2026-09-25. Committed `753613c`, pushed.** |
 | **9A** | **Sales history, payment method & cost price** | **Done 2026-09-26. Approved on the automated tests; committed `5495b05`, pushed. Manual check pending (pre-launch acceptance checklist).** |
-| **9B** | **Reports & owner dashboard** | **Implemented and tested 2026-09-26; waiting for the user's approval. Not committed.** Two commits after approval: the Phase 7 race fix, then Phase 9B. Manual checks in the pre-launch acceptance checklist. |
-| 10 | Bulk / CSV tools | Next. Not started |
+| **9B** | **Reports & owner dashboard** | **Done 2026-09-26. Approved on the automated tests; committed as `072f4d6` (Phase 7 race fix) and `716600d` (Phase 9B), pushed. Manual checks pending (pre-launch acceptance checklist).** |
+| **10** | **Bulk / CSV tools** | **Implemented and tested 2026-09-27; waiting for the user's review. Not committed.** Manual checks in the pre-launch acceptance checklist. |
 | 11 → 12 | hardening/performance → QA/documentation | Not started |
 
 > **Pre-rename records.**
@@ -1485,7 +1490,7 @@ A covering index for the totals (`status, created_at_gmt, payment_method, quanti
 
 ### Phase 9B: Reports & owner dashboard (2026-09-26)
 
-**Status:** implemented and tested; **NOT committed, waiting for the user's approval.** After approval: two commits, first the Phase 7 race fix ("Fix Phase 7 idempotency race: duplicate request mid-sale reported failed": the `SaleService` change, its comment correction and the new deterministic Phase 7 checks), then Phase 9B. The plugin stays active; the live site migrated to schema v4 with 0 sales rows.
+**Status:** done; approved on the automated tests and committed as two commits, pushed to `origin/main`: `072f4d6` (the Phase 7 race fix) and `716600d` (Phase 9B). _Originally written before approval as:_ implemented and tested; NOT committed, waiting for the user's approval. After approval: two commits, first the Phase 7 race fix ("Fix Phase 7 idempotency race: duplicate request mid-sale reported failed": the `SaleService` change, its comment correction and the new deterministic Phase 7 checks), then Phase 9B. The plugin stays active; the live site migrated to schema v4 with 0 sales rows.
 
 **Environment:** re-verified at the start, with no differences: WP 7.1.2, WC 11.1.2 (HPOS on, sync off), PHP 8.5.6 ZTS, MariaDB 10.4.32; 0 codes, 0 sales, 0 products, 0 orders, 1 user; DB_VERSION 3; Asia/Kolkata, week starts Monday; INR, 2 decimals; Coming Soon on; WooCommerce Analytics on with scheduled import (12-hour lookup-table lag); low-stock threshold 2, out-of-stock 0. `HEAD` = `origin/main` = `5495b05`, clean.
 
@@ -1578,6 +1583,70 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 
 **Next phase (not started):** Phase 10, Bulk / CSV tools. **The production domain is still not final** and the Phase 8 printer test is still open.
 
+### Phase 10: Bulk and CSV tools (2026-09-26 → 2026-09-27)
+
+**Status:** implemented and tested; **NOT committed, waiting for the user's review.** The plugin stays active; no schema change (`DB_VERSION` 4).
+
+**Start state:** `HEAD` = `origin/main` = `716600d`, clean. Roadmap numbering confirmed (Phase 10 = Bulk / CSV tools). Housekeeping: `072f4d6` and `716600d` recorded in this file.
+
+**Backups** (`C:\xampp\backups\sharayu\`, outside the web root, never committed): `sharayu-20260926-234618-before-phase10.sql` (933,640 bytes, 53 tables, complete; before the baseline) and `sharayu-20260927-105123-before-phase10-tests.sql` (946,004 bytes, 53 tables, complete; before the final runs).
+
+**Baseline** (suite by suite, free memory 1,271 MB): 1,540 passed, 0 failed, 0 skipped after re-running phases 4, 5, 6 and 8 with the decoder/print-check paths pointing at the `.mjs` files (the first pass had pointed at folders, so those suites skipped their round-trip checks; not a failure). Crash count 139 throughout.
+
+**Approved plan:** D1a, D2a, D3a, D4, D5a, D6a (code import left out, in the backlog), D7, D9a, D10, D11a, D12a, D14, D15 with the timing targets, D16. **Changed by the user (D8/D13):** no new menu items; the tools are tabs of the existing WooCommerce → QR & Barcodes page (Settings | Code tools | Import cost prices), the page opens for `pqbg_manage_codes`, each tab gated on its own (Settings `pqbg_manage_settings`, Code tools `pqbg_manage_codes`, Import cost prices `pqbg_view_costs`), a tab the user lacks is not rendered and its URL and every handler return 403 even with an administrator's nonce/token. **Additions:** expired cost-import previews of every user deleted whenever the page loads and on uninstall (tested with an expired preview holding a cost); the test tools installed permanently in `C:\xampp\tools\pqbg\`; the MENU RESTRUCTURE open item (above).
+
+**Design:**
+- `BulkGenerator`: qualifying items = automatic-assignment rules (simple products and variations of variable products whose product status is publish/private/draft/pending/future; never trash, auto-draft, importing, variable parents, grouped/external, orphan or misplaced variations; stock tracking irrelevant); counts by type and status; batches of 100 items or ~10 s via `admin-post` POSTs (auto-continue script, Continue button without JS); no stored queue (every batch re-queries "qualifying, no active code, ID above the cursor"), so stop/resume/abandon/re-run are safe; codes only through `ProductCodeService::get_or_create()` (new optional `&$created` out-parameter); item re-checked before each code; one active run at a time (5-minute staleness), batches serialised by a MySQL `GET_LOCK` (released if the request dies); run state in `pqbg_bulk_run` (not autoloaded); "Print labels" links via `PrintAdmin::setup_url()`, 300 items each.
+- `CodesExport`: one row per code (active/retired/all) plus optionally the items without a code; columns item ID, parent ID, type, SKU, product, attributes (WooCommerce's stored summary in `post_excerpt`, else built from the variation), product status, code, code status, scan URL (active codes only, `ScanUrl::for_code()`), created/retired (site timezone); filters; BOM; `SalesExport::put()` neutralisation; no cost; streamed.
+- `CsvUpload`: 1 MB, 5,000 rows, 20 columns, 1,000 characters per cell, `.csv` + finfo text MIME, no NUL; UTF-8 (BOM stripped) or Windows-1252 (flagged); comma or semicolon; the file is read from PHP's temporary folder after `is_uploaded_file()` and deleted immediately.
+- `CostImport`: headers ID/Item ID/Product ID and/or SKU and Cost price; matching by ID, else SKU (case-insensitive like WooCommerce); errors for mismatch, duplicates (every row), unknown (digits-only SKU gets the Excel leading-zero hint), trashed, grouped/external, orphan variations; variable parent = default for variations; values: empty = no change, `clear` = remove, numbers with ₹/Rs/Rs./INR before or after and `/-`, Western or Indian grouping, ≤ 2 decimals never rounded; then `CostPrice::normalize()` and `CostPrice::set()` only. Preview stored compressed in the uploader's user meta `pqbg_cost_import` (token, 1-hour expiry; kept under MariaDB's 1 MB packet limit). Apply row by row in chunks of 500 with "changed since preview" / "already" checks (resumable, idempotent); errors need an acknowledgement. Report CSV; template CSV with current costs.
+- `BulkLog`: `pqbg_bulk_log` (not autoloaded), last 200 entries (time, user, tool, counts, file name + SHA-256; never a cost), shown as Recent bulk runs; cost entries only for `pqbg_view_costs`; one WooCommerce log line each; the log is re-read before each write.
+- `ToolsAdmin`: tabs, page load gate (`load-` hook, 403/404, pruning), six handlers (`pqbg_bulk_generate`, `pqbg_codes_csv`, `pqbg_cost_upload`, `pqbg_cost_apply`, `pqbg_cost_report`, `pqbg_cost_template`), each method → capability → nonce; `admin_enqueue_scripts` for `assets/pqbg-tools.css/js`. `SettingsPage`: menu capability `pqbg_manage_codes`, tab navigation, Settings tab unchanged (options.php still `pqbg_manage_settings`).
+- `uninstall.php`: always removes the previews and `pqbg_bulk_run`; `pqbg_bulk_log` only with delete-all.
+- Hooks: admin requests only; no REST/AJAX/nopriv/shortcode; no product, meta or sale hooks; the sale path is untouched.
+
+**Files created** (plugin-relative): `includes/BulkGenerator.php`, `BulkLog.php`, `CodesExport.php`, `CsvUpload.php`, `CostImport.php`, `ToolsAdmin.php`; `assets/pqbg-tools.css`, `assets/pqbg-tools.js`; `tests/phase10-bulk.php`.
+
+**Files modified:** `includes/ProductCodeService.php` (`&$created`), `SettingsPage.php` (tabs, capability), `Plugin.php` (wiring, after the class files existed), `CostPrice.php` (docblock only), `uninstall.php`; `tests/run.php`, `tests/phase3-codes.php`, `tests/phase4-rendering.php`, `tests/phase9a-sales-history.php` (D16), `tests/README.md`; `README.md` (plugin); `progress.md`.
+
+**False by design (D16, listed in tests/README):** Phase 4 "shop manager: direct URL refused (403)" → the page opens on Code tools with no settings form and `&tab=settings` is 403; Phase 4 "shop manager: … no settings item" → the QR & Barcodes item is present (still no warning); Phase 9A "shop manager cannot open the settings page" → `&tab=settings` 403 and no payment-method fields; Phase 3 options list also allows `pqbg_bulk_log` / `pqbg_bulk_run`.
+
+**Development incidents:**
+- **The first Phase 10 run was stopped by Claude Code for low system memory** (793 MB free of 8 GB, with Chrome, VS Code and Edge open; the machine had probably slept overnight during the run). It was not a test failure and there was no Apache crash (139). It left that run's test data (1,377 products/variations with IDs 17995–19372, 71 codes, 5 `pqbg10_` users, 7 costs, the log option, one render-cache entry, 1,377 completed lookup jobs); with the user's approval it was removed by a guarded script (refusing anything outside those IDs; 2,753 Action Scheduler jobs removed) and the clean state confirmed. The user closed Chrome/Edge and turned sleep off; the runner now has a **memory watchdog** (below 500 MB it creates `PQBG_STOP_FILE`, and the Phase 10 suite stops and cleans up instead of being killed).
+- Found and fixed from the runs: `BulkGenerator::state()` now also clears WordPress's cached "option does not exist" (a process could miss a run another request created; new test with worker processes); `BulkLog::add()` re-reads the log before writing (new test: an entry written meanwhile by another process is kept); the codes export reads WooCommerce's stored attribute summary instead of loading every variation (4.1 s → 0.65 s for 2,070 rows); run-id/token parsing keeps the case (`sanitize_key()` would lowercase them). Test-side fixes: the print-link checks (now the exact item IDs in the setup screen's hidden field), the suite's object cache is flushed after every HTTP request, cleanup of render-cache entries the suite creates.
+
+**Tests** (`PQBG_TESTS_ALLOW_PRODUCTION=1`, tools from `C:\xampp\tools\pqbg\`: `PQBG_DECODER=C:\xampp\tools\pqbg\decoder\decode.mjs`, `PQBG_PRINTCHECK=C:\xampp\tools\pqbg\print-check\check.mjs`, `PQBG_WXR_IMPORTER=C:\xampp\tools\pqbg\wordpress-importer\wordpress-importer.php`), 2026-09-27, suite by suite, free memory 3.0–3.5 GB (minimum 2,651 MB):
+
+| Suite | Result | Crashes before → after |
+|---|---|---|
+| phase10-bulk (on its own first) | 197/197, 0 skipped, AS guard PASS | 139 → 139 |
+| phase2-main | 83/83 | 139 → 139 |
+| phase2-lifecycle | 17/17 | 139 → 139 |
+| phase2-no-woocommerce | 12/12 | 139 → 139 |
+| phase3-codes | 110/110 | 139 → 139 |
+| phase4-rendering | 165/165 | 139 → 139 |
+| phase5-admin | 158/158 | 139 → 139 |
+| phase6-scan | 214/214 | 139 → 139 |
+| phase7-sales | 213/213 | 139 → 139 |
+| phase8-printing | 167/167 | 139 → 139 |
+| phase9a-sales-history | 253/253 | 139 → 139 |
+| phase9b-reports | 148/148 | 139 → 139 |
+| **Total** | **1,737 passed, 0 failed, 0 skipped; AS guard PASS for every suite; no suite skipped its decoder/print checks** | |
+
+**Volume timings** (2,000 items: 500 simple + 150 variable × 10 variations, in-process): counts 49 ms (target < 1 s); worst batch of 100 0.66 s (< 5 s); all 2,000 codes 11.7 s (< 60 s); codes export 2,070 rows 0.65 s, 1.2 s over HTTP (< 5 s); cost preview 2,000 rows 0.20 s, 20 KB stored (< 5 s); cost apply 2,000 rows 6.7 s (< 20 s); PHP peak memory of the volume part 107 MB (< 256 MB). Building the 2,150 products took 232 s (not timed against a target).
+
+**Access evidence (HTTP):** shop manager: QR & Barcodes opens on Code tools only (no Settings/cost tab, no link, no cost wording or value, no cost log entries), `&tab=settings` and `&tab=costs` 403, every cost handler 403 even with the administrator's nonce and token, the template 403 with no cost in the body, may generate codes and download the codes CSV (no cost); seller and customer: 403 on the page and every handler, no menu item; logged out: login redirect / no handler; a second administrator cannot use the first one's import (nonce bound to the user; with their own nonce the token is refused).
+
+**Known limitations:**
+- BulkLog::add() re-reads before writing; two log writes at the same instant could still lose one entry. Acceptable for an activity log; revisit in hardening if needed.
+- Code CSV import is not implemented (D6a, backlog); there is no undo of a cost import (the downloaded report keeps the old values).
+- Items saved during a generation run with an ID below its cursor are picked up by the next run; a batch that dies midway keeps its committed codes but they are not in that run's counts.
+- The codes export and the cost template read current product data (names, SKUs, statuses).
+
+**Manual checks:** not asked for in this phase; added to the **Pre-launch acceptance checklist** with the steps in the plugin README ("Phase 10 checklist").
+
+**Final report:** `C:\xampp\backups\sharayu\phase10-report.txt`.
+
 ### Instructions for the next Claude session
 
 - Read this file and `wp-content/plugins/product-qrcode-barcode-generator/README.md` first. Re-verify the environment; don't trust these notes blindly.
@@ -1610,7 +1679,16 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 - **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25).
 - **Phase 8 (Printing) is done, approved, committed as `753613c` and pushed** (2026-09-25). **The physical printer test is NOT done** (no printer was available): it must be done before printing real labels / before production launch (see the Status open items).
 - **Phase 9A (Sales history, payment method & cost price) is done, approved on the automated tests, committed as `5495b05` and pushed** (2026-09-26). **Its manual check is NOT done** (the "Phase 9A checklist" in the plugin README): it is in the pre-launch acceptance checklist.
-- **Phase 9B (Reports & owner dashboard) is implemented and tested, NOT committed** (2026-09-26; waiting for the user's approval; then two commits: the Phase 7 race fix, then Phase 9B). **Phase 10 (Bulk / CSV tools) is next.**
+- **Phase 9B (Reports & owner dashboard) is done, approved on the automated tests, committed as `072f4d6` (the Phase 7 race fix) and `716600d` (Phase 9B) and pushed** (2026-09-26). **Its manual checks are NOT done** (the "Phase 9B checklist" in the plugin README): they are in the pre-launch acceptance checklist. **Phase 10 (Bulk / CSV tools) is implemented and tested, NOT committed** (2026-09-27; waiting for the user's review).
+- **Bulk tools rules** (Phase 10):
+  - The tools live in tabs of WooCommerce → QR & Barcodes (`page=pqbg-settings&tab=settings|tools|costs`); the page needs `pqbg_manage_codes`, each tab and handler checks its own capability (Settings `pqbg_manage_settings`, Code tools `pqbg_manage_codes`, Import cost prices `pqbg_view_costs`) before the nonce. Keep that per-tab gate in the MENU RESTRUCTURE phase.
+  - Bulk codes only through `BulkGenerator` → `ProductCodeService::get_or_create()`; never a stored queue; keep the batch `GET_LOCK` and the re-check before each code.
+  - Costs in bulk only through `CostImport` → `CostPrice::normalize()` / `CostPrice::set()`; never name the meta key outside `CostPrice` and `uninstall.php`; the codes CSV never contains costs.
+  - Uploaded files are read from PHP's temporary folder and deleted at once; only parsed rows are kept (user meta `pqbg_cost_import`, 1 hour, pruned on page load, removed on uninstall).
+  - Every bulk action is logged in `pqbg_bulk_log` (counts only); cost entries are shown only to `pqbg_view_costs`.
+  - Code CSV **import** is deliberately not implemented (D6, backlog).
+- **Test tools:** permanently in `C:\xampp\tools\pqbg\` (outside the web root): `PQBG_DECODER=C:\xampp\tools\pqbg\decoder\decode.mjs`, `PQBG_PRINTCHECK=C:\xampp\tools\pqbg\print-check\check.mjs`, `PQBG_WXR_IMPORTER=C:\xampp\tools\pqbg\wordpress-importer\wordpress-importer.php`. Point them at the files, not the folders; state "0 skipped" in every test report.
+- **Memory:** close Chrome/Edge and turn off sleep before long runs; with less than 1.5 GB free run the suites one at a time; stop a run cleanly below 500 MB (the Phase 10 suite honours `PQBG_STOP_FILE`). Claude Code stops background commands when the machine runs critically low on memory; a killed suite leaves its test data, which must be listed and removed with the user's approval.
 - **Sales history rules** (Phase 9A):
   - Every sale needs a payment method enabled at that moment (`PaymentMethods`), validated in `SaleRequest` and again in `SaleService::sell()`, after the existing-request check (idempotency first). It, `unit_cost` and `seller_name` are written in the pending row.
   - Reports count `completed` rows only; `voided`/`failed` are counted separately. Unknown cost (`unit_cost` NULL) is never zero: exclude those lines from cost/profit and report how many.
@@ -1634,7 +1712,7 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
   - Never wrap the sale code in a DB transaction.
   - Never change stock except through `wc_update_product_stock()` inside `SaleService::change_stock()`.
   - If WooCommerce is upgraded, run the Phase 7 suite: its COMPATIBILITY checks fail loudly if `woocommerce_update_product_stock_query` stops firing or its SQL changes shape.
-- `DB_VERSION` is **4** (Phase 9B: `void_restock`). The next schema change is migration 5.
+- `DB_VERSION` is **4** (Phase 9B: `void_restock`; Phase 10 needed no schema change). The next schema change is migration 5.
 - **The scan URL format `{base}/scan/{CODE}/` is permanent** (labels will be printed with it). Never change `ScanUrl::for_code()` or the two rewrite rules without a migration plan for printed labels. Bump `ScanRoute::RULES_VERSION` whenever `ScanUrl::rewrite_rules()` changes, so the rules are flushed once.
 - **Scan page rules:**
   - access is checked before any lookup: logged out → login redirect, no `pqbg_view_products` → a fixed 403
@@ -1781,3 +1859,18 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
   - Re-run approved: with free memory already below 1.5 GB, every suite ran on its own: all 11 passed, 1,540 checks, AS guard PASS, crash count 139 throughout. The race-fix checks passed 5 times in a row. Reconciliation and shop-manager evidence recorded. Commit-1 patch and a fresh backup saved in `C:\xampp\backups\sharayu\`.
   - Housekeeping: `5495b05` recorded; the Pre-launch acceptance checklist created (Phase 8 printer test, Phase 9A and 9B manual checks) with the new instruction on manual tests.
   - Not committed; waiting for the user's approval (then two commits).
+  - Approved on the automated tests; committed as `072f4d6` (the Phase 7 race fix) and `716600d` (Phase 9B), pushed to `origin/main` (normal push).
+- **Phase 10 (Bulk / CSV tools), planning:**
+  - `HEAD` = `origin/main` = `716600d`, clean; roadmap numbering confirmed. Recorded `072f4d6` and `716600d`.
+  - Backup `sharayu-20260926-234618-before-phase10.sql`. Baseline 1,540 passed, 0 failed, 0 skipped (suite by suite; phases 4, 5, 6, 8 re-run with the tool paths pointing at the `.mjs` files). Crash count 139.
+  - Wrote the plan (D1–D16).
+
+### 2026-09-27
+- **Phase 10 (Bulk / CSV tools):**
+  - The user approved the plan with the tools as tabs of QR & Barcodes (per-tab capabilities), pruning of expired cost previews, permanent test tools in `C:\xampp\tools\pqbg\` and the MENU RESTRUCTURE open item.
+  - Added `BulkGenerator`, `BulkLog`, `CodesExport`, `CsvUpload`, `CostImport`, `ToolsAdmin`, the tools CSS/JS, the tabs in `SettingsPage`, `ProductCodeService::get_or_create()`'s `&$created`, the uninstall changes and `tests/phase10-bulk.php`. Class files were created before `Plugin.php` referenced them. No schema change.
+  - The first Phase 10 run was stopped by Claude Code for low system memory; its test data was listed and, with the user's approval, removed by a guarded script; clean state confirmed. Added a memory watchdog to the runner and a cooperative stop (`PQBG_STOP_FILE`) to the suite.
+  - Fixed from the runs: `BulkGenerator::state()` stale "option does not exist" cache, `BulkLog::add()` re-read, faster export (stored attribute summary); new tests for the first two.
+  - Backup `sharayu-20260927-105123-before-phase10-tests.sql`. Phase 10 on its own: 197/197; then every other suite one at a time: 1,540/1,540. Total 1,737 passed, 0 failed, 0 skipped; AS guard PASS everywhere; crash count 139 throughout. All volume timings within target.
+  - Updated the Phase 3, 4 and 9A checks made false by design (D16), `tests/README.md`, the plugin README (Bulk tools, Phase 10 checklist) and this file. Report: `C:\xampp\backups\sharayu\phase10-report.txt`.
+  - Not committed; waiting for the user's review.

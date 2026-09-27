@@ -1,0 +1,77 @@
+/* QR & Barcodes → Code tools / Import cost prices. */
+
+.pqbg-run {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-left-width: 4px;
+	border-left-color: #2271b1;
+	margin: 1em 0;
+	max-width: 60em;
+	padding: 0.5em 1em 1em;
+}
+
+.pqbg-run--done {
+	border-left-color: #00a32a;
+}
+
+.pqbg-run--stopped,
+.pqbg-run--stale {
+	border-left-color: #dba617;
+}
+
+.pqbg-run progress {
+	vertical-align: middle;
+	width: min(24em, 100%);
+}
+
+.pqbg-run__counts {
+	list-style: disc;
+	margin-left: 1.5em;
+}
+
+.pqbg-run__actions {
+	margin: 1em 0 0;
+}
+
+.pqbg-inline-form {
+	display: inline-block;
+	margin: 0 0.5em 0.5em 0;
+}
+
+.pqbg-print-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5em;
+}
+
+.pqbg-counts,
+.pqbg-log,
+.pqbg-preview {
+	margin: 1em 0;
+	max-width: 70em;
+}
+
+.pqbg-counts .num {
+	text-align: right;
+}
+
+.pqbg-import-counts li,
+.pqbg-rules li {
+	list-style: disc;
+	margin-left: 1.5em;
+}
+
+.pqbg-preview .pqbg-outcome--error td {
+	background: #fcf0f1;
+}
+
+.pqbg-preview .pqbg-outcome--update td,
+.pqbg-preview .pqbg-outcome--clear td {
+	background: #f0f6fc;
+}
+
+.pqbg-log code {
+	background: none;
+	white-space: normal;
+	word-break: break-word;
+}

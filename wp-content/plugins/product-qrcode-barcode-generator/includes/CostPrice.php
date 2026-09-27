@@ -12,7 +12,8 @@
  * past sales, which keep their snapshot.
  *
  * Visibility: only users with pqbg_view_costs (administrators) ever see or edit
- * it, and only on the classic product edit screen. Everything else is closed:
+ * it, and only on the classic product edit screen and (Phase 10) the Import cost prices tab
+ * (CostImport, which writes through set()). Everything else is closed:
  *   - read_meta filter: the key never enters any WooCommerce object's meta_data,
  *     so it is not in the WC REST API (products/variations), the product CSV
  *     exporter, Duplicate, or anything else built on WC_Data meta, for anyone;

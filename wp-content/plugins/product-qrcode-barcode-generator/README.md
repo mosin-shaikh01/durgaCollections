@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–9B (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports)
+## Current scope: Phases 2–10 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools)
 
 Implemented:
 
@@ -23,9 +23,10 @@ Implemented:
 - **Phase 8:** label printing from wp-admin: "Print label" on the product panel, "Print QR labels" on the products list, a print setup screen (A4 sheet and thermal presets, custom layouts, start position, copies, fields), and a standalone print-ready page with exact millimetre geometry, plus a render cache. See [Label printing](#label-printing).
 - **Phase 9A:** the payment method on every sale (required, chosen by the seller), an optional cost price per product/variation (administrators only) snapshotted on every sale, the seller's name snapshot, the managers' **In-store sales** history (filters, totals, profit, sale detail, CSV export, void), and the sellers' **My sales** page. Schema version 3 and the `pqbg_view_costs` capability. See [Sales history](#sales-history).
 - **Phase 9B:** **In-store reports**: the owner dashboard and ten reports (sales over time, products, categories, sellers, peak times, end of day / payments with "Cash expected in drawer", profit & margin, voids & failed, stock, dead stock), server-rendered SVG charts, CSV exports and a print-friendly end of day. Schema version 4 (`void_restock`). Also the fix of a Phase 7 idempotency race (a duplicate submission arriving mid-sale was answered "failed"). See [In-store reports](#in-store-reports).
+- **Phase 10:** bulk and CSV tools as tabs of **WooCommerce → QR & Barcodes** (Settings | Code tools | Import cost prices, each tab with its own capability): resumable generation of missing codes with "Print labels" links, the codes CSV export, the administrator-only cost price import (preview, apply, report, template) and an audit log. No schema change. See [Bulk tools](#bulk-tools).
 
 **Not implemented yet (later phases):**
-- CSV import/export of codes, bulk code generation, bulk cost import and bulk tools (Phase 10)
+- CSV import of codes (left out of Phase 10 by decision D6; in the backlog), an undo of a cost import, bulk regeneration or retirement of codes
 - split/mixed payments, receipts/invoices, returns/exchanges, discounts, GST/tax, customer data
 - GST/tax reports, scheduled or e-mailed reports, combined online + in-store revenue reports, forecasting, multi-store
 - PDF output, print history, a label designer, direct printer drivers
@@ -38,6 +39,7 @@ The plugin adds **no REST routes, AJAX handlers or shortcodes**. Its request han
 - the scan page of Phase 6, which requires a login and `pqbg_view_products` before it shows anything (see [Scan page](#scan-page)); since Phase 7 it also accepts POST (sell, undo) on code URLs from users with `pqbg_sell`, with a nonce and a signed form token (see [Mark as Sold](#mark-as-sold))
 - Phase 9A (see [Sales history](#sales-history)): the **In-store sales** screens (a wp-admin page, GET, `pqbg_view_all_sales`), the void POST (`admin-post.php`, nonce, `pqbg_void_sale`), the CSV download (`admin-post.php`, GET, nonce, `pqbg_view_all_sales`), and **My sales** at `/scan/my-sales/` (GET/HEAD, `pqbg_view_own_sales`)
 - Phase 9A cost price: two WooCommerce product-editor save actions for users with `pqbg_view_costs`, and filters that keep the cost out of WooCommerce's meta data, REST, exports and imports (see [Cost price](#cost-price))
+- Phase 10 (see [Bulk tools](#bulk-tools)): the Code tools and Import cost prices tabs of the QR & Barcodes page, and six `admin-post.php` handlers: `pqbg_bulk_generate` (POST) and `pqbg_codes_csv` (GET/HEAD) for `pqbg_manage_codes`; `pqbg_cost_upload`, `pqbg_cost_apply` (POST), `pqbg_cost_report` and `pqbg_cost_template` (GET/HEAD) for `pqbg_view_costs`; every one with a nonce
 - Phase 9B (see [In-store reports](#in-store-reports)): the **In-store reports** page (a wp-admin page, GET, `pqbg_view_all_sales`; cost parts `pqbg_view_costs`), the report CSV (`admin-post.php?action=pqbg_report_csv`, GET/HEAD, nonce) and the end-of-day print page (`admin-post.php?action=pqbg_report_print`, GET/HEAD, nonce)
 
 ## QR codes and barcodes
@@ -99,9 +101,19 @@ The libraries' own SVG writers are not used. picqer's has no quiet zone and no h
 
 ## Settings
 
-**WooCommerce → QR & Barcodes** (`wp-admin/admin.php?page=pqbg-settings`) is visible only to users with `pqbg_manage_settings`, which means administrators.
-- Shop Managers get neither the menu item nor the page: the direct URL returns 403.
-- Store Sellers are kept out of wp-admin by WooCommerce.
+**WooCommerce → QR & Barcodes** (`wp-admin/admin.php?page=pqbg-settings`) has three tabs since Phase 10, each checked on its own before any output:
+
+| Tab | URL | Capability | Who |
+|---|---|---|---|
+| Settings | `&tab=settings` | `pqbg_manage_settings` | administrators |
+| Code tools | `&tab=tools` | `pqbg_manage_codes` | administrators, Shop Managers |
+| Import cost prices | `&tab=costs` | `pqbg_view_costs` | administrators |
+
+- The menu item needs `pqbg_manage_codes`. Without a tab the page opens the user's first tab: Settings for administrators, Code tools for Shop Managers.
+- A tab the user may not use is not shown, and its URL returns 403 (an unknown tab 404). A Shop Manager never sees the Settings or cost tab, a link to either, or any cost.
+- Store Sellers get neither the menu item nor the page (and WooCommerce keeps them out of wp-admin).
+
+The Settings tab is unchanged:
 
 It uses the WordPress Settings API:
 - The form posts to `options.php`, which checks the `pqbg_settings-options` nonce and, through `option_page_capability_pqbg_settings`, the `pqbg_manage_settings` capability.
@@ -937,6 +949,7 @@ Phase 9A: how each in-store sale was paid, what the item cost, and who sold it; 
   - `delete_post_metadata`: a logged-in user without `pqbg_view_costs` cannot delete one item's cost through the meta API. **Never blocked:** permanent deletion of products/variations (WordPress deletes meta by ID, `delete_post_metadata_by_mid`, which is not hooked), bulk removal (`$delete_all`, e.g. uninstall), and requests without a user (cron, CLI).
   - `wxr_export_skip_postmeta`: Tools → Export never includes the cost, for anyone (the importer could not write it back anyway, so an exported cost could only leak).
   - The Store API, storefront, scan screens, labels and My sales never read it; the history, detail and CSV show it only to `pqbg_view_costs`.
+  - Since Phase 10, administrators can also set costs in bulk on **QR & Barcodes → Import cost prices** and download them in its template (both `pqbg_view_costs` only, through `CostPrice::get_many()` / `CostPrice::set()`); the codes CSV never contains costs. See [Bulk tools](#bulk-tools).
 - Deleting a product, removing a variation or changing variable → simple (WooCommerce deletes the variations) leaves no orphaned cost meta; after variable → simple the parent's default becomes the simple product's cost.
 
 ### Seller name
@@ -1095,6 +1108,93 @@ Why, and what was measured: grouping 50,000 rows costs 350–450 ms per query in
 - Online orders are read only for dead stock; there is no combined online + in-store revenue report.
 - The dashboard's 90-day target is not met at 50,000 sales in 90 days (above).
 
+## Bulk tools
+
+Phase 10. Two tabs of **WooCommerce → QR & Barcodes** (see [Settings](#settings) for the tab access rules). No schema change (`DB_VERSION` stays 4), no new capability, no REST/AJAX/nopriv handler, no new product or meta hook, and the sale path is untouched.
+
+### Generate missing codes (Code tools tab, `pqbg_manage_codes`)
+
+**Which items qualify** (the same rules as automatic assignment on save):
+- simple products whose status is Published, Private, Draft, Pending review or Scheduled;
+- the variations (enabled or disabled) of a variable product in one of those statuses;
+- never: variable products themselves, grouped/external/other types, orphan variations or variations under a non-variable product, auto-drafts, the importer's "importing" placeholders, trashed items or variations of a trashed product. Stock tracking plays no part.
+
+The tab shows the count per status and type (a variation counts under its product's status), a checkbox per status (all ticked), and a required confirmation that codes are permanent. The "missing codes" alert on the In-store reports dashboard counts published products only.
+
+**How it runs** (`BulkGenerator`):
+- In batches of up to 100 items or about 10 seconds, each one `admin-post.php?action=pqbg_bulk_generate` (POST, nonce). The page continues by itself (`assets/pqbg-tools.js` submits "Continue"); without JavaScript, press Continue. **Stop** and **Continue** work at any time.
+- There is no stored queue: each batch asks again for "qualifying, no active code, ID above the cursor". So a run can be stopped, abandoned (closed tab, crash, power cut) and continued, and running again is always safe; it never gives an item a second code (`ProductCodeService::get_or_create()`, backed by the unique index).
+- Before each code, the item is checked again (status, eligibility): an item trashed or changed during the run is skipped.
+- One run at a time: a new run cannot start while another had a batch in the last 5 minutes. An abandoned run can be continued, or replaced by a new one (it is logged as "abandoned"). Batches run one at a time under a MySQL named lock (`GET_LOCK`, released automatically if the request dies), so the counts are exact. A batch that dies midway keeps the codes it had committed; they are simply not in that run's counts.
+- Run state: the option `pqbg_bulk_run` (not autoloaded). Codes record who created them (`created_by`).
+- When a run finishes, **"Print labels: items 1–300"** (and so on, at most 300 items per link, the Phase 8 limit) open the existing print setup screen for the items just coded. Printing itself is unchanged and never generates codes.
+
+### Export codes (Code tools tab, `pqbg_manage_codes`)
+
+`admin-post.php?action=pqbg_codes_csv` (GET/HEAD, nonce; read-only apart from one log entry).
+- **Columns:** Item ID, Parent ID (0 for simple products), Type, SKU, Product (the parent's name for a variation), Attributes, Product status ("…; variation disabled" for a disabled variation, "Deleted" for a deleted item), Code, Code status (`active`, `retired`, `none`), Scan URL (**active codes only**, from `ScanUrl::for_code()`), Code created and Retired at (site timezone).
+- **Filters:** active (default), retired or all codes; product status (any, one status, trash or deleted); type; and "also list items without a code" (appended with an empty code).
+- **Never any cost data**, for anyone.
+- The Phase 9A CSV rules: UTF-8 with a byte order mark, formula injection neutralised (a cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading apostrophe; plain numbers stay numbers), streamed 500 rows at a time.
+- **Leading zeros:** SKUs are written exactly (`00123`). Excel removes leading zeros only when a CSV is opened by double-click; to keep them, use **Data → From Text/CSV** and set the SKU column to **Text**. (An `.xlsx` export was not added: PHP's `ZipArchive` is not available on this server.)
+
+### Import cost prices (its own tab, `pqbg_view_costs`: administrators only)
+
+**Download the template** (`pqbg_cost_template`, GET): every simple product, variable product (its default cost for variations) and variation with its current cost price: Item ID, Parent ID, Type, SKU, Product, Attributes, Cost price (₹). Edit the last column and upload the file as it is.
+
+**File rules** (`CsvUpload`): a `.csv` file of at most 1 MB and 5,000 data rows, 20 columns, 1,000 characters per cell, a text MIME type, no NUL bytes. UTF-8 with or without a byte order mark; a file that is not UTF-8 is read as Windows-1252 and the preview says so. Comma separated, or semicolon when the header has semicolons and no commas. Empty rows are ignored.
+
+**Columns:** an ID column ("ID", "Item ID", "Product ID") and/or "SKU", and "Cost price" (any "(₹)" suffix is ignored; case does not matter). Other columns are ignored.
+
+**Each row:**
+- matched by ID; by SKU when the ID is empty (without regard to case, as WooCommerce compares SKUs). Errors: ID and SKU pointing to different items, the same item on more than one row (every such row), an unknown ID or SKU (a digits-only SKU gets a hint about Excel and leading zeros), a trashed item, a type without a cost (grouped, external), a variation whose parent is missing or not variable. A variable product's row sets the default for its variations, as on the edit screen.
+- cost: **empty = no change**; **`clear`** = remove the cost (it becomes unknown); **0** is a known cost of zero; otherwise a number, with an optional ₹, Rs, Rs. or INR before or after it and an optional `/-`, thousands separators only in real Western (1,200,000) or Indian (12,00,000) grouping, and at most 2 decimals (**never rounded**). Negative numbers, scientific notation, bad grouping ("1,2") and text are errors. Our own export's leading apostrophe and Excel's `="…"` are undone first.
+- everything is written only by `CostPrice::set()` after `CostPrice::normalize()`.
+
+**Preview, then apply:**
+1. **Upload** (`pqbg_cost_upload`, POST, multipart): the file is read from PHP's temporary upload folder (outside the web root) and **deleted immediately**; it is never stored anywhere public. Only the parsed rows are kept, in the uploader's own user meta (`pqbg_cost_import`, compressed, with a random token), for **1 hour**. Nothing is written.
+2. **Preview:** counts (update, clear, no change, empty cell, error), the rows with errors first (200 on screen), each with the current and new cost and the reason, and **Download the full report** (`pqbg_cost_report`, GET).
+3. **Apply** (`pqbg_cost_apply`, POST): **row by row** (decision D11), 500 rows per request. When the file has errors, applying needs the box "Apply the N valid changes and skip the M rows with errors". Each row is checked again: a cost changed since the preview is skipped ("changed since preview"); a row already at its new value counts as done, so an interrupted apply can simply be continued; re-applying the same file changes nothing. The result and the report stay for another hour.
+
+Row by row rather than all-or-nothing: each row is one independent, idempotent meta write, so a partly applied import is consistent and can be finished or re-run; a database transaction would not roll back WordPress's object cache and would bypass the meta API that `CostPrice`'s guards rely on.
+
+**Expired previews** of every user are deleted whenever the QR & Barcodes page loads (`CostImport::prune()`), and all previews on uninstall.
+
+### Audit log
+
+`BulkLog`: the option `pqbg_bulk_log` (not autoloaded), the last 200 entries, newest first, shown as **Recent bulk runs** on the Code tools tab. Each entry: time, user, tool (code generation, codes export, cost template download, cost import), and counts; for an import also the file name and its SHA-256. No cost value is ever logged. Generation and export entries are shown to `pqbg_manage_codes`; **cost entries only to `pqbg_view_costs`**. Each entry is also one line in the WooCommerce log (source `product-qrcode-barcode-generator`).
+
+### Classes
+
+`BulkGenerator`, `CodesExport`, `CsvUpload`, `CostImport`, `BulkLog`, `ToolsAdmin` (the two tabs and the six handlers), `assets/pqbg-tools.js` and `assets/pqbg-tools.css`. `SettingsPage` renders the tab navigation and hands the two new tabs to `ToolsAdmin`. `ProductCodeService::get_or_create()` gained an optional `&$created` out-parameter (true only when that call created the code).
+
+### Timings (dev machine, 2,000 items: 500 simple + 150 variable products × 10 variations)
+
+| | Measured | Target |
+|---|---|---|
+| Count and preview of items without a code | 49 ms | < 1 s |
+| One batch of 100 codes (worst) | 0.66 s | < 5 s |
+| All 2,000 codes | 11.7 s | < 60 s |
+| Codes export, 2,070 rows | 0.65 s in-process, 1.2 s over HTTP | < 5 s |
+| Cost preview, 2,000 rows | 0.20 s (20 KB stored) | < 5 s |
+| Cost apply, 2,000 rows | 6.7 s | < 20 s |
+| PHP peak memory of the volume test | 107 MB | < 256 MB |
+
+**Phase 10 checklist (bulk tools).** Part of the pre-launch acceptance checklist in `progress.md`: do it once before launch, on the real catalogue (after a database backup). No phone is needed.
+
+1. **Generate missing codes (administrator):** WooCommerce → QR & Barcodes → **Code tools**. Check the counts per status make sense for the catalogue, untick any status you do not want, tick the confirmation and click **Generate missing codes**. Let it finish (or click Stop, then Continue). Afterwards the tab says "Every qualifying product and variation has a code", and the dashboard's missing-codes alert is gone.
+2. **Print from the run:** click the first **Print labels** link: the Phase 8 setup screen opens with those items. (Do not print real labels before the Phase 8 printer test and the production scan URL.)
+3. **Export in Excel:** download the codes CSV and open it in Excel with **Data → From Text/CSV** (SKU column as Text): ₹/Devanagari names correct, SKUs with leading zeros intact, scan URLs for active codes only, no cost column.
+4. **Cost import (administrator):** open **Import cost prices**, download the template, change a few costs (one with "1,200.50", one "clear", one wrong value such as "12.345"), upload it, check the preview (the wrong value is an error with its reason), tick the box, apply, and check the products' cost prices and the downloaded report.
+5. **Shop manager:** log in as a Shop Manager: QR & Barcodes opens on **Code tools** only (no Settings or Import cost prices tab, no cost anywhere, no cost entries in Recent bulk runs); adding `&tab=costs` or `&tab=settings` to the address gives "Sorry, you are not allowed to access this page."
+
+### Limitations
+
+- Code CSV **import** is not implemented (decision D6: a database move keeps codes; importing codes could point printed labels at the wrong product). It is in the backlog.
+- There is no undo of a cost import; keep the downloaded report for the old values.
+- Items saved while a run is in progress with an ID below its cursor are picked up by the next run.
+- The codes export and the template read current product data (names, SKUs, statuses).
+
 ## Requirements
 
 | | Minimum | Tested |
@@ -1184,8 +1284,12 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 | `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
 | `pqbg_svg_cache_index` | no | Phase 8 render cache index: `{transient key} => last used`, at most 2,000 entries. Not data; removed on every uninstall. |
 | `_transient_pqbg_svg_{md5}` (+ `_transient_timeout_…`) | no | Phase 8 cached QR/barcode SVGs, 30-day expiry (in the object cache instead when the host has a persistent one). Not data; removed on every uninstall. |
+| `pqbg_bulk_run` | no | Phase 10: the current or last code-generation run (status, statuses, cursor, counts, created item IDs for the print links). Exists only after a run until it is dismissed. Not data; removed on every uninstall. |
+| `pqbg_bulk_log` | no | Phase 10: the bulk tools' audit log, the last 200 entries (time, user, tool, counts; file name and SHA-256 for imports; never a cost). Removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`. |
 
 User meta `pqbg_print_prefs` (Phase 8) holds each user's last-used print options; it is removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`.
+
+User meta `pqbg_cost_import` (Phase 10) holds a user's current cost-import preview (parsed rows, compressed, with a token; 1-hour expiry; it contains costs, so it exists only for users with `pqbg_view_costs`). Expired ones are deleted whenever the QR & Barcodes page loads, and all of them on every uninstall.
 
 Post meta `_pqbg_cost_price` (Phase 9A) holds a product's or variation's cost price (on a variable product: the default for its variations); see [Cost price](#cost-price). It is removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`.
 
@@ -1251,6 +1355,7 @@ WooCommerce only lets Shop Managers assign the `customer` role, so only Administ
 - Phase 7 mapping: selling and undo need `pqbg_sell` (undo also: own sale, 10 minutes); the sale page needs `can_view_sale()`; `SaleService::void_sale()` needs `pqbg_void_sale`. No new capability was added.
 - Phase 9A mapping: the In-store sales history, sale detail and CSV need `pqbg_view_all_sales`; the void screen and handler `pqbg_void_sale`; My sales `pqbg_view_own_sales` (after the scan page's `pqbg_view_products` gate); cost fields, cost and profit `pqbg_view_costs` (new, administrators only).
 - Phase 9B mapping: In-store reports, their CSVs and the end-of-day print page need `pqbg_view_all_sales`; the Profit & margin report and every cost, profit, margin and value-at-cost card, column, chart or CSV column need `pqbg_view_costs`. For other users they are not built at all, and asking for them (the profit tab or CSV, sorting by a cost column) is refused with 403. No new capability.
+- Phase 10 mapping: the QR & Barcodes page needs `pqbg_manage_codes`; its Settings tab (and `options.php` for the group) `pqbg_manage_settings`; the Code tools tab, `pqbg_bulk_generate` and `pqbg_codes_csv` `pqbg_manage_codes`; the Import cost prices tab and `pqbg_cost_upload`, `pqbg_cost_apply`, `pqbg_cost_report`, `pqbg_cost_template` `pqbg_view_costs`. The capability is checked before the nonce, so a user without it gets 403 even with an administrator's nonce or import token; an import token also belongs to the user who uploaded the file. No new capability.
 
 ## HPOS
 
@@ -1263,7 +1368,7 @@ Deactivation is non-destructive. Tables, codes, sales, settings, the role and ca
 
 ## Uninstall
 
-**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only runtime state: the transient install lock, the `pqbg_rewrite_version` flag and the render cache of QR/barcode images (Phase 8; the cache is not data). Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
+**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only runtime state: the transient install lock, the `pqbg_rewrite_version` flag, the render cache of QR/barcode images (Phase 8; the cache is not data), every user's cost-import preview (`pqbg_cost_import` user meta) and the code-generation run state (`pqbg_bulk_run`) (Phase 10; codes already created stay). Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
 
 To permanently delete all plugin data, add this to `wp-config.php` **before** deleting the plugin:
 
@@ -1271,7 +1376,7 @@ To permanently delete all plugin data, add this to `wp-config.php` **before** de
 define( 'PQBG_UNINSTALL_DELETE_ALL_DATA', true );
 ```
 
-This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings` and `pqbg_db_version`, every user's remembered print options (`pqbg_print_prefs` user meta) and every cost price (`_pqbg_cost_price` post meta, Phase 9A), removes every `pqbg_*` capability (including `pqbg_view_costs`), and deletes the Store Seller role. Affected users keep their accounts.
+This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings`, `pqbg_db_version` and the bulk tools' audit log (`pqbg_bulk_log`, Phase 10), every user's remembered print options (`pqbg_print_prefs` user meta) and every cost price (`_pqbg_cost_price` post meta, Phase 9A), removes every `pqbg_*` capability (including `pqbg_view_costs`), and deletes the Store Seller role. Affected users keep their accounts.
 **This cannot be undone. Back up the database first.** On multisite, only the site running the uninstall is affected.
 
 ## Operational notes

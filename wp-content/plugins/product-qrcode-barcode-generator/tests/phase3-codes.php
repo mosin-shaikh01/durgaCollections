@@ -354,7 +354,8 @@ try {
 	pqbg_t( 'no pqbg post meta', 0 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key LIKE '%pqbg%'" ) );
 	$opts = $wpdb->get_col( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE '%pqbg%' ORDER BY option_name" );
 	// Phase 6 added pqbg_rewrite_version, the scan route's rewrite-rules flag. It holds no data.
-	pqbg_t( 'only the pqbg options exist: db version, settings and the Phase 6 rewrite-rules flag', array( 'pqbg_db_version', 'pqbg_rewrite_version', 'pqbg_settings' ) === $opts, implode( ',', $opts ) );
+	// Phase 10 (approved, D14): pqbg_bulk_log (audit trail) and pqbg_bulk_run (run state) exist once the bulk tools were used.
+	pqbg_t( 'only the pqbg options exist: db version, settings and the Phase 6 rewrite-rules flag (plus, once used, the Phase 10 bulk log and run state)', array( 'pqbg_db_version', 'pqbg_rewrite_version', 'pqbg_settings' ) === array_values( array_diff( $opts, array( 'pqbg_bulk_log', 'pqbg_bulk_run' ) ) ), implode( ',', $opts ) );
 	$forbidden = array( 'add_action', 'add_filter', 'register_rest_route', 'add_shortcode', 'wpdb', '_get', '_post', '_request', '_server', '_cookie', 'home_url', 'site_url', 'admin_url' );
 	$scan      = static function ( string $file ) use ( $forbidden ): array {
 		$found = array();

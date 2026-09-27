@@ -475,11 +475,12 @@ try {
 	preg_match( '/name="_wpnonce" value="([a-f0-9]+)"/', $r['body'], $m );
 	$admin_nonce = $m[1] ?? '';
 	pqbg_t( 'admin: form carries a nonce', '' !== $admin_nonce );
+	// Phase 10 (approved): the page opens for pqbg_manage_codes on its Code tools tab; the Settings tab stays pqbg_manage_settings.
 	$r = $http( 'sm', 'GET', $page_url );
-	pqbg_t( 'shop manager: direct URL refused (403), no form', 403 === $r['code'] && ! str_contains( $r['body'], 'pqbg_settings[' ) );
+	pqbg_t( 'shop manager: the page opens on Code tools (Phase 10) with no settings form and no Settings tab; the Settings tab URL is refused (403)', 200 === $r['code'] && ! str_contains( $r['body'], 'pqbg_settings[' ) && ! str_contains( $r['body'], "name='option_page'" ) && ! str_contains( $r['body'], 'tab=settings' ) && 403 === $http( 'sm', 'GET', $page_url . '&tab=settings' )['code'] );
 	// The Dashboard renders the full admin menu, including WooCommerce's (the Products screen of an empty store redirects to onboarding).
 	$r = $http( 'sm', 'GET', admin_url( 'index.php' ) );
-	pqbg_t( 'shop manager: WooCommerce menu visible but no settings item and no warning', str_contains( $r['body'], 'admin.php?page=wc-settings' ) && 200 === $r['code'] && ! str_contains( $r['body'], 'page=pqbg-settings' ) && ! str_contains( $r['body'], esc_html( $message ) ), $r['code'] . ' ' . $r['location'] );
+	pqbg_t( 'shop manager: WooCommerce menu visible, the QR & Barcodes item (Code tools, Phase 10) but no warning', str_contains( $r['body'], 'admin.php?page=wc-settings' ) && 200 === $r['code'] && str_contains( $r['body'], 'page=pqbg-settings' ) && ! str_contains( $r['body'], esc_html( $message ) ), $r['code'] . ' ' . $r['location'] );
 	$r = $http( 'seller', 'GET', $page_url );
 	pqbg_t( 'seller: direct URL does not show the page', 200 !== $r['code'] && ! str_contains( $r['body'], 'pqbg_settings[' ), $r['code'] . ' ' . $r['location'] );
 
