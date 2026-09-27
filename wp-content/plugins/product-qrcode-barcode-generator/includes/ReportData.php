@@ -31,7 +31,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class ReportData {
 
-	/** Every report with a table (the dashboard has none). */
+	/** Every report with a table (the Summary tab has none). */
 	const REPORTS = array( 'sales', 'products', 'categories', 'sellers', 'peak', 'eod', 'profit', 'voids', 'stock', 'dead' );
 
 	/** Reports that exist only for pqbg_view_costs. */
@@ -299,7 +299,7 @@ final class ReportData {
 					'name'     => str_repeat( '— ', (int) $r['depth'] ) . $r['name'],
 					'products' => $r['products'],
 					'_order'   => $i,
-					'_link'    => $r['term_id'] > 0 ? admin_url( 'edit.php?post_type=product&product_cat=' . rawurlencode( (string) get_term_field( 'slug', $r['term_id'], 'product_cat' ) ) ) : '',
+					'_link'    => $r['term_id'] > 0 ? AdminUrl::products( array( 'product_cat' => (string) get_term_field( 'slug', $r['term_id'], 'product_cat' ) ) ) : '',
 				)
 			);
 		}
@@ -568,7 +568,7 @@ final class ReportData {
 				'reason'    => $voided ? self::reason( $sale ) : '',
 				'restocked' => $voided ? self::restocked( $sale ) : '',
 				'failure'   => (string) $sale['failure_code'],
-				'_link'     => SalesAdmin::detail_url( (int) $sale['id'] ),
+				'_link'     => AdminUrl::sale( (int) $sale['id'] ),
 			);
 		}
 

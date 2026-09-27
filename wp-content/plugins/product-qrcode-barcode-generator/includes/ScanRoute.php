@@ -376,7 +376,7 @@ final class ScanRoute {
 
 		$requested = is_string( $requested ) ? $requested : '';
 
-		if ( ! user_can( $user, 'edit_posts' ) && in_array( $requested, array( '', 'wp-admin/', admin_url(), admin_url( 'profile.php' ) ), true ) ) {
+		if ( ! user_can( $user, 'edit_posts' ) && AdminUrl::is_admin_home( $requested ) ) {
 			return ScanUrl::site_url();
 		}
 

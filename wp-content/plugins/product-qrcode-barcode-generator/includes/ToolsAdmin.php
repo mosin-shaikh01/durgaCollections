@@ -1,11 +1,12 @@
 <?php
 /**
- * The Phase 10 tabs of WooCommerce → QR & Barcodes, and their handlers.
+ * QR & Barcodes → Bulk tools (Phase 10; its own page since Phase 10B) and its handlers.
  *
- *   ?page=pqbg-settings&tab=settings   Settings (SettingsPage)          pqbg_manage_settings
- *   ?page=pqbg-settings&tab=tools      Code tools: generate missing     pqbg_manage_codes
+ *   ?page=pqbg-bulk-tools&tab=tools    Code tools: generate missing     pqbg_manage_codes (also the page)
  *                                      codes, export codes, recent runs
- *   ?page=pqbg-settings&tab=costs      Import cost prices               pqbg_view_costs
+ *   ?page=pqbg-bulk-tools&tab=costs    Import cost prices               pqbg_view_costs
+ * Until Phase 10B these were tabs of WooCommerce → QR & Barcodes (?page=pqbg-settings&tab=…);
+ * those addresses redirect here (AdminMenu). Settings is its own page (SettingsPage).
  * Without a tab the page opens the first tab the user may use. A tab the user may not
  * use is not shown and its URL is refused with 403 (load_page(), before any output).
  *
@@ -38,6 +39,7 @@ final class ToolsAdmin {
 	const REPORT   = 'pqbg_cost_report';
 	const TEMPLATE = 'pqbg_cost_template';
 
+	/** The Settings tab of the Phase 10 page; since Phase 10B its own page (the old URL redirects). */
 	const TAB_SETTINGS = 'settings';
 	const TAB_TOOLS    = 'tools';
 	const TAB_COSTS    = 'costs';
@@ -73,10 +75,6 @@ final class ToolsAdmin {
 	public static function tabs( ?int $user_id = null ): array {
 		$tabs = array();
 
-		if ( Permissions::can_manage_settings( $user_id ) ) {
-			$tabs[] = self::TAB_SETTINGS;
-		}
-
 		if ( Permissions::can_manage_codes( $user_id ) ) {
 			$tabs[] = self::TAB_TOOLS;
 		}
@@ -104,23 +102,13 @@ final class ToolsAdmin {
 	}
 
 	/**
-	 * URL of a tab.
-	 *
-	 * @param string               $tab  Tab.
-	 * @param array<string, string> $args More query arguments.
-	 */
-	public static function url( string $tab, array $args = array() ): string {
-		return add_query_arg( array_merge( array( 'page' => SettingsPage::SLUG, 'tab' => $tab ), $args ), admin_url( 'admin.php' ) );
-	}
-
-	/**
 	 * load-{page}: refuses a tab the user may not use (403) or an unknown tab (404)
 	 * before any output, and removes every user's expired cost import preview.
 	 */
 	public static function load_page(): void {
 		$tab = self::requested_tab();
 
-		if ( ! in_array( $tab, array( self::TAB_SETTINGS, self::TAB_TOOLS, self::TAB_COSTS ), true ) ) {
+		if ( ! in_array( $tab, array( self::TAB_TOOLS, self::TAB_COSTS ), true ) ) {
 			wp_die( esc_html__( 'This page does not exist.', 'product-qrcode-barcode-generator' ), '', array( 'response' => 404 ) );
 		}
 
@@ -132,21 +120,20 @@ final class ToolsAdmin {
 	}
 
 	/**
-	 * The tab navigation (only the tabs the user may use).
+	 * The page's own tab row (only the tabs the user may use), below the plugin navigation.
 	 *
 	 * @param string $current Current tab.
 	 */
 	public static function render_nav( string $current ): void {
 		$labels = array(
-			self::TAB_SETTINGS => __( 'Settings', 'product-qrcode-barcode-generator' ),
 			self::TAB_TOOLS    => __( 'Code tools', 'product-qrcode-barcode-generator' ),
 			self::TAB_COSTS    => __( 'Import cost prices', 'product-qrcode-barcode-generator' ),
 		);
 
-		echo '<nav class="nav-tab-wrapper wp-clearfix" aria-label="' . esc_attr__( 'Secondary menu', 'product-qrcode-barcode-generator' ) . '">';
+		echo '<nav class="nav-tab-wrapper wp-clearfix pqbg-page-tabs" aria-label="' . esc_attr__( 'Bulk tools', 'product-qrcode-barcode-generator' ) . '">';
 
 		foreach ( self::tabs() as $tab ) {
-			echo '<a href="' . esc_url( self::url( $tab ) ) . '" class="nav-tab' . ( $tab === $current ? ' nav-tab-active' : '' ) . '"' . ( $tab === $current ? ' aria-current="page"' : '' ) . '>' . esc_html( $labels[ $tab ] ) . '</a>';
+			echo '<a href="' . esc_url( AdminUrl::bulk_tools( $tab ) ) . '" class="nav-tab' . ( $tab === $current ? ' nav-tab-active' : '' ) . '"' . ( $tab === $current ? ' aria-current="page"' : '' ) . '>' . esc_html( $labels[ $tab ] ) . '</a>';
 		}
 
 		echo '</nav>';
@@ -158,12 +145,36 @@ final class ToolsAdmin {
 	 * @param string $hook_suffix Current admin page.
 	 */
 	public static function enqueue( $hook_suffix ): void {
-		if ( 'woocommerce_page_' . SettingsPage::SLUG !== $hook_suffix ) {
+		if ( ! AdminMenu::is_page( AdminUrl::BULK_TOOLS, (string) $hook_suffix ) ) {
 			return;
 		}
 
 		wp_enqueue_style( 'pqbg-tools', PQBG_PLUGIN_URL . 'assets/pqbg-tools.css', array(), PQBG_VERSION );
 		wp_enqueue_script( 'pqbg-tools', PQBG_PLUGIN_URL . 'assets/pqbg-tools.js', array(), PQBG_VERSION, true );
+	}
+
+	/**
+	 * Renders the Bulk tools page (load_page() has refused a tab the user may not use).
+	 */
+	public static function render(): void {
+		$tab = self::requested_tab();
+
+		if ( ! in_array( $tab, self::tabs(), true ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'product-qrcode-barcode-generator' ), 403 );
+		}
+
+		echo '<div class="wrap">';
+		AdminMenu::render_nav( AdminUrl::BULK_TOOLS );
+		echo '<h1>' . esc_html__( 'Bulk tools', 'product-qrcode-barcode-generator' ) . '</h1>';
+		self::render_nav( $tab );
+
+		if ( self::TAB_COSTS === $tab ) {
+			self::render_costs();
+		} else {
+			self::render_tools();
+		}
+
+		echo '</div>';
 	}
 
 	// ---------------------------------------------------------------- Code tools tab
@@ -269,7 +280,7 @@ final class ToolsAdmin {
 			foreach ( $chunks as $chunk ) {
 				$to = $from + count( $chunk ) - 1;
 				/* translators: 1: first item number, 2: last item number. */
-				echo '<li><a class="button" href="' . esc_url( PrintAdmin::setup_url( $chunk ) ) . '">' . esc_html( sprintf( __( 'Print labels: items %1$s–%2$s', 'product-qrcode-barcode-generator' ), number_format_i18n( $from ), number_format_i18n( $to ) ) ) . '</a></li>';
+				echo '<li><a class="button" href="' . esc_url( AdminUrl::print_setup( $chunk ) ) . '">' . esc_html( sprintf( __( 'Print labels: items %1$s–%2$s', 'product-qrcode-barcode-generator' ), number_format_i18n( $from ), number_format_i18n( $to ) ) ) . '</a></li>';
 				$from = $to + 1;
 			}
 
@@ -298,7 +309,7 @@ final class ToolsAdmin {
 			return;
 		}
 
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="pqbg-generate-form">';
+		echo '<form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '" class="pqbg-generate-form">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::GENERATE ) . '" /><input type="hidden" name="op" value="start" />';
 		wp_nonce_field( self::GENERATE, Permissions::NONCE_FIELD );
 		echo '<table class="widefat striped pqbg-counts"><thead><tr><th scope="col">' . esc_html__( 'Product status', 'product-qrcode-barcode-generator' ) . '</th><th scope="col" class="num">' . esc_html__( 'Simple products', 'product-qrcode-barcode-generator' ) . '</th><th scope="col" class="num">' . esc_html__( 'Variations', 'product-qrcode-barcode-generator' ) . '</th><th scope="col" class="num">' . esc_html__( 'Without a code', 'product-qrcode-barcode-generator' ) . '</th></tr></thead><tbody>';
@@ -310,7 +321,7 @@ final class ToolsAdmin {
 		}
 
 		echo '</tbody><tfoot><tr><th scope="row">' . esc_html__( 'Total', 'product-qrcode-barcode-generator' ) . '</th><td class="num">' . esc_html( number_format_i18n( array_sum( $counts['simple'] ) ) ) . '</td><td class="num">' . esc_html( number_format_i18n( array_sum( $counts['variation'] ) ) ) . '</td><td class="num"><strong>' . esc_html( number_format_i18n( $total ) ) . '</strong></td></tr></tfoot></table>';
-		echo '<p class="description">' . esc_html__( 'A variation counts under its product\'s status; enabled and disabled variations are both included. Stock tracking does not matter. The "missing codes" alert on the In-store reports dashboard counts published products only.', 'product-qrcode-barcode-generator' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'A variation counts under its product\'s status; enabled and disabled variations are both included. Stock tracking does not matter. The Dashboard and In-store reports → Summary count published products only ("Published products without a code").', 'product-qrcode-barcode-generator' ) . '</p>';
 
 		if ( null !== $state && BulkGenerator::RUNNING === $state['status'] ) {
 			echo '<p class="description">' . esc_html__( 'Starting a new run replaces the interrupted one above.', 'product-qrcode-barcode-generator' ) . '</p>';
@@ -327,7 +338,7 @@ final class ToolsAdmin {
 	 */
 	private static function render_export(): void {
 		echo '<h2>' . esc_html__( 'Export codes (CSV)', 'product-qrcode-barcode-generator' ) . '</h2>';
-		echo '<form method="get" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="pqbg-export-form">';
+		echo '<form method="get" action="' . esc_url( AdminUrl::admin_post() ) . '" class="pqbg-export-form">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( CodesExport::ACTION ) . '" />';
 		echo '<input type="hidden" name="_wpnonce" value="' . esc_attr( wp_create_nonce( CodesExport::ACTION ) ) . '" />';
 		echo '<p><label>' . esc_html__( 'Codes', 'product-qrcode-barcode-generator' ) . ' <select name="code_status">';
@@ -384,7 +395,7 @@ final class ToolsAdmin {
 	 * @param string $class  Extra form class.
 	 */
 	private static function generate_form( string $op, string $run_id, string $label, string $type, string $class = '' ): void {
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="pqbg-inline-form ' . esc_attr( $class ) . '">';
+		echo '<form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '" class="pqbg-inline-form ' . esc_attr( $class ) . '">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::GENERATE ) . '" /><input type="hidden" name="op" value="' . esc_attr( $op ) . '" /><input type="hidden" name="run" value="' . esc_attr( $run_id ) . '" />';
 		wp_nonce_field( self::GENERATE, Permissions::NONCE_FIELD );
 		submit_button( $label, $type, 'submit', false );
@@ -452,7 +463,7 @@ final class ToolsAdmin {
 			$args[ self::MESSAGE_ARG ] = 'generate_dismissed';
 		}
 
-		self::redirect( self::url( self::TAB_TOOLS, $args ) );
+		self::redirect( AdminUrl::bulk_tools( self::TAB_TOOLS, $args ) );
 	}
 
 	// ---------------------------------------------------------------- Import cost prices tab
@@ -482,7 +493,7 @@ final class ToolsAdmin {
 		echo '</ul>';
 
 		if ( null === $import ) {
-			echo '<form method="post" enctype="multipart/form-data" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="pqbg-upload-form">';
+			echo '<form method="post" enctype="multipart/form-data" action="' . esc_url( AdminUrl::admin_post() ) . '" class="pqbg-upload-form">';
 			echo '<input type="hidden" name="action" value="' . esc_attr( self::UPLOAD ) . '" /><input type="hidden" name="MAX_FILE_SIZE" value="' . esc_attr( (string) CsvUpload::MAX_BYTES ) . '" />';
 			wp_nonce_field( self::UPLOAD, Permissions::NONCE_FIELD );
 			echo '<p><label>' . esc_html__( 'CSV file', 'product-qrcode-barcode-generator' ) . ' <input type="file" name="pqbg_file" accept=".csv,text/csv" required="required" /></label></p>';
@@ -523,7 +534,7 @@ final class ToolsAdmin {
 			$apply = (int) $c[ CostImport::UPDATE ] + (int) $c[ CostImport::CLEAR ];
 
 			if ( $apply > 0 ) {
-				echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="pqbg-inline-form">';
+				echo '<form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '" class="pqbg-inline-form">';
 				self::apply_fields( 'start', (string) $import['token'] );
 
 				if ( $c[ CostImport::ERROR ] > 0 ) {
@@ -549,7 +560,7 @@ final class ToolsAdmin {
 			/* translators: 1: rows done, 2: rows. */
 			echo '<span>' . esc_html( sprintf( __( '%1$s of %2$s rows', 'product-qrcode-barcode-generator' ), number_format_i18n( (int) $import['position'] ), number_format_i18n( $total ) ) ) . '</span>';
 			$auto = isset( $_GET[ self::AUTO_ARG ] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
-			echo '<div class="pqbg-run__actions"><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="pqbg-inline-form' . ( $auto ? ' pqbg-auto-continue' : '' ) . '">';
+			echo '<div class="pqbg-run__actions"><form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '" class="pqbg-inline-form' . ( $auto ? ' pqbg-auto-continue' : '' ) . '">';
 			self::apply_fields( 'continue', (string) $import['token'] );
 			submit_button( __( 'Continue', 'product-qrcode-barcode-generator' ), 'primary', 'submit', false );
 			echo '</form> ';
@@ -632,7 +643,7 @@ final class ToolsAdmin {
 	 * @param string $label Label.
 	 */
 	private static function cancel_form( string $token, string $label ): void {
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="pqbg-inline-form">';
+		echo '<form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '" class="pqbg-inline-form">';
 		self::apply_fields( 'cancel', $token );
 		submit_button( $label, 'secondary', 'submit', false );
 		echo '</form>';
@@ -645,7 +656,7 @@ final class ToolsAdmin {
 	 * @param array<string, string> $args   More arguments.
 	 */
 	private static function cost_url( string $action, array $args = array() ): string {
-		return add_query_arg( array_map( 'rawurlencode', array_merge( array( 'action' => $action ), $args, array( '_wpnonce' => wp_create_nonce( $action ) ) ) ), admin_url( 'admin-post.php' ) );
+		return AdminUrl::admin_post( array_map( 'rawurlencode', array_merge( array( 'action' => $action ), $args, array( '_wpnonce' => wp_create_nonce( $action ) ) ) ) );
 	}
 
 	/**
@@ -673,7 +684,7 @@ final class ToolsAdmin {
 			self::fail( $result->get_error_message(), self::TAB_COSTS, 'pqbg_import_busy' === $result->get_error_code() ? 409 : 400 );
 		}
 
-		self::redirect( self::url( self::TAB_COSTS ) );
+		self::redirect( AdminUrl::bulk_tools( self::TAB_COSTS ) );
 	}
 
 	/**
@@ -724,7 +735,7 @@ final class ToolsAdmin {
 			$args[ self::MESSAGE_ARG ] = 'import_cancelled';
 		}
 
-		self::redirect( self::url( self::TAB_COSTS, $args ) );
+		self::redirect( AdminUrl::bulk_tools( self::TAB_COSTS, $args ) );
 	}
 
 	/**
@@ -907,7 +918,7 @@ final class ToolsAdmin {
 			esc_html__( 'Product QR Code and Barcode Generator', 'product-qrcode-barcode-generator' ),
 			array(
 				'response'  => $status,
-				'link_url'  => esc_url( self::url( $tab ) ),
+				'link_url'  => esc_url( AdminUrl::bulk_tools( $tab ) ),
 				'link_text' => esc_html__( 'Back', 'product-qrcode-barcode-generator' ),
 			)
 		);

@@ -30,9 +30,8 @@ final class ReportPrint {
 	public static function url( array $args ): string {
 		$keep = array_intersect_key( $args, array_flip( array( 'range', 'from', 'to' ) ) );
 
-		return add_query_arg(
-			array_map( 'rawurlencode', array_merge( array( 'action' => self::ACTION ), $keep, array( '_wpnonce' => wp_create_nonce( self::ACTION ) ) ) ),
-			admin_url( 'admin-post.php' )
+		return AdminUrl::admin_post(
+			array_map( 'rawurlencode', array_merge( array( 'action' => self::ACTION ), $keep, array( '_wpnonce' => wp_create_nonce( self::ACTION ) ) ) )
 		);
 	}
 
@@ -81,7 +80,7 @@ final class ReportPrint {
 				'label'  => ReportPeriod::span_label( $p['from'], $p['to'] ),
 				'data'   => ReportsQuery::end_of_day( ReportPeriod::where_filters( $p ) ),
 				'store'  => get_bloginfo( 'name' ),
-				'back'   => ReportsAdmin::url( ReportsAdmin::args( $ctx ) ),
+				'back'   => AdminUrl::reports( ReportsAdmin::args( $ctx ) ),
 			)
 		);
 	}
@@ -97,7 +96,7 @@ final class ReportPrint {
 			'mode'    => 'error',
 			'title'   => __( 'End of day', 'product-qrcode-barcode-generator' ),
 			'message' => $message,
-			'back'    => admin_url( 'admin.php?page=' . ReportsAdmin::SLUG . '&tab=eod' ),
+			'back'    => AdminUrl::reports( array( 'tab' => 'eod' ) ),
 		);
 	}
 

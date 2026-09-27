@@ -16,7 +16,7 @@
  * permissions over real HTTP for every tab, CSV and the print page (administrator,
  * shop manager, seller, customer, logged out) with cost/profit absent for the shop
  * manager; CSV rules; escaping (HTML and SVG); security headers; GET/HEAD never
- * write; the 50,000-row timings with EXPLAIN; scope; cleanup.
+ * write; the 5,000-row timings (50,000 with PQBG_STRESS=1) with EXPLAIN; scope; cleanup.
  *
  * Fixture sale rows are inserted directly into pqbg_sales (marked in `note`);
  * real sales go through SaleService. Everything created is removed at the end.
@@ -37,7 +37,7 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 require_once ABSPATH . 'wp-admin/includes/post.php';
 require_once ABSPATH . 'wp-admin/includes/admin.php';
 
-use ProductQrBarcode\{CodeRepository, CostPrice, Install, PaymentMethods, Permissions, Plugin, ReportChart, ReportData, ReportPeriod, ReportPrint, ReportsAdmin, ReportsExport, ReportsQuery, SaleRepository, SaleService, SalesExport, SalesQuery, ScanRoute, Schema, StockQuery};
+use ProductQrBarcode\{AdminMenu, CodeRepository, CostPrice, Install, PaymentMethods, Permissions, Plugin, ReportChart, ReportData, ReportPeriod, ReportPrint, ReportsAdmin, ReportsExport, ReportsQuery, SaleRepository, SaleService, SalesExport, SalesQuery, ScanRoute, Schema, StockQuery};
 
 global $wpdb;
 
@@ -690,7 +690,8 @@ try {
 
 	// ------------------------------------------------------------------ HTTP
 	pqbg_section( 'HTTP: every tab, CSV and the print page; permissions (admin, shop manager, seller, customer, logged out)' );
-	$tabs   = array( 'dashboard', 'sales', 'products', 'categories', 'sellers', 'peak', 'eod', 'profit', 'voids', 'stock', 'dead' );
+	// Phase 10B (approved): the Dashboard tab is called Summary (&tab=dashboard still opens it; tested in the 10B suite).
+	$tabs   = array( 'summary', 'sales', 'products', 'categories', 'sellers', 'peak', 'eod', 'profit', 'voids', 'stock', 'dead' );
 	$week   = array( 'range' => 'custom', 'from' => '2025-03-10', 'to' => '2025-03-16' );
 	$pages  = array();
 	$bad    = array();
@@ -708,7 +709,7 @@ try {
 	pqbg_t( 'administrator: every tab 200; shop manager: every tab 200 except Profit & margin (403); no PHP errors on any page', array() === $bad, implode( ', ', $bad ) );
 	$bad = array();
 	foreach ( array( 'seller', 'customer', 'anon' ) as $who ) {
-		foreach ( array( 'dashboard', 'products', 'eod', 'stock' ) as $tab ) {
+		foreach ( array( 'summary', 'products', 'eod', 'stock' ) as $tab ) {
 			$r = $http( $who, 'GET', $rep_url( array( 'tab' => $tab ) ) );
 			if ( 200 === $r['code'] || str_contains( $r['body'], 'pqbg-reports' ) || str_contains( $r['body'], 'Alpha Kurta' ) ) {
 				$bad[] = "$who $tab {$r['code']}";
@@ -719,7 +720,7 @@ try {
 	pqbg_t( 'logged out → the login page', str_contains( $http( 'anon', 'GET', $rep_url() )['location'], 'wp-login.php' ) );
 	$ab = $pages['admin'];
 	$sb = $pages['sm'];
-	pqbg_t( 'menu: "In-store reports" right after "In-store sales" for both; the Profit & margin tab only for the administrator', (bool) preg_match( '/page=pqbg-sales[\'"][^>]*>In-store sales<\/a><\/li>\s*<li[^>]*><a href=[\'"]admin\.php\?page=pqbg-reports[\'"]/', $ab['dashboard']['body'] ) && str_contains( $ab['dashboard']['body'], '>Profit &amp; margin<' ) && ! str_contains( $sb['dashboard']['body'], 'Profit &amp; margin' ) && str_contains( $sb['dashboard']['body'], 'In-store reports' ) );
+	pqbg_t( 'menu: "In-store reports" right after "In-store sales" for both (Phase 10B: in the QR & Barcodes menu); the Profit & margin tab only for the administrator', (bool) preg_match( '/page=pqbg-sales[\'"][^>]*>In-store sales<\/a><\/li>\s*<li[^>]*><a href=[\'"]admin\.php\?page=pqbg-reports[\'"]/', $ab['summary']['body'] ) && str_contains( $ab['summary']['body'], '>Profit &amp; margin<' ) && ! str_contains( $sb['summary']['body'], 'Profit &amp; margin' ) && str_contains( $sb['summary']['body'], 'In-store reports' ) );
 	$leak = array();
 	foreach ( $sb as $tab => $r ) {
 		if ( 'profit' === $tab ) {
@@ -732,13 +733,13 @@ try {
 		}
 	}
 	pqbg_t( 'shop manager: no profit, margin, cost, value at cost, unknown-cost note or planted cost anywhere (cards, columns, charts, notes)', array() === $leak, implode( ', ', $leak ) );
-	pqbg_t( 'administrator sees them: the profit card, the value at cost and the planted cost value', str_contains( $ab['dashboard']['body'], 'Gross profit' ) && str_contains( $ab['stock']['body'], 'Value at cost' ) && str_contains( $ab['stock']['body'], '4,938.25' ) );
+	pqbg_t( 'administrator sees them: the profit card, the value at cost and the planted cost value', str_contains( $ab['summary']['body'], 'Gross profit' ) && str_contains( $ab['stock']['body'], 'Value at cost' ) && str_contains( $ab['stock']['body'], '4,938.25' ) );
 	$r = $http( 'sm', 'GET', $rep_url( array_merge( $week, array( 'tab' => 'products', 'orderby' => 'profit' ) ) ) );
 	$r2 = $http( 'sm', 'GET', $rep_url( array( 'tab' => 'stock', 'orderby' => 'cost_value' ) ) );
 	pqbg_t( 'shop manager asking to sort by a cost column → 403 (refused, not ignored)', 403 === $r['code'] && 403 === $r2['code'] );
-	pqbg_t( 'figures on the pages: sales tab ₹1,880.00 total; end of day "Cash expected in drawer" ₹490.00; dashboard compares with 3–9 Mar', str_contains( $ab['sales']['body'], '₹1,880.00' ) && (bool) preg_match( '/Cash expected in drawer<\/div><div class="pqbg-card__value">₹490.00/', $ab['eod']['body'] ) && str_contains( $ab['dashboard']['body'], 'Compared with 3 Mar – 9 Mar 2025' ) );
-	pqbg_t( 'escaping: the <script> product name, the category "&" and chart labels are escaped (HTML and SVG)', ! str_contains( $ab['products']['body'], '<script>alert(1)' ) && str_contains( $ab['products']['body'], '&lt;script&gt;alert(1)&lt;/script&gt; Zeta (deleted)' ) && str_contains( $ab['categories']['body'], 'PQBG9B Sale &amp; Offers' ) && ! str_contains( $ab['categories']['body'], '&amp;amp;' ) && ! str_contains( $ab['dashboard']['body'], '<script>alert(1)' ) );
-	pqbg_t( 'every report page states the counting rules (in-store only, completed only, site timezone)', ! array_filter( $ab, static fn( $r ) => 200 === $r['code'] && ! str_contains( $r['body'], 'pqbg-reports__rules' ) ) && str_contains( $ab['dashboard']['body'], 'online orders are in WooCommerce → Analytics' ) );
+	pqbg_t( 'figures on the pages: sales tab ₹1,880.00 total; end of day "Cash expected in drawer" ₹490.00; dashboard compares with 3–9 Mar', str_contains( $ab['sales']['body'], '₹1,880.00' ) && (bool) preg_match( '/Cash expected in drawer<\/div><div class="pqbg-card__value">₹490.00/', $ab['eod']['body'] ) && str_contains( $ab['summary']['body'], 'Compared with 3 Mar – 9 Mar 2025' ) );
+	pqbg_t( 'escaping: the <script> product name, the category "&" and chart labels are escaped (HTML and SVG)', ! str_contains( $ab['products']['body'], '<script>alert(1)' ) && str_contains( $ab['products']['body'], '&lt;script&gt;alert(1)&lt;/script&gt; Zeta (deleted)' ) && str_contains( $ab['categories']['body'], 'PQBG9B Sale &amp; Offers' ) && ! str_contains( $ab['categories']['body'], '&amp;amp;' ) && ! str_contains( $ab['summary']['body'], '<script>alert(1)' ) );
+	pqbg_t( 'every report page states the counting rules (in-store only, completed only, site timezone)', ! array_filter( $ab, static fn( $r ) => 200 === $r['code'] && ! str_contains( $r['body'], 'pqbg-reports__rules' ) ) && str_contains( $ab['summary']['body'], 'online orders are in WooCommerce → Analytics' ) );
 
 	// CSV over HTTP.
 	$csv_a = $link_of( $ab['products']['body'], 'pqbg_report_csv' );
@@ -749,7 +750,7 @@ try {
 	pqbg_t( 'shop manager CSV: the same rows, no cost columns', 200 === $h2['code'] && count( $csv_rows( substr( $h1['body'], 3 ) ) ) === count( $csv_rows( substr( $h2['body'], 3 ) ) ) && ! preg_grep( '/profit|margin|cost/i', $csv_rows( substr( $h2['body'], 3 ) )[0] ) );
 	$bad = array();
 	foreach ( $tabs as $tab ) {
-		if ( 'dashboard' === $tab ) {
+		if ( 'summary' === $tab ) {
 			continue;
 		}
 		$ua = $link_of( $ab[ $tab ]['body'], 'pqbg_report_csv' );
@@ -791,7 +792,7 @@ try {
 	foreach ( $tabs as $tab ) {
 		$http( 'admin', 'GET', $rep_url( array( 'tab' => $tab ) ) );
 		$http( 'sm', 'HEAD', $rep_url( array( 'tab' => $tab ) ) );
-		if ( 'dashboard' !== $tab ) {
+		if ( 'summary' !== $tab ) {
 			$http( 'admin', 'GET', $link_of( $ab[ $tab ]['body'], 'pqbg_report_csv' ) );
 		}
 	}
@@ -800,7 +801,7 @@ try {
 	pqbg_t( 'every tab, CSV and the print page (GET and HEAD) change nothing (sales, costs, stock, prices, posts, codes, options, orders)', $before === $state() );
 
 	// ------------------------------------------------------------------ performance
-	pqbg_section( 'performance: 50,000 sales and 1,000 sellable items' );
+	pqbg_section( 'performance: 5,000 sales (50,000 with PQBG_STRESS=1) and 1,000 sellable items' );
 	$t0    = microtime( true );
 	$items = array();
 	$cats  = array();
@@ -853,7 +854,7 @@ try {
 	$time_all = static function ( string $volume ) use ( $time_ms, $p90, $p12 ): array {
 		$out = array();
 		foreach ( array( '90 days' => $p90, '12 months' => $p12 ) as $label => $per ) {
-			$tm = array( 'dashboard' => $time_ms( static fn() => ReportsAdmin::dashboard_data( $per, true ) ) );
+			$tm = array( 'summary' => $time_ms( static fn() => ReportsAdmin::dashboard_data( $per, true ) ) );
 			foreach ( array( 'sales', 'products', 'categories', 'sellers', 'peak', 'eod', 'profit', 'voids' ) as $rep ) {
 				$tm[ $rep ] = $time_ms( static fn() => ReportData::build( $rep, array( 'period' => $per, 'costs' => true, 'by' => 'product' ) ) );
 			}
@@ -873,15 +874,9 @@ try {
 	$t0 = microtime( true );
 	pqbg_t( 'realistic volume: 5,000 synthetic sales over 90 days (~55 a day; the same mix of sellers, methods, statuses and items)', 5000 === $fill( 5000 ), sprintf( '%.1f s', microtime( true ) - $t0 ) );
 	$real = $time_all( '5,000 sales' );
-	pqbg_t( 'realistic volume, in-process: the dashboard and every report under 1 s for 90 days', $real['90 days'][0] < 1000, sprintf( 'slowest %s %.0f ms', $real['90 days'][1], $real['90 days'][0] ) );
-	pqbg_t( 'realistic volume, in-process: the dashboard and every report under 2 s for 12 months', $real['12 months'][0] < 2000, sprintf( 'slowest %s %.0f ms', $real['12 months'][1], $real['12 months'][0] ) );
+	pqbg_t( 'realistic volume, in-process: the Summary and every report under 1 s for 90 days', $real['90 days'][0] < 1000, sprintf( 'slowest %s %.0f ms', $real['90 days'][1], $real['90 days'][0] ) );
+	pqbg_t( 'realistic volume, in-process: the Summary and every report under 2 s for 12 months', $real['12 months'][0] < 2000, sprintf( 'slowest %s %.0f ms', $real['12 months'][1], $real['12 months'][0] ) );
 
-	// Stress volume: 50,000 sales in 90 days (~550 a day), the Phase 9A dataset. A regression guard at
-	// 2 s for both ranges (decision of 2026-09-26: the dashboard's 1 s for 90 days is not met at this volume).
-	$t0 = microtime( true );
-	pqbg_t( 'stress volume: 50,000 synthetic sales over 90 days (90/6/4 % completed/voided/failed, 70 % with a cost)', 50000 === $fill( 50000 ), sprintf( '%.1f s', microtime( true ) - $t0 ) );
-	$big = $time_all( '50,000 sales' );
-	pqbg_t( 'stress volume (regression guard), in-process: the dashboard and every report under 2 s for 90 days and for 12 months', $big['90 days'][0] < 2000 && $big['12 months'][0] < 2000, sprintf( 'slowest %s %.0f ms / %s %.0f ms', $big['90 days'][1], $big['90 days'][0], $big['12 months'][1], $big['12 months'][0] ) );
 	$med = static function ( string $url ) use ( $http, $median ): float {
 		$t = array();
 		for ( $i = 0; $i < 3; $i++ ) {
@@ -889,17 +884,36 @@ try {
 		}
 		return $median( $t );
 	};
-	$empty = $med( admin_url( 'admin.php?page=pqbg-sales&range=custom&from=2000-01-01&to=2000-01-01' ) );
-	printf( "   TIMING HTTP empty wp-admin page (baseline) %8.1f ms (median of 3)\n", $empty );
-	$over = array();
-	foreach ( array( '90 days' => $p90, '12 months' => $p12 ) as $label => $per ) {
-		foreach ( array( 'dashboard', 'sales', 'products', 'sellers', 'peak', 'profit' ) as $tab ) {
-			$ms = $med( $rep_url( array( 'tab' => $tab, 'range' => 'custom', 'from' => $per['from'], 'to' => $per['to'] ) ) );
-			printf( "   TIMING HTTP 50,000 sales %-9s %-10s %8.1f ms (median of 3; %+.0f ms over the empty page)\n", $label, $tab, $ms, $ms - $empty );
-			$over[ $label ][] = $ms - $empty;
+	/** HTTP timings of the heaviest pages over an empty wp-admin page (median of 3). */
+	$http_over = static function ( string $volume ) use ( $med, $rep_url, $p90, $p12 ): array {
+		$empty = $med( admin_url( 'admin.php?page=pqbg-sales&range=custom&from=2000-01-01&to=2000-01-01' ) );
+		printf( "   TIMING HTTP empty wp-admin page (baseline) %8.1f ms (median of 3)\n", $empty );
+		$over = array();
+		foreach ( array( '90 days' => $p90, '12 months' => $p12 ) as $label => $per ) {
+			foreach ( array( 'summary', 'sales', 'products', 'sellers', 'peak', 'profit' ) as $tab ) {
+				$ms = $med( $rep_url( array( 'tab' => $tab, 'range' => 'custom', 'from' => $per['from'], 'to' => $per['to'] ) ) );
+				printf( "   TIMING HTTP %s %-9s %-10s %8.1f ms (median of 3; %+.0f ms over the empty page)\n", $volume, $label, $tab, $ms, $ms - $empty );
+				$over[ $label ][] = $ms - $empty;
+			}
 		}
+		return $over;
+	};
+	$over = $http_over( '5,000 sales' );
+	pqbg_t( 'realistic volume, HTTP: each page adds under 1 s (90 days) and under 2 s (12 months) to an empty wp-admin page', max( $over['90 days'] ) < 1000 && max( $over['12 months'] ) < 2000, sprintf( 'max +%.0f / +%.0f ms', max( $over['90 days'] ), max( $over['12 months'] ) ) );
+
+	// Stress volume: 50,000 sales in 90 days (~550 a day), the Phase 9A dataset. A regression guard at
+	// 2 s for both ranges (decision of 2026-09-26: the dashboard's 1 s for 90 days is not met at this volume).
+	// Phase 10B (owner's decision): opt-in with PQBG_STRESS=1; it runs in Phase 11 (hardening) and once before launch.
+	if ( '1' === getenv( 'PQBG_STRESS' ) ) {
+		$t0 = microtime( true );
+		pqbg_t( 'stress volume: 50,000 synthetic sales over 90 days (90/6/4 % completed/voided/failed, 70 % with a cost)', 50000 === $fill( 50000 ), sprintf( '%.1f s', microtime( true ) - $t0 ) );
+		$big = $time_all( '50,000 sales' );
+		pqbg_t( 'stress volume (regression guard), in-process: the Summary and every report under 2 s for 90 days and for 12 months', $big['90 days'][0] < 2000 && $big['12 months'][0] < 2000, sprintf( 'slowest %s %.0f ms / %s %.0f ms', $big['90 days'][1], $big['90 days'][0], $big['12 months'][1], $big['12 months'][0] ) );
+		$over = $http_over( '50,000 sales' );
+		pqbg_t( 'stress volume (regression guard), HTTP: each page adds under 2 s to an empty wp-admin page (90 days and 12 months)', max( $over['90 days'] ) < 2000 && max( $over['12 months'] ) < 2000, sprintf( 'max +%.0f / +%.0f ms', max( $over['90 days'] ), max( $over['12 months'] ) ) );
+	} else {
+		echo "   (the 50,000-sale stress checks are opt-in: PQBG_STRESS=1; they run in Phase 11 and before launch)\n";
 	}
-	pqbg_t( 'stress volume (regression guard), HTTP: each page adds under 2 s to an empty wp-admin page (90 days and 12 months)', max( $over['90 days'] ) < 2000 && max( $over['12 months'] ) < 2000, sprintf( 'max +%.0f / +%.0f ms', max( $over['90 days'] ), max( $over['12 months'] ) ) );
 	$explain = static function ( string $sql ) use ( $wpdb ): string {
 		$x = $wpdb->get_row( 'EXPLAIN ' . $sql, ARRAY_A );
 		return sprintf( 'key=%s rows=%s %s', $x['key'] ?? 'NULL', $x['rows'] ?? '?', $x['Extra'] ?? '' );
@@ -914,7 +928,7 @@ try {
 		printf( "   EXPLAIN %-36s %s\n", $label, $explain( $sql ) );
 	}
 	pqbg_t( 'no new index was needed (schema v4 adds only the void_restock column; 10 indexes as in v3)', 10 === count( array_unique( $wpdb->get_col( "SHOW INDEX FROM $S", 2 ) ) ) );
-	pqbg_t( 'reconciliation on 50,000 rows: dashboard cards = Phase 9A totals; products, sellers and categories sum to the same revenue', ( static function () use ( $p90 ) {
+	pqbg_t( 'reconciliation on every synthetic row (5,000, or 50,000 with PQBG_STRESS=1): Summary cards = Phase 9A totals; products, sellers and categories sum to the same revenue', ( static function () use ( $p90 ) {
 		$f  = ReportPeriod::where_filters( $p90 );
 		$t  = SalesQuery::totals( $f )['all']['revenue'];
 		$ds = ReportsAdmin::dashboard_data( $p90, true )['now']['revenue'];
@@ -939,7 +953,7 @@ try {
 	pqbg_t( 'orders are only read (no order creation, update or status change)', ! preg_match( '/wc_create_order|wc_get_order|->set_status|->update_status/', $all ) && str_contains( $src( 'includes/StockQuery.php' ), 'OrderUtil::get_table_for_orders()' ) );
 	pqbg_t( 'costs only through CostPrice::get() and only behind the $costs flag (no cost meta key in the report classes)', ! str_contains( $all, '_pqbg_cost_price' ) && str_contains( $src( 'includes/StockQuery.php' ), 'if ( $costs )' ) );
 	pqbg_t( 'still no nopriv handlers, AJAX actions, REST routes, shortcodes or rewrite rules', ! preg_match( '/admin_post_nopriv|wp_ajax_|register_rest_route|add_shortcode|add_rewrite/', $all ) );
-	pqbg_t( 'the report hooks are admin-only (not registered in this CLI request) and the only new hooks are admin_menu, admin_enqueue_scripts, two admin_post handlers and the page\'s load- hook', false === has_action( 'admin_menu', array( ReportsAdmin::class, 'add_menu' ) ) && 5 === preg_match_all( '/add_action\(/', $src( 'includes/ReportsAdmin.php' ) ) && ! preg_match( '/add_filter\(/', $all ) && ! preg_match( '/add_action\(/', implode( "\n", array_map( $src, array_diff( $new, array( 'includes/ReportsAdmin.php' ) ) ) ) ) );
+	pqbg_t( 'the report hooks are admin-only (not registered in this CLI request) and the only hooks are admin_enqueue_scripts and two admin_post handlers (Phase 10B: the menu and the load- hook moved to AdminMenu)', false === has_action( 'admin_menu', array( AdminMenu::class, 'add_pages' ) ) && 3 === preg_match_all( '/add_action\(/', $src( 'includes/ReportsAdmin.php' ) ) && str_contains( $src( 'includes/AdminMenu.php' ), "'load'   => array( ReportsAdmin::class, 'load' )" ) && ! preg_match( '/add_filter\(/', $all ) && ! preg_match( '/add_action\(/', implode( "\n", array_map( $src, array_diff( $new, array( 'includes/ReportsAdmin.php' ) ) ) ) ) );
 	pqbg_t( 'the print page loads no WordPress head/footer and no inline script', ! preg_match( '/wp_head|wp_footer|wp_enqueue/', $src( 'templates/pqbg-report-print.php' ) ) );
 
 } catch ( Throwable $e ) {

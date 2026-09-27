@@ -1,6 +1,7 @@
 <?php
 /**
- * In-store sales history for managers (Phase 9A): WooCommerce → In-store sales.
+ * In-store sales history for managers (Phase 9A): QR & Barcodes → In-store sales
+ * (under WooCommerce until Phase 10B; the page and its URLs are unchanged).
  *
  * Screens (one hidden-query page, all GET and read-only):
  *   admin.php?page=pqbg-sales&{filters}              list, filters, totals, CSV link
@@ -26,7 +27,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class SalesAdmin {
 
-	const SLUG        = 'pqbg-sales';
+	const SLUG        = AdminUrl::SALES;
 	const VOID_ACTION = 'pqbg_void_sale';
 	const MESSAGE_ARG = 'pqbg_msg';
 	const VIEW_ARG    = 'pqbg_view';
@@ -41,72 +42,9 @@ final class SalesAdmin {
 	 * Hooks used on admin requests.
 	 */
 	public static function register(): void {
-		add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 99 );
 		add_action( 'admin_post_' . self::VOID_ACTION, array( __CLASS__, 'handle_void' ) );
 		add_action( 'admin_post_' . SalesExport::ACTION, array( SalesExport::class, 'handle' ) );
 		add_filter( 'removable_query_args', array( __CLASS__, 'removable_query_args' ) );
-	}
-
-	/**
-	 * Adds "In-store sales" under WooCommerce, right after Orders.
-	 */
-	public static function add_menu(): void {
-		global $submenu;
-
-		$position = null;
-
-		foreach ( array_values( $submenu['woocommerce'] ?? array() ) as $index => $item ) {
-			if ( in_array( $item[2] ?? '', array( 'wc-orders', 'edit.php?post_type=shop_order' ), true ) ) {
-				$position = $index + 1;
-				break;
-			}
-		}
-
-		$hook = add_submenu_page(
-			'woocommerce',
-			__( 'In-store sales', 'product-qrcode-barcode-generator' ),
-			__( 'In-store sales', 'product-qrcode-barcode-generator' ),
-			Permissions::VIEW_ALL_SALES,
-			self::SLUG,
-			array( __CLASS__, 'render' ),
-			$position
-		);
-
-		if ( $hook ) {
-			add_action( 'load-' . $hook, array( __CLASS__, 'load' ) );
-		}
-	}
-
-	/**
-	 * URL of the list with filters.
-	 *
-	 * @param array<string, string> $args Query arguments.
-	 */
-	public static function list_url( array $args = array() ): string {
-		return add_query_arg( array_map( 'rawurlencode', array_merge( array( 'page' => self::SLUG ), $args ) ), admin_url( 'admin.php' ) );
-	}
-
-	/**
-	 * URL of a sale's detail screen.
-	 *
-	 * @param int $sale_id Sale ID.
-	 */
-	public static function detail_url( int $sale_id ): string {
-		return self::list_url( array( 'sale' => (string) $sale_id ) );
-	}
-
-	/**
-	 * URL of a sale's void confirmation.
-	 *
-	 * @param int $sale_id Sale ID.
-	 */
-	public static function void_url( int $sale_id ): string {
-		return self::list_url(
-			array(
-				'sale'         => (string) $sale_id,
-				self::VIEW_ARG => 'void',
-			)
-		);
 	}
 
 	/**
@@ -143,6 +81,7 @@ final class SalesAdmin {
 		}
 
 		echo '<div class="wrap pqbg-sales">';
+		AdminMenu::render_nav( AdminUrl::SALES );
 
 		if ( null !== self::$sale && self::is_void_view() ) {
 			self::render_void( self::$sale );
@@ -187,26 +126,26 @@ final class SalesAdmin {
 		}
 
 		if ( '' === $reason ) {
-			self::redirect( self::void_url( $sale_id ), 'reason_required' );
+			self::redirect( AdminUrl::sale_void( $sale_id ), 'reason_required' );
 		}
 
 		if ( mb_strlen( $reason ) > self::REASON_MAX ) {
-			self::redirect( self::void_url( $sale_id ), 'reason_long' );
+			self::redirect( AdminUrl::sale_void( $sale_id ), 'reason_long' );
 		}
 
 		$result = SaleService::void_sale( $sale_id, get_current_user_id(), $reason, $restock );
 
 		if ( ! is_wp_error( $result ) ) {
-			self::redirect( self::detail_url( $sale_id ), $restock ? 'voided_restocked' : 'voided' );
+			self::redirect( AdminUrl::sale( $sale_id ), $restock ? 'voided_restocked' : 'voided' );
 		}
 
 		$map = array(
-			'pqbg_not_voidable'     => array( self::detail_url( $sale_id ), 'not_voidable' ),
-			'pqbg_busy'             => array( self::void_url( $sale_id ), 'busy' ),
-			'pqbg_undo_unavailable' => array( self::void_url( $sale_id ), 'restock_unavailable' ),
-			'pqbg_forbidden'        => array( self::detail_url( $sale_id ), 'forbidden' ),
+			'pqbg_not_voidable'     => array( AdminUrl::sale( $sale_id ), 'not_voidable' ),
+			'pqbg_busy'             => array( AdminUrl::sale_void( $sale_id ), 'busy' ),
+			'pqbg_undo_unavailable' => array( AdminUrl::sale_void( $sale_id ), 'restock_unavailable' ),
+			'pqbg_forbidden'        => array( AdminUrl::sale( $sale_id ), 'forbidden' ),
 		);
-		$to  = $map[ $result->get_error_code() ] ?? array( self::void_url( $sale_id ), 'failed' );
+		$to  = $map[ $result->get_error_code() ] ?? array( AdminUrl::sale_void( $sale_id ), 'failed' );
 
 		self::redirect( $to[0], $to[1] );
 	}
@@ -247,7 +186,7 @@ final class SalesAdmin {
 		self::render_filters( $filters );
 		self::render_totals( SalesQuery::totals( $filters ), $costs );
 
-		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '">';
+		echo '<form method="get" action="' . esc_url( AdminUrl::admin_php() ) . '">';
 		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '">';
 
 		foreach ( SalesQuery::args( $filters ) as $key => $value ) {
@@ -280,7 +219,7 @@ final class SalesAdmin {
 
 		foreach ( $labels as $preset => $label ) {
 			$current = $preset === $filters['range']['preset'];
-			$links[] = '<li><a href="' . esc_url( self::list_url( array_merge( $args, array( 'range' => $preset ) ) ) ) . '"' . ( $current ? ' class="current" aria-current="page"' : '' ) . '>' . esc_html( $label ) . '</a></li>';
+			$links[] = '<li><a href="' . esc_url( AdminUrl::sales( array_merge( $args, array( 'range' => $preset ) ) ) ) . '"' . ( $current ? ' class="current" aria-current="page"' : '' ) . '>' . esc_html( $label ) . '</a></li>';
 		}
 
 		echo '<ul class="subsubsub">' . implode( ' | ', $links ) . '</ul><div class="clear"></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
@@ -295,7 +234,7 @@ final class SalesAdmin {
 		$range  = $filters['range'];
 		$option = static fn( string $value, string $label, string $current ): string => '<option value="' . esc_attr( $value ) . '"' . selected( $current, $value, false ) . '>' . esc_html( $label ) . '</option>';
 
-		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" class="pqbg-sales__filters">';
+		echo '<form method="get" action="' . esc_url( AdminUrl::admin_php() ) . '" class="pqbg-sales__filters">';
 		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '">';
 		echo '<input type="hidden" name="range" value="custom">';
 
@@ -407,10 +346,10 @@ final class SalesAdmin {
 		echo '<h1 class="wp-heading-inline">' . esc_html( sprintf( __( 'Sale #%1$s — %2$s', 'product-qrcode-barcode-generator' ), $id, SalePresenter::status( (string) $sale['status'] ) ) ) . '</h1> ';
 
 		if ( SaleRepository::STATUS_COMPLETED === $sale['status'] && Permissions::can_void_sale() ) {
-			echo '<a class="page-title-action" href="' . esc_url( self::void_url( $id ) ) . '">' . esc_html__( 'Void sale', 'product-qrcode-barcode-generator' ) . '</a> ';
+			echo '<a class="page-title-action" href="' . esc_url( AdminUrl::sale_void( $id ) ) . '">' . esc_html__( 'Void sale', 'product-qrcode-barcode-generator' ) . '</a> ';
 		}
 
-		echo '<a class="page-title-action" href="' . esc_url( self::list_url() ) . '">' . esc_html__( 'Back to In-store sales', 'product-qrcode-barcode-generator' ) . '</a>';
+		echo '<a class="page-title-action" href="' . esc_url( AdminUrl::sales() ) . '">' . esc_html__( 'Back to In-store sales', 'product-qrcode-barcode-generator' ) . '</a>';
 		echo '<hr class="wp-header-end">';
 		self::render_message();
 
@@ -478,7 +417,7 @@ final class SalesAdmin {
 
 		if ( SaleRepository::STATUS_COMPLETED !== $sale['status'] ) {
 			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Only a completed sale can be voided.', 'product-qrcode-barcode-generator' ) . '</p></div>';
-			echo '<p><a class="button" href="' . esc_url( self::detail_url( $id ) ) . '">' . esc_html__( 'Back to the sale', 'product-qrcode-barcode-generator' ) . '</a></p>';
+			echo '<p><a class="button" href="' . esc_url( AdminUrl::sale( $id ) ) . '">' . esc_html__( 'Back to the sale', 'product-qrcode-barcode-generator' ) . '</a></p>';
 			return;
 		}
 
@@ -488,7 +427,7 @@ final class SalesAdmin {
 		$holder = (int) $sale['stock_holder_id'];
 		$stock  = $holder > 0 ? SaleRepository::read_stock( $holder ) : null;
 
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		echo '<form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::VOID_ACTION ) . '">';
 		echo '<input type="hidden" name="sale" value="' . esc_attr( (string) $id ) . '">';
 		echo '<input type="hidden" name="' . esc_attr( Permissions::NONCE_FIELD ) . '" value="' . esc_attr( wp_create_nonce( Permissions::nonce_action( 'void_sale_' . $id ) ) ) . '">';
@@ -505,7 +444,7 @@ final class SalesAdmin {
 		echo '</label></p>';
 		echo '<p class="description">' . esc_html__( 'The sale stays in the history, marked as voided, with your name, the time and the reason. It no longer counts in totals.', 'product-qrcode-barcode-generator' ) . '</p>';
 		submit_button( __( 'Void sale', 'product-qrcode-barcode-generator' ), 'primary', 'submit', false );
-		echo ' <a class="button" href="' . esc_url( self::detail_url( $id ) ) . '">' . esc_html__( 'Cancel', 'product-qrcode-barcode-generator' ) . '</a>';
+		echo ' <a class="button" href="' . esc_url( AdminUrl::sale( $id ) ) . '">' . esc_html__( 'Cancel', 'product-qrcode-barcode-generator' ) . '</a>';
 		echo '</form>';
 	}
 

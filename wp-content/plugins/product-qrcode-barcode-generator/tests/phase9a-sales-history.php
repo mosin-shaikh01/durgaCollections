@@ -1045,11 +1045,14 @@ try {
 	$today = $http( 'admin', 'GET', $hist_url() );
 	pqbg_t( 'default view is Today (the preset link is current)', 200 === $today['code'] && (bool) preg_match( '/<a href="[^"]*range=today"[^>]*class="current"/', $today['body'] ) );
 	pqbg_t( 'escaping: the seller\'s HTML display name is shown as text', str_contains( $today['body'], '&lt;img src=x onerror=alert(1)&gt; Priya' ) && ! str_contains( $today['body'], '<img src=x onerror' ) );
-	$menu = $from( $today['body'], 'id="toplevel_page_woocommerce"' );
+	// Phase 10B (approved): In-store sales is in the plugin's own QR & Barcodes menu, right after Dashboard, and no longer under WooCommerce.
+	$menu = $from( $today['body'], 'id="toplevel_page_pqbg-dashboard"' );
 	$menu = substr( $menu, 0, (int) strpos( $menu, '</ul>' ) );
 	preg_match_all( '/href=[\'"](?:admin\.php\?page=|[^\'"]*page=)([a-z0-9_-]+)/', $menu, $mm );
-	$pos = array_search( 'wc-orders', $mm[1], true );
-	pqbg_t( 'menu: WooCommerce → In-store sales, right after Orders', false !== $pos && 'pqbg-sales' === ( $mm[1][ $pos + 1 ] ?? '' ) && str_contains( $menu, 'In-store sales' ) );
+	$pos = array_search( 'pqbg-sales', $mm[1], true ) - 1; // The block holds the top-level link and then the sub-items.
+	$wc  = $from( $today['body'], 'id="toplevel_page_woocommerce"' );
+	$wc  = substr( $wc, 0, (int) strpos( $wc, '</ul>' ) );
+	pqbg_t( 'menu: QR & Barcodes → In-store sales, right after Dashboard; not under WooCommerce (Phase 10B)', $pos > 0 && 'pqbg-dashboard' === ( $mm[1][ $pos ] ?? '' ) && 'pqbg-dashboard' === ( $mm[1][0] ?? '' ) && str_contains( $menu, 'In-store sales' ) && '' !== $wc && ! str_contains( $wc, 'pqbg-sales' ) );
 
 	// ------------------------------------------------------------------ CSV
 	pqbg_section( 'CSV export' );

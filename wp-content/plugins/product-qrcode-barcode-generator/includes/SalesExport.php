@@ -33,9 +33,8 @@ final class SalesExport {
 	 * @param array<string, mixed> $filters Filters from SalesQuery::filters().
 	 */
 	public static function url( array $filters ): string {
-		return add_query_arg(
-			array_map( 'rawurlencode', array_merge( array( 'action' => self::ACTION ), SalesQuery::args( $filters ), array( '_wpnonce' => wp_create_nonce( self::ACTION ) ) ) ),
-			admin_url( 'admin-post.php' )
+		return AdminUrl::admin_post(
+			array_map( 'rawurlencode', array_merge( array( 'action' => self::ACTION ), SalesQuery::args( $filters ), array( '_wpnonce' => wp_create_nonce( self::ACTION ) ) ) )
 		);
 	}
 

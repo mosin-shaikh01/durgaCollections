@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–10 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools)
+## Current scope: Phases 2–10B (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard)
 
 Implemented:
 
@@ -22,8 +22,9 @@ Implemented:
 - **Phase 7:** Mark as Sold from the scan page: quantity, "Confirm sale", WooCommerce stock decrement, a permanent `pqbg_sales` record with snapshots, a 10-minute Undo for the seller, and `SaleService::void_sale()` for managers (service only). See [Mark as Sold](#mark-as-sold).
 - **Phase 8:** label printing from wp-admin: "Print label" on the product panel, "Print QR labels" on the products list, a print setup screen (A4 sheet and thermal presets, custom layouts, start position, copies, fields), and a standalone print-ready page with exact millimetre geometry, plus a render cache. See [Label printing](#label-printing).
 - **Phase 9A:** the payment method on every sale (required, chosen by the seller), an optional cost price per product/variation (administrators only) snapshotted on every sale, the seller's name snapshot, the managers' **In-store sales** history (filters, totals, profit, sale detail, CSV export, void), and the sellers' **My sales** page. Schema version 3 and the `pqbg_view_costs` capability. See [Sales history](#sales-history).
-- **Phase 9B:** **In-store reports**: the owner dashboard and ten reports (sales over time, products, categories, sellers, peak times, end of day / payments with "Cash expected in drawer", profit & margin, voids & failed, stock, dead stock), server-rendered SVG charts, CSV exports and a print-friendly end of day. Schema version 4 (`void_restock`). Also the fix of a Phase 7 idempotency race (a duplicate submission arriving mid-sale was answered "failed"). See [In-store reports](#in-store-reports).
-- **Phase 10:** bulk and CSV tools as tabs of **WooCommerce → QR & Barcodes** (Settings | Code tools | Import cost prices, each tab with its own capability): resumable generation of missing codes with "Print labels" links, the codes CSV export, the administrator-only cost price import (preview, apply, report, template) and an audit log. No schema change. See [Bulk tools](#bulk-tools).
+- **Phase 9B:** **In-store reports**: the owner dashboard (called **Summary** since Phase 10B) and ten reports (sales over time, products, categories, sellers, peak times, end of day / payments with "Cash expected in drawer", profit & margin, voids & failed, stock, dead stock), server-rendered SVG charts, CSV exports and a print-friendly end of day. Schema version 4 (`void_restock`). Also the fix of a Phase 7 idempotency race (a duplicate submission arriving mid-sale was answered "failed"). See [In-store reports](#in-store-reports).
+- **Phase 10:** bulk and CSV tools (Code tools | Import cost prices, each tab with its own capability; under WooCommerce → QR & Barcodes until Phase 10B): resumable generation of missing codes with "Print labels" links, the codes CSV export, the administrator-only cost price import (preview, apply, report, template) and an audit log. No schema change. See [Bulk tools](#bulk-tools).
+- **Phase 10B:** the plugin's own top-level menu **QR & Barcodes** (Dashboard, In-store sales, In-store reports, Bulk tools, Settings; nothing under WooCommerce), a shared tab row on every plugin page, redirects from the old addresses, one source for admin URLs (`AdminUrl`) and screen detection by stored hook suffix (`AdminMenu`), and the plugin **Dashboard**. No schema, capability or data change. See [Admin menu](#admin-menu) and [Dashboard](#dashboard).
 
 **Not implemented yet (later phases):**
 - CSV import of codes (left out of Phase 10 by decision D6; in the backlog), an undo of a cost import, bulk regeneration or retirement of codes
@@ -39,7 +40,8 @@ The plugin adds **no REST routes, AJAX handlers or shortcodes**. Its request han
 - the scan page of Phase 6, which requires a login and `pqbg_view_products` before it shows anything (see [Scan page](#scan-page)); since Phase 7 it also accepts POST (sell, undo) on code URLs from users with `pqbg_sell`, with a nonce and a signed form token (see [Mark as Sold](#mark-as-sold))
 - Phase 9A (see [Sales history](#sales-history)): the **In-store sales** screens (a wp-admin page, GET, `pqbg_view_all_sales`), the void POST (`admin-post.php`, nonce, `pqbg_void_sale`), the CSV download (`admin-post.php`, GET, nonce, `pqbg_view_all_sales`), and **My sales** at `/scan/my-sales/` (GET/HEAD, `pqbg_view_own_sales`)
 - Phase 9A cost price: two WooCommerce product-editor save actions for users with `pqbg_view_costs`, and filters that keep the cost out of WooCommerce's meta data, REST, exports and imports (see [Cost price](#cost-price))
-- Phase 10 (see [Bulk tools](#bulk-tools)): the Code tools and Import cost prices tabs of the QR & Barcodes page, and six `admin-post.php` handlers: `pqbg_bulk_generate` (POST) and `pqbg_codes_csv` (GET/HEAD) for `pqbg_manage_codes`; `pqbg_cost_upload`, `pqbg_cost_apply` (POST), `pqbg_cost_report` and `pqbg_cost_template` (GET/HEAD) for `pqbg_view_costs`; every one with a nonce
+- Phase 10 (see [Bulk tools](#bulk-tools)): the Code tools and Import cost prices tabs (the Bulk tools page since Phase 10B), and six `admin-post.php` handlers: `pqbg_bulk_generate` (POST) and `pqbg_codes_csv` (GET/HEAD) for `pqbg_manage_codes`; `pqbg_cost_upload`, `pqbg_cost_apply` (POST), `pqbg_cost_report` and `pqbg_cost_template` (GET/HEAD) for `pqbg_view_costs`; every one with a nonce
+- Phase 10B (see [Admin menu](#admin-menu)): the **Dashboard** page (a wp-admin page, GET, `pqbg_view_all_sales`) and the old-address redirects (GET/HEAD); no new handler
 - Phase 9B (see [In-store reports](#in-store-reports)): the **In-store reports** page (a wp-admin page, GET, `pqbg_view_all_sales`; cost parts `pqbg_view_costs`), the report CSV (`admin-post.php?action=pqbg_report_csv`, GET/HEAD, nonce) and the end-of-day print page (`admin-post.php?action=pqbg_report_print`, GET/HEAD, nonce)
 
 ## QR codes and barcodes
@@ -99,21 +101,67 @@ The libraries only *encode*: the QR bit matrix and the Code 128 bars. `Svg` writ
 
 The libraries' own SVG writers are not used. picqer's has no quiet zone and no human-readable text, references an external DTD and hard-codes `id="bars"`. bacon's needs `XMLWriter`.
 
+## Admin menu
+
+Since Phase 10B the plugin has its own top-level wp-admin menu, **QR & Barcodes**, directly below Products (position 55.7: WooCommerce is 55.5 and WooCommerce keeps Products right after it; Analytics is 57). Its icon is a generic grid dashicon. Nothing is under WooCommerce any more.
+
+| Page | Address | Capability | Administrator | Shop Manager | Store Seller | Customer |
+|---|---|---|---|---|---|---|
+| Dashboard | `admin.php?page=pqbg-dashboard` | `pqbg_view_all_sales` | yes, with profit | yes, no cost or profit | no | no |
+| In-store sales | `admin.php?page=pqbg-sales` | `pqbg_view_all_sales` (void: `pqbg_void_sale`) | yes, with cost | yes, no cost | no | no |
+| In-store reports | `admin.php?page=pqbg-reports` | `pqbg_view_all_sales` (profit: `pqbg_view_costs`) | yes | yes, no Profit & margin | no | no |
+| Bulk tools → Code tools | `admin.php?page=pqbg-bulk-tools&tab=tools` | `pqbg_manage_codes` | yes | yes | no | no |
+| Bulk tools → Import cost prices | `admin.php?page=pqbg-bulk-tools&tab=costs` | `pqbg_view_costs` | yes | no | no | no |
+| Settings | `admin.php?page=pqbg-settings` | `pqbg_manage_settings` | yes | no | no | no |
+
+- **Shared tab row.** Every plugin page starts with one row of tabs: Dashboard | In-store sales | In-store reports | Bulk tools | Settings. It shows only the pages the user may open (a Shop Manager has no Settings tab), in menu order, with the current page marked (`aria-current="page"`). A page's own tabs (the reports; Code tools | Import cost prices) are a second, smaller row below it.
+- **The top-level item** needs `pqbg_view_all_sales`, like the Dashboard. If a custom role can open a sub-item but not the Dashboard, WordPress points the top-level item at the first sub-item that role may open.
+- **Every page checks its own capability** on its `load-` hook, before any output (403 otherwise). Every `admin-post.php` handler still checks the method, then the capability, then the nonce; none changed in Phase 10B.
+- **Store Sellers and customers** get no plugin menu. The plugin pages answer 403, and WooCommerce sends them from the rest of wp-admin to My Account. Sellers work on the scan page (`/scan/`).
+- **Screens not in the menu:** the print setup (`edit.php?post_type=product&page=pqbg-print`) and the Regenerate confirmation (`…&page=pqbg-regenerate`) stay hidden screens under Products, reached from the products list and the product edit screen (Products stays highlighted). A sale's detail and void screens are In-store sales with `&sale=ID` (and `&pqbg_view=void`). The label print page and the end-of-day print page are standalone documents.
+- **Menu highlighting** comes from WordPress: every sub-screen (sale detail, void, report tabs, Bulk tools tabs and progress, "Settings saved") uses its page's slug.
+- **Screen detection.** `AdminMenu` registers every page and stores the hook suffix WordPress returns (the screen ID). Code compares with the stored value (`AdminMenu::is_page()`); never write a screen ID by hand, because the part before `_page_` is the translated menu title.
+- **One source for admin URLs.** `AdminUrl` is the only class that calls `admin_url()` and names the page slugs: every link, form action and redirect target (including the `admin-post.php` handlers' redirects) comes from it. The Phase 10B suite fails on a URL built anywhere else, and on any hard-coded screen ID.
+
+### Old addresses
+
+In-store sales and In-store reports kept their slugs, so their addresses (with every filter, tab and period) did not change; they just open under QR & Barcodes. Only the Phase 10 page `admin.php?page=pqbg-settings` was split. Its old forms redirect **permanently in code** (302, GET and HEAD only), keeping every other query argument:
+
+| Old address | Administrator | Shop Manager |
+|---|---|---|
+| `admin.php?page=pqbg-settings` | Settings (the same address, no redirect) | → Bulk tools (they used to land on Code tools) |
+| `…&tab=settings` | → `admin.php?page=pqbg-settings` | 403, as before |
+| `…&tab=tools` | → `admin.php?page=pqbg-bulk-tools&tab=tools` | → the same |
+| `…&tab=costs` | → `admin.php?page=pqbg-bulk-tools&tab=costs` | 403, as before |
+| `…&tab=<anything else>` | 404, as before | 403 |
+
+- A user who may not open the target is never redirected (Store Sellers and customers keep getting 403). Logged-out visitors go to the login page with the old address as the destination and are redirected after logging in.
+- 302 rather than 301: browsers keep 301s forever, and wp-admin addresses have no search value.
+- POSTs are unaffected: `options.php` and every `admin-post.php` handler keep their addresses.
+- The redirect runs on `admin_menu` (last), after the pages are registered but before WordPress checks access to the requested page; otherwise a Shop Manager would get WordPress's 403 on the Settings slug before any redirect could run.
+- In-store reports' "Dashboard" tab is now called **Summary** (`&tab=summary`), so the plugin has one Dashboard. `&tab=dashboard` still opens Summary.
+
+## Dashboard
+
+QR & Barcodes → **Dashboard** (Phase 10B), `pqbg_view_all_sales`. Today at a glance and shortcuts; for trends and analysis, use In-store reports. GET only; opening it writes nothing.
+
+- **Needs attention** (only when something does): QR codes point to a local address ("Do not print labels until the production URL is set"), or a public host on plain `http://`; shown to everyone who may print labels (`pqbg_manage_codes`), with the Settings link only for administrators (the site-wide admin notice stays administrators-only). Also: scan links unavailable with the current permalinks, content taking over `/scan/`, and a code-generation run in progress, interrupted or stopped (with "Continue in Bulk tools").
+- **Today in the shop** (in-store, completed sales, site timezone): revenue, sales, items sold; for `pqbg_view_costs` also gross profit, margin and the unknown-cost note. Revenue and sales per payment method, and the sales voided today. Links: End of day, Today's sales, In-store reports.
+- **Products and codes** (`pqbg_manage_codes`): **Published products without a code** (with a link to Bulk tools → Code tools), low on stock and out of stock (links to the Stock report).
+- **Recent bulk runs** (`pqbg_manage_codes`): the last 5 entries of the bulk log; cost-import entries only for `pqbg_view_costs`.
+- **Setup** (read-only): where scan links point, an example, barcodes on/off, the payment methods offered; "Change in Settings" for administrators.
+- **Quick links:** the scan page (sell on a phone), Print labels (the Products list, where "Print QR labels" is a bulk action), Generate missing codes, End of day, Today's sales; for administrators also Import cost prices and Settings.
+
+**Where the figures come from (no second calculation):** today's sales, payment methods, voids, low/out of stock and the missing-code count are `ReportsAdmin::dashboard_data()` for the period "today": the same function and period as In-store reports → Summary → Today, so they always match it (and the In-store sales totals for today). The Phase 10B suite checks both.
+
+**Two missing-code numbers, on purpose.** The Dashboard (and Summary) count **published** simple products and published variations of published variable products without a code: the items that can be sold now. Bulk tools → Code tools counts **every qualifying item**, including drafts, private, pending and scheduled ones, so its number can be higher. Generating codes there covers both.
+
+**Speed** (dev machine, 1,000 sellable items): see the timings in the Phase 10B section of `progress.md`; the targets are under 1 s at 5,000 sales in 90 days and under 2 s at 50,000.
 ## Settings
 
-**WooCommerce → QR & Barcodes** (`wp-admin/admin.php?page=pqbg-settings`) has three tabs since Phase 10, each checked on its own before any output:
+QR & Barcodes → **Settings** (`wp-admin/admin.php?page=pqbg-settings`), administrators only (`pqbg_manage_settings`). Until Phase 10B this address was WooCommerce → QR & Barcodes with three tabs (Settings | Code tools | Import cost prices); the tools are now [Bulk tools](#bulk-tools), and the old tab addresses redirect (see [Old addresses](#old-addresses)). A Shop Manager asking for Settings is sent to Bulk tools, or gets 403 for `&tab=settings`.
 
-| Tab | URL | Capability | Who |
-|---|---|---|---|
-| Settings | `&tab=settings` | `pqbg_manage_settings` | administrators |
-| Code tools | `&tab=tools` | `pqbg_manage_codes` | administrators, Shop Managers |
-| Import cost prices | `&tab=costs` | `pqbg_view_costs` | administrators |
-
-- The menu item needs `pqbg_manage_codes`. Without a tab the page opens the user's first tab: Settings for administrators, Code tools for Shop Managers.
-- A tab the user may not use is not shown, and its URL returns 403 (an unknown tab 404). A Shop Manager never sees the Settings or cost tab, a link to either, or any cost.
-- Store Sellers get neither the menu item nor the page (and WooCommerce keeps them out of wp-admin).
-
-The Settings tab is unchanged:
+The settings form is unchanged:
 
 It uses the WordPress Settings API:
 - The form posts to `options.php`, which checks the `pqbg_settings-options` nonce and, through `option_page_capability_pqbg_settings`, the `pqbg_manage_settings` capability.
@@ -628,7 +676,7 @@ A phone cannot open `http://localhost/sharayu`. For testing, use a **Cloudflare 
    }
    ```
 
-3. Go to **WooCommerce → QR & Barcodes**, set **Scan base URL** to `https://<words>.trycloudflare.com/sharayu`, and save. The QR codes in the admin now point at the tunnel, and the local-address warning disappears.
+3. Go to **QR & Barcodes → Settings**, set **Scan base URL** to `https://<words>.trycloudflare.com/sharayu`, and save. The QR codes in the admin now point at the tunnel, and the local-address warning disappears.
 4. **To revert:** clear the Scan base URL field and save (the warning returns), stop the tunnel, and remove the snippet.
 
 **Warning:** while the tunnel runs, the whole site is reachable at that URL. Scan pages still require a login, but keep the tunnel short-lived.
@@ -672,12 +720,12 @@ Use two or three test products with codes, one with a price (to check the ₹ si
 
 **Phase 9A checklist (payment method, My sales, cost price, sales history).** Set up the tunnel and the `wp-config.php` snippet as in steps 1–3 above for the phone parts. Use two test products with **Manage stock** on (stock at least 5), one of them variable.
 
-1. **Payment methods:** as an administrator, open **WooCommerce → QR & Barcodes**. Under "In-store sales", Cash, UPI and Card are ticked and Other is not. Untick all four and save: the page says "At least one payment method must stay enabled" and keeps them. Leave the defaults.
+1. **Payment methods:** as an administrator, open **QR & Barcodes → Settings**. Under "In-store sales", Cash, UPI and Card are ticked and Other is not. Untick all four and save: the page says "At least one payment method must stay enabled" and keeps them. Leave the defaults.
 2. **Sell with each method (phone, as a Store Seller):** scan the first product. Under **Paid by**, nothing is selected. Tap **Confirm sale** without choosing: the browser asks you to choose one (or the page says "Choose how the customer paid."). Choose **Cash** and confirm: the sale page shows "Paid by: Cash". Sell again with **UPI**, then with **Card**.
 3. **My sales (phone):** tap **My sales** at the top of the scan page. Today's three sales are listed with time, item, "quantity × price = total", the method and "Completed". The summary shows Cash, UPI and Card with their totals, and a Total line. Tap **Yesterday** and **Last 7 days**. Undo one sale from its sale page and check that My sales shows it as voided and counts "Voided: 1" (the summary no longer includes it). There is no cost or profit anywhere.
 4. **Cost price (laptop, as an administrator):** edit the simple product. On the General tab, under the prices, fill **Cost price (₹)** (e.g. 900) and update. On the variable product, fill **Default cost price (₹)** (General tab) and, for one variation, its own **Cost price (₹)** (its placeholder shows the default). Update. Enter something invalid (e.g. `-5` or `1,499.00`) once: an error appears and the previous value stays.
 5. **Sell the variations (phone):** sell one variation with its own cost and one without.
-6. **History (laptop, administrator): WooCommerce → In-store sales** (right after Orders). Today's sales are listed with date/time, sale #, product, SKU, qty, unit price, total, "Paid by", seller, status, unit cost and profit. The earlier sales (before step 4) show cost "unknown". The totals bar shows the revenue per method, then "Cost … · Profit … — excludes N lines with unknown cost". Try the presets (Yesterday, This month) and the filters (seller, Paid by, status, search by SKU or by the product code). Copy the address and open it in a new tab: the same view appears.
+6. **History (laptop, administrator): QR & Barcodes → In-store sales** (right after Dashboard). Today's sales are listed with date/time, sale #, product, SKU, qty, unit price, total, "Paid by", seller, status, unit cost and profit. The earlier sales (before step 4) show cost "unknown". The totals bar shows the revenue per method, then "Cost … · Profit … — excludes N lines with unknown cost". Try the presets (Yesterday, This month) and the filters (seller, Paid by, status, search by SKU or by the product code). Copy the address and open it in a new tab: the same view appears.
 7. **Shop Manager cannot see cost:** log in as a Shop Manager. On the product edit screen there is no cost field; in **In-store sales** there is no Unit cost or Profit column and no cost in the totals; the exported CSV has no cost columns.
 8. **Void (as a Shop Manager or administrator):** open a sale (click its date or number) → **Void sale**. Submit without a reason: "Enter a reason for voiding this sale." Enter a reason, keep **Return 1 to stock** ticked, and click **Void sale**: "Sale voided. The quantity was returned to stock." The timeline shows who voided it, when and why. The product's stock in wp-admin is back up by 1. The sale stays in the list as Voided and is no longer in the totals.
 9. **CSV:** click **Export CSV** and open the file in **Excel**: the ₹ sign in the headers shows correctly, dates are in Indian time, and there is one line per sale in the view.
@@ -686,7 +734,7 @@ Undo the test sales or leave them (they are real rows in `pqbg_sales` and cannot
 
 **Phase 9B checklist (reports and the owner dashboard).** Part of the pre-launch acceptance checklist in `progress.md`: do it once before launch, on a copy with a few days of real-looking sales (the Phase 9A checklist leaves some). No phone is needed.
 
-1. **Dashboard (laptop, as an administrator): WooCommerce → In-store reports** (right after In-store sales). With **Today**, check that Revenue, Sales, Items sold and Average sale match what you sold today (compare with **In-store sales** filtered to Today: the same completed total). Each card shows ↑/↓ % against the comparison period named under the dates ("Compared with … (up to HH:MM, the same point in time)"). Gross profit and Margin appear, with "Profit and margin leave out N sales … with an unknown cost" when some sales had no cost price. Try **This week** and **This month**.
+1. **Summary (laptop, as an administrator): QR & Barcodes → In-store reports** (right after In-store sales; the first tab, **Summary**, was called Dashboard until Phase 10B). With **Today**, check that Revenue, Sales, Items sold and Average sale match what you sold today (compare with **In-store sales** filtered to Today: the same completed total). Each card shows ↑/↓ % against the comparison period named under the dates ("Compared with … (up to HH:MM, the same point in time)"). Gross profit and Margin appear, with "Profit and margin leave out N sales … with an unknown cost" when some sales had no cost price. Try **This week** and **This month**.
 2. **Payment split and alerts:** "Paid by" lists Cash / UPI / Card / Other (and Not recorded, if any) with amounts that add up to the revenue. The alerts link to the low/out-of-stock items, the voids and the items without a QR code; open each link.
 3. **End of day and print:** open **End of day** (today). "Cash expected in drawer" = today's cash sales minus the cash amounts of earlier sales voided today. Void one of yesterday's cash sales (In-store sales → the sale → Void sale) and reload: the cash figure drops by that amount, and "Voided in this period by <you>" lists it. Click **Print**: a clean page opens; print it (or save as PDF) and check it fits A4 and ₹ shows correctly.
 4. **A CSV in Excel:** on **Products** (or any report) click **Export CSV** and open it in **Excel**: ₹ in the headers, Indian dates, the same rows as on screen, the Total row last.
@@ -958,7 +1006,7 @@ Phase 9A: how each in-store sale was paid, what the item cost, and who sold it; 
 
 ### In-store sales (managers)
 
-**WooCommerce → In-store sales** (`admin.php?page=pqbg-sales`), right after Orders, for `pqbg_view_all_sales` (Shop Manager, Administrator). Every filter is in the URL, so a view can be bookmarked or shared. Everything is read-only GET.
+**QR & Barcodes → In-store sales** (`admin.php?page=pqbg-sales`; under WooCommerce, right after Orders, until Phase 10B), for `pqbg_view_all_sales` (Shop Manager, Administrator). Every filter is in the URL, so a view can be bookmarked or shared. Everything is read-only GET.
 
 - **Columns:** date/time (site timezone), sale #, product (with variation attributes), SKU, qty, unit price, total, paid by, seller, status (Completed / Voided / Failed; In progress for a sale being recorded). For `pqbg_view_costs` also unit cost and profit (total − qty × cost; "unknown" without a cost; "—" for rows that are not completed).
 - **Date range:** Today (default), Yesterday, Last 7 days (today and the 6 days before), This month, Last month, or From/To (both inclusive; swapped if reversed). Whole days in the **site timezone** (Asia/Kolkata: a day starts at 18:30 UTC the day before).
@@ -1025,13 +1073,13 @@ The first CSV version took 31 s for the same export (OFFSET chunks alone 23.6 s)
 
 ## In-store reports
 
-Phase 9B: **WooCommerce → In-store reports** (`admin.php?page=pqbg-reports`), right after In-store sales, for `pqbg_view_all_sales` (Shop Manager, Administrator). Every view is a plain GET with its options in the URL (bookmarkable); nothing on these pages writes.
+Phase 9B: **QR & Barcodes → In-store reports** (`admin.php?page=pqbg-reports`; under WooCommerce until Phase 10B), right after In-store sales, for `pqbg_view_all_sales` (Shop Manager, Administrator). Every view is a plain GET with its options in the URL (bookmarkable); nothing on these pages writes.
 
 ### Counting rules (stated on every screen)
 
 - **In-store (scan) sales only.** Online orders are in WooCommerce → Analytics.
 - A "sale" is one row of `pqbg_sales`: one scanned item with its quantity. Sales = rows, items = sum of quantities, revenue = sum of `line_total`, average sale = revenue ÷ sales.
-- **Revenue, items and sales count completed sales only.** Voided and failed sales are never in revenue; they appear in Voids & failed, End of day, the dashboard alert and the sellers' void columns.
+- **Revenue, items and sales count completed sales only.** Voided and failed sales are never in revenue; they appear in Voids & failed, End of day, the Summary alert and the sellers' void columns.
 - **Amounts are the sale's snapshots** (`line_total`, `unit_price`, `quantity`, `unit_cost`), never current prices (Stock and Dead stock excepted: they are about current stock).
 - **Profit** = `line_total − quantity × unit_cost`, only where the cost was known at the moment of sale. **Margin** = profit ÷ revenue *of the sales with a known cost*. Sales with an unknown cost are left out of cost, profit and margin (never counted as zero) and always disclosed ("N sales, ₹X with unknown cost").
 - **Days are site-timezone days** (Asia/Kolkata: a day starts at 18:30 UTC the day before); weeks start on Settings → General → "Week starts on". Every report filters on the **sale date**, like the sales history, so the totals reconcile with it.
@@ -1042,7 +1090,9 @@ Presets: Today, Yesterday, This week, Last week, This month, Last month, Last 7 
 
 The dashboard compares with the previous period **up to the same point in time**: today vs yesterday up to the same time of day; this week vs last week up to the same weekday and time; this month vs last month up to the same day and time, clamped to that month's length (on 31 March: the whole of February). Finished periods compare with the whole period before; last-N-days and custom ranges with the same number of days immediately before. The comparison dates are printed under the period. Changes are ↑/↓ % ("— nothing to compare with" when the previous value is 0); margin changes in percentage points.
 
-### Dashboard
+### Summary
+
+The first tab (`&tab=summary`; called "Dashboard" until Phase 10B, and `&tab=dashboard` still opens it). Its "Today" figures are also what the plugin [Dashboard](#dashboard) shows.
 
 - Cards: revenue, sales, items sold, average sale, each with its change; for `pqbg_view_costs` also gross profit and margin, with the unknown-cost disclosure.
 - Paid by: Cash / UPI / Card / Other / Not recorded.
@@ -1110,7 +1160,7 @@ Why, and what was measured: grouping 50,000 rows costs 350–450 ms per query in
 
 ## Bulk tools
 
-Phase 10. Two tabs of **WooCommerce → QR & Barcodes** (see [Settings](#settings) for the tab access rules). No schema change (`DB_VERSION` stays 4), no new capability, no REST/AJAX/nopriv handler, no new product or meta hook, and the sale path is untouched.
+Phase 10. QR & Barcodes → **Bulk tools** (`admin.php?page=pqbg-bulk-tools`, `pqbg_manage_codes`) with two tabs: **Code tools** (`&tab=tools`, `pqbg_manage_codes`) and **Import cost prices** (`&tab=costs`, `pqbg_view_costs`). A tab the user may not use is not shown and its address returns 403 (an unknown tab 404); without a tab the page opens the user's first tab. Until Phase 10B these were tabs of WooCommerce → QR & Barcodes (see [Old addresses](#old-addresses)). No schema change (`DB_VERSION` stays 4), no new capability, no REST/AJAX/nopriv handler, no new product or meta hook, and the sale path is untouched.
 
 ### Generate missing codes (Code tools tab, `pqbg_manage_codes`)
 
@@ -1119,7 +1169,7 @@ Phase 10. Two tabs of **WooCommerce → QR & Barcodes** (see [Settings](#setting
 - the variations (enabled or disabled) of a variable product in one of those statuses;
 - never: variable products themselves, grouped/external/other types, orphan variations or variations under a non-variable product, auto-drafts, the importer's "importing" placeholders, trashed items or variations of a trashed product. Stock tracking plays no part.
 
-The tab shows the count per status and type (a variation counts under its product's status), a checkbox per status (all ticked), and a required confirmation that codes are permanent. The "missing codes" alert on the In-store reports dashboard counts published products only.
+The tab shows the count per status and type (a variation counts under its product's status), a checkbox per status (all ticked), and a required confirmation that codes are permanent. The Dashboard's "Published products without a code" and the Summary alert count published products only (see [Dashboard](#dashboard)).
 
 **How it runs** (`BulkGenerator`):
 - In batches of up to 100 items or about 10 seconds, each one `admin-post.php?action=pqbg_bulk_generate` (POST, nonce). The page continues by itself (`assets/pqbg-tools.js` submits "Continue"); without JavaScript, press Continue. **Stop** and **Continue** work at any time.
@@ -1182,11 +1232,19 @@ Row by row rather than all-or-nothing: each row is one independent, idempotent m
 
 **Phase 10 checklist (bulk tools).** Part of the pre-launch acceptance checklist in `progress.md`: do it once before launch, on the real catalogue (after a database backup). No phone is needed.
 
-1. **Generate missing codes (administrator):** WooCommerce → QR & Barcodes → **Code tools**. Check the counts per status make sense for the catalogue, untick any status you do not want, tick the confirmation and click **Generate missing codes**. Let it finish (or click Stop, then Continue). Afterwards the tab says "Every qualifying product and variation has a code", and the dashboard's missing-codes alert is gone.
+1. **Generate missing codes (administrator):** QR & Barcodes → Bulk tools → **Code tools**. Check the counts per status make sense for the catalogue, untick any status you do not want, tick the confirmation and click **Generate missing codes**. Let it finish (or click Stop, then Continue). Afterwards the tab says "Every qualifying product and variation has a code", and the Dashboard's "Published products without a code" is 0.
 2. **Print from the run:** click the first **Print labels** link: the Phase 8 setup screen opens with those items. (Do not print real labels before the Phase 8 printer test and the production scan URL.)
 3. **Export in Excel:** download the codes CSV and open it in Excel with **Data → From Text/CSV** (SKU column as Text): ₹/Devanagari names correct, SKUs with leading zeros intact, scan URLs for active codes only, no cost column.
 4. **Cost import (administrator):** open **Import cost prices**, download the template, change a few costs (one with "1,200.50", one "clear", one wrong value such as "12.345"), upload it, check the preview (the wrong value is an error with its reason), tick the box, apply, and check the products' cost prices and the downloaded report.
-5. **Shop manager:** log in as a Shop Manager: QR & Barcodes opens on **Code tools** only (no Settings or Import cost prices tab, no cost anywhere, no cost entries in Recent bulk runs); adding `&tab=costs` or `&tab=settings` to the address gives "Sorry, you are not allowed to access this page."
+5. **Shop manager:** log in as a Shop Manager: Bulk tools opens on **Code tools** only (no Import cost prices tab, no Settings, no cost anywhere, no cost entries in Recent bulk runs); adding `&tab=costs` to the Bulk tools address gives "Sorry, you are not allowed to access this page."
+
+**Phase 10B checklist (menu and Dashboard).** Part of the pre-launch acceptance checklist in `progress.md`. Do it on a desktop and on a phone (wp-admin on the phone's browser), once as an administrator and once as a Shop Manager.
+
+1. **Menu:** "QR & Barcodes" is directly below Products, with Dashboard, In-store sales, In-store reports, Bulk tools and Settings (the Shop Manager has no Settings). WooCommerce's own menu has no plugin item. Open each item: the right one stays highlighted, and the tab row at the top marks the same page.
+2. **Access:** as the Shop Manager, Bulk tools has only Code tools, and no page shows a cost, profit or margin. Adding `&tab=costs` to the Bulk tools address gives "Sorry, you are not allowed to access this page."
+3. **Dashboard:** today's revenue, sales and payment split match In-store reports → Summary → Today and In-store sales filtered to Today. The administrator also sees gross profit. "Published products without a code" opens Bulk tools → Code tools. The quick links open the right pages; "Open the scan page" opens `/scan/`.
+4. **Old bookmarks:** `…/wp-admin/admin.php?page=pqbg-settings&tab=tools` lands on Bulk tools → Code tools. As the administrator, `…&tab=settings` lands on Settings.
+5. **Phone:** the menu folds into the ☰ button, the tabs wrap onto several lines without sideways scrolling, and the Dashboard shows one column with full-width buttons.
 
 ### Limitations
 

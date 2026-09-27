@@ -39,6 +39,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 8 was committed as `753613c` ("Phase 8: label printing (A4 sheet and thermal layouts, QR minimum size, render cache, print page) and the Action Scheduler test-leak fix") and pushed to `origin/main`, with the user's approval, before their printer test (normal fast-forward, no force).
 - Phase 9A was committed as a single commit as `5495b05` ("Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3)") and pushed to `origin/main`, with the user's approval on the automated tests, before their manual test (normal fast-forward, no force).
 - Phase 9B was committed as two commits, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist), and pushed to `origin/main` (normal fast-forward, no force): first the Phase 7 race fix as `072f4d6` ("Fix Phase 7 idempotency race: duplicate request mid-sale reported failed"), then Phase 9B as `716600d` ("Phase 9B: in-store reports and owner dashboard (end of day, profit, stock, dead stock; schema v4)"). Recorded at the start of Phase 10 (2026-09-26).
+- Phase 10 was committed as `5b746a7` ("Phase 10: bulk code generation, codes CSV export, admin-only cost-price import") and pushed to `origin/main`, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist; normal fast-forward, no force). Recorded at the start of Phase 10B (2026-09-27); this record is committed together with Phase 10B.
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -52,6 +53,7 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `5b746a7` | Phase 10: bulk code generation, codes CSV export, admin-only cost-price import |
 | `716600d` | Phase 9B: in-store reports and owner dashboard (end of day, profit, stock, dead stock; schema v4) |
 | `072f4d6` | Fix Phase 7 idempotency race: duplicate request mid-sale reported failed |
 | `5495b05` | Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3) |
@@ -103,21 +105,27 @@ every other plugin stays ignored. For a future custom theme the pattern is:
 
 ### Open items
 - [x] Permalinks set to `/%postname%/` (verified 2026-09-24)
-- [ ] Decide on theme approach — customize twentytwentyfive, use a child theme, or build custom
-- [ ] The manual checks that must pass before launch are in the **Pre-launch acceptance checklist** below (Phase 8 printer test, Phase 9A and Phase 9B manual checks).
+- [ ] **Optional, later (owner's decision A, 2026-09-27: plugin first):** decide on the theme approach (customize twentytwentyfive, a child theme, or a custom theme). All plugin phases are completed before any theme work; the theme phases are at the end of the roadmap.
+- [ ] The manual checks that must pass before launch are in the **Pre-launch acceptance checklist** below (Phase 8 printer test with its interim no-printer check, Phase 9A, 9B, 10 and 10B manual checks, the 50,000-sale stress checks).
 - [ ] The user's label stock → possibly a new default print preset (A4 3 × 7 until then).
 - [ ] **Phase 11 (hardening):** the reconciliation check and the concurrency-test items from Phase 7.
-- [ ] **MENU RESTRUCTURE (the phase before final plugin QA; added 2026-09-27 at the user's request in Phase 10):** group all plugin screens (In-store sales, In-store reports, QR & Barcodes and its tabs Settings / Code tools / Import cost prices) into one plugin area with a dashboard. Options: **(1) its own top-level "QR & Barcodes" menu with sub-items (the reviewer's recommendation)** or (2) one WooCommerce submenu with tabs. Requirements: keep every per-screen and per-tab capability check; redirect the old admin URLs (`admin.php?page=pqbg-settings`, `pqbg-sales`, `pqbg-reports`, with their tabs and arguments); update the links in CSVs, print pages, notices (e.g. the scan-URL warning) and the README; keep all tests passing.
+- [x] **Phase 10B = MENU RESTRUCTURE** (added 2026-09-27 in Phase 10; owner's decision Option 1): the plugin's own top-level "QR & Barcodes" menu with Dashboard, In-store sales, In-store reports, Bulk tools, Settings; nothing under WooCommerce; old addresses redirect. **Implemented 2026-09-27; see the Phase 10B section.**
+- [ ] **Phase 12 (theme compatibility, owner's decision B, 2026-09-27):** plan it after Phase 11. The plugin must work with any WooCommerce theme: every front-end / staff-facing screen it outputs (the scan page, My sales, the login round trip, anything on product pages or My Account) works and looks usable with classic themes (e.g. Storefront) and block themes (e.g. Twenty Twenty-Five), with block and classic cart/checkout present; no theme-specific code; only WordPress/WooCommerce APIs and the plugin's own scoped CSS.
 - [ ] **Phase 11 (performance):** If the dashboard exceeds 2 s on real data, or in-store sales exceed ~300/day, implement a daily roll-up table (option B) or a permission-keyed result cache (option C). Do not change the sale path for this before then. (Phase 9B measured the dashboard at about 1.4–1.55 s for 90 days with 50,000 sales in 90 days; every report meets the 1 s / 2 s targets at 5,000 sales in 90 days. See the Phase 9B section.)
 
 ### Pre-launch acceptance checklist
 
 All pending. Each item must pass before production launch; the detailed steps are in the plugin README. Per-phase manual tests are no longer asked for at the end of each phase (see the next-session instructions).
 
-- [ ] **Phase 8 physical printer test** (must be done before printing real labels): print on plain paper and on the actual label stock, check size/alignment (use the printer offset if needed), check ₹ and text, and scan several labels with a phone. No printer was available on 2026-09-25; Phase 8 was approved on the automated print verification. Steps: the "Phase 8 checklist" in the plugin README.
+- [ ] **Printer (owner's decision D, 2026-09-27):** "Printer: no printer yet. Physical printer test to be done when the printer and label stock are chosen. Interim check without a printer: open a label sheet, Save as PDF, and scan several codes from the screen with a phone."
+  - [ ] **Interim check without a printer:** open a label sheet (the print page), Save as PDF, and scan several codes from the screen with a phone.
+  - [ ] **Phase 8 physical printer test** (when the printer and label stock are chosen; must be done before printing real labels): print on plain paper and on the actual label stock, check size/alignment (use the printer offset if needed), check ₹ and text, and scan several labels with a phone. No printer was available on 2026-09-25; Phase 8 was approved on the automated print verification. Steps: the "Phase 8 checklist" in the plugin README.
 - [ ] **Phase 9A manual test:** sell with each payment method (required, none pre-selected), check My sales on the phone, set a cost price, check history/totals/profit as admin, confirm a shop manager sees no cost anywhere, void a sale with a reason, and open the CSV export in Excel. Phase 9A was approved on the automated tests on 2026-09-26. Steps: the "Phase 9A checklist" in the plugin README.
 - [ ] **Phase 10 manual checks:** generate the missing codes on the real catalogue (after a backup) and open the first "Print labels" link; open the codes CSV in Excel via Data → From Text/CSV (leading zeros kept, no cost); a cost import with preview (one wrong value shown as an error), apply and report; a shop manager sees only Code tools (no Settings or cost tab, no cost anywhere). Steps: the "Phase 10 checklist" in the plugin README.
-- [ ] **Phase 9B manual checks:** the dashboard figures look right (against In-store sales for the same day), the end-of-day "Cash expected in drawer" and its print page, a report CSV opened in Excel, and a shop manager sees no profit, margin or cost anywhere in the reports. Steps: the "Phase 9B checklist" in the plugin README.
+- [ ] **Phase 9B manual checks:** the Summary figures (the reports' "Dashboard" tab until Phase 10B) look right (against In-store sales for the same day), the end-of-day "Cash expected in drawer" and its print page, a report CSV opened in Excel, and a shop manager sees no profit, margin or cost anywhere in the reports. Steps: the "Phase 9B checklist" in the plugin README.
+
+- [ ] **Phase 10B manual checks:** click through QR & Barcodes as an administrator and as a shop manager, on a desktop and on a phone: the menu below Products with Dashboard, In-store sales, In-store reports, Bulk tools, Settings (no Settings for the shop manager) and nothing under WooCommerce; the tab row and highlighting on every page; the Dashboard figures against In-store reports → Summary → Today; an old bookmark `admin.php?page=pqbg-settings&tab=tools` lands on Bulk tools; on the phone the menu folds, tabs wrap and the Dashboard is one column. Steps: the "Phase 10B checklist" in the plugin README.
+- [ ] **50,000-sale stress checks (owner's decision C, 2026-09-27):** run in Phase 11 (hardening) and once more before launch: `PQBG_STRESS=1` with the Phase 9B and 10B suites (the reports and the Dashboard under 2 s at 50,000 sales in 90 days). Default runs use the 5,000-sale checks.
 
 ### Backlog
 _To be filled in — site structure, pages, content, plugins._
@@ -142,8 +150,12 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **8** | **Printing** | **Done 2026-09-25. Committed `753613c`, pushed.** |
 | **9A** | **Sales history, payment method & cost price** | **Done 2026-09-26. Approved on the automated tests; committed `5495b05`, pushed. Manual check pending (pre-launch acceptance checklist).** |
 | **9B** | **Reports & owner dashboard** | **Done 2026-09-26. Approved on the automated tests; committed as `072f4d6` (Phase 7 race fix) and `716600d` (Phase 9B), pushed. Manual checks pending (pre-launch acceptance checklist).** |
-| **10** | **Bulk / CSV tools** | **Implemented and tested 2026-09-27; waiting for the user's review. Not committed.** Manual checks in the pre-launch acceptance checklist. |
-| 11 → 12 | hardening/performance → QA/documentation | Not started |
+| **10** | **Bulk / CSV tools** | **Done 2026-09-27. Approved on the automated tests; committed `5b746a7`, pushed. Manual checks pending (pre-launch acceptance checklist).** |
+| **10B** | **Menu restructure (own "QR & Barcodes" menu) and plugin Dashboard** | **Implemented and tested 2026-09-27; waiting for the user's review. Not committed.** Manual checks in the pre-launch acceptance checklist. |
+| 11 | Hardening and performance (incl. the 50,000-sale stress checks) | Not started |
+| 12 | Theme compatibility (owner's decision B: any WooCommerce theme, classic and block, block and classic cart/checkout; no theme-specific code) | Not started; plan after Phase 11 |
+| 13 | Plugin QA, documentation and packaging | Not started |
+| later | Theme work (optional, later; owner's decision A: plugin first) | Not started |
 
 > **Pre-rename records.**
 >
@@ -1585,7 +1597,7 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 
 ### Phase 10: Bulk and CSV tools (2026-09-26 → 2026-09-27)
 
-**Status:** implemented and tested; **NOT committed, waiting for the user's review.** The plugin stays active; no schema change (`DB_VERSION` 4).
+**Status:** done; approved on the automated tests, committed as `5b746a7` and pushed to `origin/main`. _Originally written before approval as:_ implemented and tested; NOT committed, waiting for the user's review. The plugin stays active; no schema change (`DB_VERSION` 4).
 
 **Start state:** `HEAD` = `origin/main` = `716600d`, clean. Roadmap numbering confirmed (Phase 10 = Bulk / CSV tools). Housekeeping: `072f4d6` and `716600d` recorded in this file.
 
@@ -1647,6 +1659,67 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 
 **Final report:** `C:\xampp\backups\sharayu\phase10-report.txt`.
 
+### Phase 10B: Menu restructure and plugin Dashboard (2026-09-27)
+
+**Status:** implemented and tested; **NOT committed, waiting for the user's review** (the commit will also carry the record of `5b746a7`). No schema, capability, option or stored-data change (`DB_VERSION` 4); the sale path is untouched.
+
+**Start state:** `HEAD` = `origin/main` = `5b746a7`, clean. Roadmap: the MENU RESTRUCTURE open item became Phase 10B (owner's decision: Option 1, the plugin's own top-level menu).
+
+**Backups** (`C:\xampp\backups\sharayu\`, outside the web root, never committed): `sharayu-20260927-120429-before-phase10b.sql` (950,829 bytes, 53 tables, complete; before the baseline); `sharayu-20260927-134249-before-phase10b-tests.sql` (953,748 bytes; before the first final run); `sharayu-20260927-152746-before-phase10b-final.sql` (954,764 bytes; after the approved cleanup, before the final runs). A first attempt at the first backup produced a 0-byte file (php not on the Bash PATH); it was deleted.
+
+**Baseline** (suite by suite, free memory 1,811 MB at the start): 1,737 passed, 0 failed, 0 skipped, AS guard PASS; crash count 139 throughout. The first phase10-bulk run was stopped by the memory watchdog (491 MB free; Chrome had been reopened) at the start of its volume part, cleaned up completely and not counted; re-run on its own: 197/197.
+
+**Approved plan:** D1–D15 as recommended (`C:\xampp\backups\sharayu\phase10b-plan.txt`), with seven changes: (1) In-store reports' "Dashboard" tab renamed **Summary** (`&tab=dashboard` still opens it); (2) Print setup and Regenerate stay where they are if they are hidden screens (**they were**: registered under Products and removed from the menu in `admin_head`; confirmed over HTTP); (3) no hard-coded screen IDs: pages recognised by the stored hook suffix, with a scope check; (4) the Dashboard's figure is labelled "Published products without a code" and links to Bulk tools → Code tools, which also counts drafts and other statuses (explained in the README); (5) `AdminUrl` also for the admin-post handlers' redirect targets; (6) a shared tab row (Dashboard | In-store sales | In-store reports | Bulk tools | Settings) at the top of every plugin page, per capability, page-internal tabs as a second row; (7) the 50,000-sale stress data opt-in (`PQBG_STRESS=1`) in the 9B and 10B suites, run once for the Dashboard in this phase. **Accepted afterwards:** a shop manager opening `admin.php?page=pqbg-settings` is redirected to Bulk tools (as in Phase 10); `&tab=settings` stays 403.
+
+**Design:**
+- `AdminMenu`: `add_menu_page` "QR & Barcodes" (slug `pqbg-dashboard`, `pqbg_view_all_sales`, `dashicons-grid-view`, position `55.7` → directly below Products) and five `add_submenu_page` calls in one `admin_menu` callback; stores each returned hook suffix (`is_page()`, `page_of()`), attaches each page's `load-` callback, enqueues `assets/pqbg-menu.css` on plugin pages, prints the shared tab row (`render_nav()`, one tab per page the user may open), and redirects the old `pqbg-settings` addresses on `admin_menu` at `PHP_INT_MAX` (before WordPress's page-access check in `wp-admin/menu.php`; GET/HEAD; only when the user may open the target; 302; every other query argument kept). The page classes lost their own `add_menu()` and the "find Orders / In-store sales" position code.
+- `AdminUrl`: the only class that calls `admin_url()` and names the page slugs (constants; `SalesAdmin::SLUG` etc. are aliases). Page URLs (`dashboard()`, `sales()`, `sale()`, `sale_void()`, `reports()`, `bulk_tools()`, `settings()`, `print_setup()`, `regenerate_confirm()`), `admin_post()` (form actions and GET links; handlers still add their own action and nonce), `admin_php()`, `options()`, `products()`, `product_edit()`, `is_admin_home()` (ScanRoute's login comparison). Removed: `SalesAdmin::list_url/detail_url/void_url`, `ReportsAdmin::url`, `ToolsAdmin::url`, `PrintAdmin::setup_url`, `AdminProductPanel::confirm_url`.
+- Slugs kept: `pqbg-sales`, `pqbg-reports`, `pqbg-settings` (their URLs did not change); new: `pqbg-dashboard`, `pqbg-bulk-tools`. `ToolsAdmin` is the Bulk tools page (tabs `tools`, `costs`; `TAB_SETTINGS` kept for the redirect map); `SettingsPage` renders only Settings (load: 403 without `pqbg_manage_settings`, 404 for any leftover tab, `CostImport::prune()`).
+- `DashboardAdmin`: needs attention (local/http scan URL for `pqbg_manage_codes` users with the Settings link only for administrators; permalinks; `/scan/` conflicts; a run in progress / interrupted / stopped), today in the shop (cards, per payment method, voided today; profit/margin/unknown-cost note only for `pqbg_view_costs`), products and codes, recent bulk runs (5), setup, quick links. Every figure from `ReportsAdmin::dashboard_data( ReportPeriod::resolve( 'today' ), $costs )` (the Summary's own function), `BulkLog::visible()`, `BulkGenerator::state()`, `Settings`/`ScanUrl`/`ScanRoute`/`PaymentMethods`. `assets/pqbg-dashboard.css` (plus `pqbg-reports.css` cards) on the Dashboard only.
+- Accessibility: one h1 per page; a labelled `nav` for the tab row (`aria-current="page"`); Dashboard sections labelled by their h2; figures as description lists; a captioned payment table; no outline removal; below 782 px the tabs wrap (40 px tap height), the Dashboard is one column and the quick links full-width 44 px buttons.
+
+**Files created** (plugin-relative): `includes/AdminUrl.php`, `includes/AdminMenu.php`, `includes/DashboardAdmin.php`, `assets/pqbg-menu.css`, `assets/pqbg-dashboard.css`, `tests/phase10b-menu.php`. Class files were created before `Plugin.php` referenced them.
+
+**Files modified:** `includes/Plugin.php` (wiring, last), `SettingsPage.php`, `ToolsAdmin.php`, `SalesAdmin.php`, `ReportsAdmin.php` (Summary), `ReportsExport.php`, `ReportPrint.php`, `ReportData.php`, `ReportTable.php`, `SalesListTable.php`, `SalesExport.php`, `PrintAdmin.php`, `PrintPage.php`, `AdminProductPanel.php`, `AdminActions.php`, `ScanRoute.php` (login comparison only); `assets/pqbg-reports.css` (comment); `README.md` (plugin: Admin menu, Old addresses, Dashboard, every menu path, Phase 10B checklist); `tests/README.md`, `tests/run.php`, `tests/phase2-no-woocommerce.php`, `phase4-rendering.php`, `phase9a-sales-history.php`, `phase9b-reports.php`, `phase10-bulk.php`; `progress.md`.
+
+**False by design (listed with reasons in tests/README.md):** Phase 4 (menu item location; the shop manager's old address → 302 to Bulk tools; the shop manager's menu; the hooks check also covers `AdminMenu`); Phase 9A (menu position: QR & Barcodes → In-store sales after Dashboard, not under WooCommerce); Phase 9B (tab `summary` instead of `dashboard`; the hooks scope check: 3 actions, the menu and `load-` in `AdminMenu`; the 50,000-sale checks opt-in and a new 5,000-sale HTTP check at the original targets; 146 checks, 149 with `PQBG_STRESS=1`); Phase 10 (`$tab_url` from `AdminUrl`; `AdminUrl::print_setup()`; `ToolsAdmin::tabs()` without Settings; Bulk tools / Settings split; the shop manager's menu; `&tab=settings` 403 and the plain Settings address 302; the `load-` hook in `AdminMenu`); Phase 2 no-WooCommerce (the menu not registered). Two of these were first missed and failed in the final run (Phase 10's in-process tab list and the shop manager's Settings address), and one Phase 9A menu check I had edited was wrong (`array_search` found the top-level Dashboard link first); all three were corrected in the tests only and re-run.
+
+**Development incidents:**
+- Dev run 1 of the 10B suite: 4 wrong expectations in the new suite (single-quoted menu markup, the D8 redirect for a shop manager's Settings address, and a CSV nonce created in-process for user 0); fixed in the suite; dev run 2: 91/91.
+- **The first final run was killed by Claude Code for low system memory** about a minute into the 10B suite (Edge had restarted in the background; about 0.9 GB free). No crash (139). Its leftovers (4 users 1031–1034, posts 32666–32668 with meta, 6 fixture sales rows, 1 code row, the render-cache index and one transient pair, 2 lookup jobs and logs) were listed read-only and, **with the user's approval**, removed by a guarded script that verified every item first; deleting the two products queued two more lookup jobs for them (65989, 65990), which the script removed after checking their hook and IDs. The sales and codes tables were empty, so their AUTO_INCREMENT was reset to 1. Clean state confirmed (0 products, 0 sales, 0 codes, 1 user, only `pqbg_db_version`, `pqbg_rewrite_version`, `pqbg_settings`).
+
+**Tests** (`PQBG_TESTS_ALLOW_PRODUCTION=1`, `PQBG_DECODER`, `PQBG_PRINTCHECK` and `PQBG_WXR_IMPORTER` pointing at the files in `C:\xampp\tools\pqbg\`), 2026-09-27, one suite at a time with the 500 MB watchdog; free memory 3,112 MB before the final runs (Chrome/Edge closed; Edge background processes about 180 MB), lowest 2,552 MB:
+
+| Suite | Result | Crashes before → after |
+|---|---|---|
+| phase10b-menu (on its own first) | 91/91, AS guard PASS | 139 → 139 |
+| phase2-main | 83/83 | 139 → 139 |
+| phase2-lifecycle | 17/17 | 139 → 139 |
+| phase2-no-woocommerce | 12/12 | 139 → 139 |
+| phase3-codes | 110/110 | 139 → 139 |
+| phase4-rendering | 165/165 | 139 → 139 |
+| phase5-admin | 158/158 | 139 → 139 |
+| phase6-scan | 214/214 | 139 → 139 |
+| phase7-sales | 213/213 | 139 → 139 |
+| phase8-printing | 167/167 | 139 → 139 |
+| phase9a-sales-history | 252/253 (a wrong check of mine) → re-run 253/253 | 139 → 139 |
+| phase9b-reports | 146/146 | 139 → 139 |
+| phase10-bulk | 195/197 (two missed false-by-design checks) → re-run 197/197 | 139 → 139 |
+| **Total** | **1,826 passed, 0 failed, 0 skipped; AS guard PASS for every suite; no suite skipped its decoder, print or importer checks** | |
+| phase10b-menu with `PQBG_STRESS=1` (one-off) | 93/93 | 139 → 139 |
+
+**Dashboard timings** (1,000 sellable items; in-process best of 3; HTTP median of 3 minus an empty wp-admin page): 5,000 sales in 90 days: 99.9–106 ms in-process, +4 to +79 ms over HTTP (dev runs up to +324 ms with the browsers open), target under 1 s: met. **50,000 sales in 90 days (one-off): 148 ms in-process, +221 ms over HTTP (690.8 ms vs 469.4 ms)**, target under 2 s: met. Phase 10 volume timings in the final re-run: counts 62 ms, worst batch 0.89 s, all 2,000 codes 13.2 s, export 0.64 s / 1.2 s HTTP, preview 0.29 s, apply 7.1 s, peak 107 MB (the first final run, on a busier machine, measured apply 18.7 s against its 20 s target).
+
+**Access evidence (HTTP):** administrator: the five sub-items and five tabs; shop manager: Dashboard, In-store sales, In-store reports, Bulk tools (Code tools only), no Settings anywhere, no cost/profit/margin on the Dashboard, 403 on `&tab=settings`, unknown tabs, Import cost prices and the 4 cost handlers; Store Seller and customer: no plugin menu, 403 on every plugin page and on all 15 admin-post handlers, never redirected to a plugin page; logged out: the login page with the old address as the destination.
+
+**Known limitations:**
+- Screen IDs changed (`woocommerce_page_pqbg-*` → `toplevel_page_pqbg-dashboard` / `qr-barcodes_page_pqbg-*`): a user's Screen Options hidden-column choice on In-store sales and report tables resets once; not migrated (no stored-data change).
+- `ReportsAdmin::dashboard_data()` for "today" also computes the comparison and top-5 lists the Dashboard does not show (cheap for one day; measured above).
+- A shop manager asking for `admin.php?page=pqbg-settings` gets the redirect to Bulk tools rather than 403 (accepted; `&tab=settings` stays 403).
+
+**Manual checks:** not asked for in this phase; added to the Pre-launch acceptance checklist ("Phase 10B manual checks") with the steps in the plugin README ("Phase 10B checklist").
+
+**Final report:** `C:\xampp\backups\sharayu\phase10b-report.txt`.
 ### Instructions for the next Claude session
 
 - Read this file and `wp-content/plugins/product-qrcode-barcode-generator/README.md` first. Re-verify the environment; don't trust these notes blindly.
@@ -1679,14 +1752,22 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 - **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25).
 - **Phase 8 (Printing) is done, approved, committed as `753613c` and pushed** (2026-09-25). **The physical printer test is NOT done** (no printer was available): it must be done before printing real labels / before production launch (see the Status open items).
 - **Phase 9A (Sales history, payment method & cost price) is done, approved on the automated tests, committed as `5495b05` and pushed** (2026-09-26). **Its manual check is NOT done** (the "Phase 9A checklist" in the plugin README): it is in the pre-launch acceptance checklist.
-- **Phase 9B (Reports & owner dashboard) is done, approved on the automated tests, committed as `072f4d6` (the Phase 7 race fix) and `716600d` (Phase 9B) and pushed** (2026-09-26). **Its manual checks are NOT done** (the "Phase 9B checklist" in the plugin README): they are in the pre-launch acceptance checklist. **Phase 10 (Bulk / CSV tools) is implemented and tested, NOT committed** (2026-09-27; waiting for the user's review).
+- **Phase 9B (Reports & owner dashboard) is done, approved on the automated tests, committed as `072f4d6` (the Phase 7 race fix) and `716600d` (Phase 9B) and pushed** (2026-09-26). **Its manual checks are NOT done** (the "Phase 9B checklist" in the plugin README): they are in the pre-launch acceptance checklist. **Phase 10 (Bulk / CSV tools) is done, approved on the automated tests, committed as `5b746a7` and pushed** (2026-09-27); its manual checks are in the pre-launch acceptance checklist. **Phase 10B (menu restructure and plugin Dashboard) is implemented and tested, NOT committed** (2026-09-27; waiting for the user's review).
 - **Bulk tools rules** (Phase 10):
-  - The tools live in tabs of WooCommerce → QR & Barcodes (`page=pqbg-settings&tab=settings|tools|costs`); the page needs `pqbg_manage_codes`, each tab and handler checks its own capability (Settings `pqbg_manage_settings`, Code tools `pqbg_manage_codes`, Import cost prices `pqbg_view_costs`) before the nonce. Keep that per-tab gate in the MENU RESTRUCTURE phase.
+  - Since Phase 10B the tools are QR & Barcodes → Bulk tools (`page=pqbg-bulk-tools&tab=tools|costs`; the page needs `pqbg_manage_codes`) and Settings is its own page (`page=pqbg-settings`, `pqbg_manage_settings`); each tab and handler checks its own capability (Code tools `pqbg_manage_codes`, Import cost prices `pqbg_view_costs`) before the nonce.
   - Bulk codes only through `BulkGenerator` → `ProductCodeService::get_or_create()`; never a stored queue; keep the batch `GET_LOCK` and the re-check before each code.
   - Costs in bulk only through `CostImport` → `CostPrice::normalize()` / `CostPrice::set()`; never name the meta key outside `CostPrice` and `uninstall.php`; the codes CSV never contains costs.
   - Uploaded files are read from PHP's temporary folder and deleted at once; only parsed rows are kept (user meta `pqbg_cost_import`, 1 hour, pruned on page load, removed on uninstall).
   - Every bulk action is logged in `pqbg_bulk_log` (counts only); cost entries are shown only to `pqbg_view_costs`.
   - Code CSV **import** is deliberately not implemented (D6, backlog).
+- **Menu and admin URL rules** (Phase 10B):
+  - Every plugin page lives in the plugin's own top-level menu **QR & Barcodes** (`AdminMenu`): Dashboard, In-store sales, In-store reports, Bulk tools, Settings. Never register a plugin page under WooCommerce. The two hidden screens (print setup, Regenerate) stay under Products.
+  - Build every wp-admin URL (links, form actions, redirect targets) only through `AdminUrl`; never call `admin_url()` or write a page slug elsewhere (the 10B suite has a scope check).
+  - Never hard-code a screen ID (`woocommerce_page_…`, `…_page_pqbg…`, `toplevel_page_…`): compare with `AdminMenu::is_page()` / `hook()` (the stored hook suffix; its prefix is the translated menu title).
+  - Every plugin page shows `AdminMenu::render_nav()` first; each page keeps its own capability check on its `load-` hook.
+  - Keep the old-address redirects (`AdminMenu::old_url_target()`) permanently.
+  - In-store reports' first tab is **Summary** (`&tab=summary`; `&tab=dashboard` still opens it). The plugin Dashboard's figures come only from `ReportsAdmin::dashboard_data()` for "today".
+- **Owner decisions of 2026-09-27 (Phase 10B):** (A) plugin first: every plugin phase before any theme work; the theme phases are at the end of the roadmap, optional, later. (B) The plugin must work with any WooCommerce theme: Phase 12 (Theme compatibility), after Phase 11 and before plugin QA/packaging (Phase 13); plan its scope then (see the open item). (C) The 50,000-sale stress checks (`PQBG_STRESS=1`, Phase 9B and 10B suites) run in Phase 11 and once before launch; default runs use the 5,000-sale checks. (D) No printer yet: the physical printer test waits for the printer and label stock; an interim no-printer check is in the pre-launch checklist.
 - **Test tools:** permanently in `C:\xampp\tools\pqbg\` (outside the web root): `PQBG_DECODER=C:\xampp\tools\pqbg\decoder\decode.mjs`, `PQBG_PRINTCHECK=C:\xampp\tools\pqbg\print-check\check.mjs`, `PQBG_WXR_IMPORTER=C:\xampp\tools\pqbg\wordpress-importer\wordpress-importer.php`. Point them at the files, not the folders; state "0 skipped" in every test report.
 - **Memory:** close Chrome/Edge and turn off sleep before long runs; with less than 1.5 GB free run the suites one at a time; stop a run cleanly below 500 MB (the Phase 10 suite honours `PQBG_STOP_FILE`). Claude Code stops background commands when the machine runs critically low on memory; a killed suite leaves its test data, which must be listed and removed with the user's approval.
 - **Sales history rules** (Phase 9A):
@@ -1873,4 +1954,16 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
   - Fixed from the runs: `BulkGenerator::state()` stale "option does not exist" cache, `BulkLog::add()` re-read, faster export (stored attribute summary); new tests for the first two.
   - Backup `sharayu-20260927-105123-before-phase10-tests.sql`. Phase 10 on its own: 197/197; then every other suite one at a time: 1,540/1,540. Total 1,737 passed, 0 failed, 0 skipped; AS guard PASS everywhere; crash count 139 throughout. All volume timings within target.
   - Updated the Phase 3, 4 and 9A checks made false by design (D16), `tests/README.md`, the plugin README (Bulk tools, Phase 10 checklist) and this file. Report: `C:\xampp\backups\sharayu\phase10-report.txt`.
+  - Not committed; waiting for the user's review.
+  - Approved on the automated tests; committed as `5b746a7` and pushed to `origin/main` (normal push).
+- **Phase 10B (menu restructure and plugin Dashboard), planning:**
+  - `HEAD` = `origin/main` = `5b746a7`, clean. Recorded `5b746a7`; the roadmap now names the MENU RESTRUCTURE phase as Phase 10B (owner's decision: Option 1).
+  - Backup `sharayu-20260927-120429-before-phase10b.sql` (950,829 bytes, 53 tables, complete). Baseline suite by suite: 1,737 passed, 0 failed, 0 skipped; AS guard PASS; crash count 139 throughout. The first phase10-bulk run was stopped by the memory watchdog (491 MB free; Chrome had been opened) and cleaned up fully; not counted; re-run on its own: 197/197.
+  - Wrote the plan (D1–D15): `C:\xampp\backups\sharayu\phase10b-plan.txt`. Waiting for approval; nothing implemented.
+- **Phase 10B (menu restructure and plugin Dashboard):**
+  - The user approved D1–D15 with seven changes (Summary tab, hidden screens stay, stored hook suffixes, the missing-code label, `AdminUrl` for redirects, the shared tab row, opt-in stress data) and recorded owner decisions A–D (plugin first; Phase 12 theme compatibility; stress checks in Phase 11 and before launch; no printer yet, interim check). Roadmap renumbered: 11 hardening, 12 theme compatibility, 13 plugin QA/packaging, theme work optional later.
+  - Added `AdminUrl`, `AdminMenu`, `DashboardAdmin`, `pqbg-menu.css`, `pqbg-dashboard.css`; switched every admin link, form action and redirect to `AdminUrl`; split Bulk tools and Settings; renamed the reports' Dashboard tab to Summary; `tests/phase10b-menu.php`; the false-by-design edits; the 9B stress checks opt-in. Class files were created before `Plugin.php` referenced them.
+  - The first final run was killed for low memory; its leftovers were removed with the user's approval by a guarded script; clean state confirmed. The user accepted the shop manager's redirect from the Settings address to Bulk tools.
+  - Backup `sharayu-20260927-152746-before-phase10b-final.sql`. Final: 10B 91/91 alone, then every other suite one at a time; Phase 9A and 10 re-run after three test-only corrections; total 1,826 passed, 0 failed, 0 skipped; AS guard PASS everywhere; crash count 139 throughout. The one-off 50,000-sale Dashboard check: 93/93, 148 ms in-process, +221 ms over HTTP.
+  - Updated the plugin README, `tests/README.md` and this file; report `C:\xampp\backups\sharayu\phase10b-report.txt`.
   - Not committed; waiting for the user's review.

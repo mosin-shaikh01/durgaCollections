@@ -64,7 +64,7 @@ final class ReportTable extends \WP_List_Table {
 				'singular' => 'pqbg-report-row',
 				'plural'   => 'pqbg-report-rows',
 				'ajax'     => false,
-				'screen'   => get_current_screen() ?? 'pqbg-reports',
+				'screen'   => get_current_screen() ?? AdminUrl::REPORTS,
 			)
 		);
 	}

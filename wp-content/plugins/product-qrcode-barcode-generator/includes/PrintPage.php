@@ -69,7 +69,7 @@ final class PrintPage {
 			$args[ self::CONFIRM_ARG ] = '1';
 		}
 
-		return add_query_arg( urlencode_deep( $args ), admin_url( 'admin-post.php' ) );
+		return AdminUrl::admin_post( urlencode_deep( $args ) );
 	}
 
 	/**
@@ -115,13 +115,13 @@ final class PrintPage {
 		$options = PrintJob::options( $raw );
 
 		if ( is_wp_error( $options ) ) {
-			self::send( 400, self::error_view( $options->get_error_message(), PrintAdmin::setup_url( $ids ) ) );
+			self::send( 400, self::error_view( $options->get_error_message(), AdminUrl::print_setup( $ids ) ) );
 		}
 
 		$view = self::build( $ids, $options, $confirm );
 
 		if ( is_wp_error( $view ) ) {
-			self::send( 400, self::error_view( $view->get_error_message(), PrintAdmin::setup_url( $ids ) ) );
+			self::send( 400, self::error_view( $view->get_error_message(), AdminUrl::print_setup( $ids ) ) );
 		}
 
 		self::send( 200, $view );
@@ -157,8 +157,8 @@ final class PrintPage {
 			'skipped'     => array_merge( $resolved['skipped'], $job['skipped'] ),
 			'notes'       => $job['notes'],
 			'total'       => $job['total'],
-			'setup_url'   => PrintAdmin::setup_url( $ids ),
-			'back_url'    => admin_url( 'edit.php?post_type=product' ),
+			'setup_url'   => AdminUrl::print_setup( $ids ),
+			'back_url'    => AdminUrl::products(),
 			'nonce'       => base64_encode( random_bytes( 18 ) ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- CSP nonce.
 		);
 
@@ -309,7 +309,7 @@ final class PrintPage {
 			'mode'     => 'error',
 			'title'    => __( 'Print QR labels', 'product-qrcode-barcode-generator' ),
 			'message'  => $message,
-			'back_url' => '' !== $back ? $back : admin_url( 'edit.php?post_type=product' ),
+			'back_url' => '' !== $back ? $back : AdminUrl::products(),
 			'nonce'    => base64_encode( random_bytes( 18 ) ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- CSP nonce.
 		);
 	}

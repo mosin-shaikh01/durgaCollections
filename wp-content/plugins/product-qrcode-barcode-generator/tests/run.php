@@ -31,6 +31,7 @@ $suites = array(
 	'phase9a-sales-history.php',
 	'phase9b-reports.php',
 	'phase10-bulk.php',
+	'phase10b-menu.php',
 );
 
 $filters = array_slice( $argv, 1 );

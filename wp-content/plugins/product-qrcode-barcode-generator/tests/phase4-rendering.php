@@ -27,7 +27,7 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 require_once ABSPATH . 'wp-admin/includes/plugin.php';
 require_once ABSPATH . 'wp-admin/includes/template.php';
 
-use ProductQrBarcode\{BarcodeRenderer, CodeGenerator, CodeRepository, Plugin, QrRenderer, Requirements, ScanUrl, Schema, Settings, SettingsPage, Svg};
+use ProductQrBarcode\{AdminMenu, AdminUrl, BarcodeRenderer, CodeGenerator, CodeRepository, Plugin, QrRenderer, Requirements, ScanUrl, Schema, Settings, SettingsPage, Svg};
 
 global $wpdb;
 
@@ -459,7 +459,7 @@ try {
 	pqbg_t( 'warning back for the default (local) site URL', str_contains( $notice( $user_ids['admin'] ), esc_html( $message ) ) === Settings::is_local_url( $home ) );
 	pqbg_t( 'options.php capability for this group is pqbg_manage_settings (enforcement tested over HTTP below)', 'pqbg_manage_settings' === SettingsPage::capability() );
 	pqbg_t( 'capability: admin yes; shop manager, seller, logged-out no', user_can( $user_ids['admin'], 'pqbg_manage_settings' ) && ! user_can( $user_ids['sm'], 'pqbg_manage_settings' ) && ! user_can( $user_ids['seller'], 'pqbg_manage_settings' ) && ! user_can( 0, 'pqbg_manage_settings' ) );
-	pqbg_t( 'admin hooks are not registered outside wp-admin', false === has_action( 'admin_menu', array( SettingsPage::class, 'add_menu' ) ) && false === has_action( 'admin_notices', array( SettingsPage::class, 'scan_url_notice' ) ) );
+	pqbg_t( 'admin hooks are not registered outside wp-admin', false === has_action( 'admin_menu', array( SettingsPage::class, 'add_menu' ) ) && false === has_action( 'admin_menu', array( AdminMenu::class, 'add_pages' ) ) && false === has_action( 'admin_notices', array( SettingsPage::class, 'scan_url_notice' ) ) );
 
 	pqbg_section( 'HTTP: settings page access' );
 	$site_is_up = 200 === $http( 'anon', 'GET', wp_login_url() )['code'];
@@ -471,16 +471,20 @@ try {
 	pqbg_t( 'admin: page loads (200) with both fields', 200 === $r['code'] && str_contains( $r['body'], 'Enable barcodes (for hardware scanners)' ) && str_contains( $r['body'], 'Scan base URL' ) && str_contains( $r['body'], "name='option_page' value='pqbg_settings'" ), $r['code'] . ' ' . $r['location'] );
 	pqbg_t( 'admin: effective URL and example payload shown', str_contains( $r['body'], '<code>' . esc_html( $home ) . '</code>' ) && str_contains( $r['body'], esc_html( $home . '/scan/DC-XXXX-XXXX-XXXX/' ) ) );
 	pqbg_t( 'admin: local-address warning shown', str_contains( $r['body'], esc_html( $message ) ) === Settings::is_local_url( $home ) );
-	pqbg_t( 'admin: menu item under WooCommerce', 1 === preg_match( '#href=[\'"]admin\.php\?page=pqbg-settings[\'"]#', $r['body'] ) );
+	// Phase 10B (approved): Settings is an item of the plugin's own QR & Barcodes menu, no longer under WooCommerce.
+	$qr_menu = (string) substr( $r['body'], (int) strpos( $r['body'], 'id="toplevel_page_' . AdminUrl::DASHBOARD . '"' ) );
+	$qr_menu = substr( $qr_menu, 0, (int) strpos( $qr_menu, '</ul>' ) );
+	pqbg_t( 'admin: Settings item in the QR & Barcodes menu (Phase 10B)', str_contains( $r['body'], 'id="toplevel_page_' . AdminUrl::DASHBOARD . '"' ) && 1 === preg_match( '#href=[\'"]admin\.php\?page=pqbg-settings[\'"]#', $qr_menu ) );
 	preg_match( '/name="_wpnonce" value="([a-f0-9]+)"/', $r['body'], $m );
 	$admin_nonce = $m[1] ?? '';
 	pqbg_t( 'admin: form carries a nonce', '' !== $admin_nonce );
-	// Phase 10 (approved): the page opens for pqbg_manage_codes on its Code tools tab; the Settings tab stays pqbg_manage_settings.
-	$r = $http( 'sm', 'GET', $page_url );
-	pqbg_t( 'shop manager: the page opens on Code tools (Phase 10) with no settings form and no Settings tab; the Settings tab URL is refused (403)', 200 === $r['code'] && ! str_contains( $r['body'], 'pqbg_settings[' ) && ! str_contains( $r['body'], "name='option_page'" ) && ! str_contains( $r['body'], 'tab=settings' ) && 403 === $http( 'sm', 'GET', $page_url . '&tab=settings' )['code'] );
+	// Phase 10B (approved): Settings is administrators-only; the shop manager's old address redirects to Bulk tools (Code tools).
+	$r0 = $http( 'sm', 'GET', $page_url );
+	$r  = 302 === $r0['code'] ? $http( 'sm', 'GET', $r0['location'] ) : $r0;
+	pqbg_t( 'shop manager: the old address redirects (302) to Bulk tools, which opens on Code tools with no settings form and no Settings tab; the Settings tab URL is refused (403)', 302 === $r0['code'] && str_contains( $r0['location'], 'page=' . AdminUrl::BULK_TOOLS ) && 200 === $r['code'] && ! str_contains( $r['body'], 'pqbg_settings[' ) && ! str_contains( $r['body'], "name='option_page'" ) && ! str_contains( $r['body'], 'tab=settings' ) && 403 === $http( 'sm', 'GET', $page_url . '&tab=settings' )['code'] );
 	// The Dashboard renders the full admin menu, including WooCommerce's (the Products screen of an empty store redirects to onboarding).
 	$r = $http( 'sm', 'GET', admin_url( 'index.php' ) );
-	pqbg_t( 'shop manager: WooCommerce menu visible, the QR & Barcodes item (Code tools, Phase 10) but no warning', str_contains( $r['body'], 'admin.php?page=wc-settings' ) && 200 === $r['code'] && str_contains( $r['body'], 'page=pqbg-settings' ) && ! str_contains( $r['body'], esc_html( $message ) ), $r['code'] . ' ' . $r['location'] );
+	pqbg_t( 'shop manager: WooCommerce menu visible, the QR & Barcodes menu with Bulk tools and no Settings (Phase 10B), but no warning', str_contains( $r['body'], 'admin.php?page=wc-settings' ) && 200 === $r['code'] && str_contains( $r['body'], 'page=' . AdminUrl::BULK_TOOLS ) && ! str_contains( $r['body'], 'page=pqbg-settings' ) && ! str_contains( $r['body'], esc_html( $message ) ), $r['code'] . ' ' . $r['location'] );
 	$r = $http( 'seller', 'GET', $page_url );
 	pqbg_t( 'seller: direct URL does not show the page', 200 !== $r['code'] && ! str_contains( $r['body'], 'pqbg_settings[' ), $r['code'] . ' ' . $r['location'] );
 

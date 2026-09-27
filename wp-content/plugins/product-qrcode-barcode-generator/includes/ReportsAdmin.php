@@ -1,9 +1,10 @@
 <?php
 /**
- * In-store reports and the owner dashboard (Phase 9B): WooCommerce → In-store
- * reports, right after In-store sales (decision D1).
+ * In-store reports (Phase 9B): QR & Barcodes → In-store reports, right after In-store
+ * sales (under WooCommerce until Phase 10B; the page and its URLs are unchanged).
  *
- *   admin.php?page=pqbg-reports                        the dashboard
+ *   admin.php?page=pqbg-reports                        the Summary tab (called "Dashboard"
+ *                                                      until Phase 10B; &tab=dashboard still opens it)
  *   admin.php?page=pqbg-reports&tab={report}&{options}  a report (ReportData::REPORTS)
  *
  * Everything is GET and read-only. Access: pqbg_view_all_sales (administrators and
@@ -24,56 +25,24 @@ defined( 'ABSPATH' ) || exit;
  */
 final class ReportsAdmin {
 
-	const SLUG = 'pqbg-reports';
+	const SLUG = AdminUrl::REPORTS;
 
-	/** Presets offered on the dashboard. */
-	const DASHBOARD_PRESETS = array( 'today', 'this_week', 'this_month' );
+	/** The Summary tab (Phase 10B; the tab value was "dashboard" before, which still opens it). */
+	const SUMMARY = 'summary';
+
+	/** Presets offered on the Summary tab. */
+	const SUMMARY_PRESETS = array( 'today', 'this_week', 'this_month' );
 
 	/** @var array<string, mixed>|null Context of this request (validated on load). */
 	private static ?array $ctx = null;
-
-	/** @var string Page hook. */
-	private static string $hook = '';
 
 	/**
 	 * Hooks used on admin requests.
 	 */
 	public static function register(): void {
-		add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 100 );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue' ) );
 		add_action( 'admin_post_' . ReportsExport::ACTION, array( ReportsExport::class, 'handle' ) );
 		add_action( 'admin_post_' . ReportPrint::ACTION, array( ReportPrint::class, 'handle' ) );
-	}
-
-	/**
-	 * Adds "In-store reports" under WooCommerce, right after "In-store sales".
-	 */
-	public static function add_menu(): void {
-		global $submenu;
-
-		$position = null;
-
-		foreach ( array_values( $submenu['woocommerce'] ?? array() ) as $index => $item ) {
-			if ( SalesAdmin::SLUG === ( $item[2] ?? '' ) ) {
-				$position = $index + 1;
-				break;
-			}
-		}
-
-		$hook = add_submenu_page(
-			'woocommerce',
-			__( 'In-store reports', 'product-qrcode-barcode-generator' ),
-			__( 'In-store reports', 'product-qrcode-barcode-generator' ),
-			Permissions::VIEW_ALL_SALES,
-			self::SLUG,
-			array( __CLASS__, 'render' ),
-			$position
-		);
-
-		if ( $hook ) {
-			self::$hook = $hook;
-			add_action( 'load-' . $hook, array( __CLASS__, 'load' ) );
-		}
 	}
 
 	/**
@@ -82,7 +51,7 @@ final class ReportsAdmin {
 	 * @param string $hook Current admin page hook.
 	 */
 	public static function enqueue( $hook ): void {
-		if ( '' !== self::$hook && self::$hook === $hook ) {
+		if ( AdminMenu::is_page( AdminUrl::REPORTS, (string) $hook ) ) {
 			wp_enqueue_style( 'pqbg-reports', PQBG_PLUGIN_URL . 'assets/pqbg-reports.css', array(), PQBG_VERSION );
 		}
 	}
@@ -95,7 +64,7 @@ final class ReportsAdmin {
 	 */
 	public static function tabs( bool $costs ): array {
 		$tabs = array(
-			'dashboard'  => __( 'Dashboard', 'product-qrcode-barcode-generator' ),
+			'summary'    => __( 'Summary', 'product-qrcode-barcode-generator' ),
 			'sales'      => __( 'Sales over time', 'product-qrcode-barcode-generator' ),
 			'products'   => __( 'Products', 'product-qrcode-barcode-generator' ),
 			'categories' => __( 'Categories', 'product-qrcode-barcode-generator' ),
@@ -127,16 +96,17 @@ final class ReportsAdmin {
 	public static function context( array $args, bool $costs, ?int $now = null ): array {
 		$get  = static fn( string $key ): string => isset( $args[ $key ] ) && is_string( $args[ $key ] ) ? trim( $args[ $key ] ) : '';
 		$tab  = $get( 'tab' );
-		$tab  = 'dashboard' === $tab || in_array( $tab, ReportData::REPORTS, true ) ? $tab : 'dashboard';
+		$tab  = 'dashboard' === $tab ? self::SUMMARY : $tab; // The Phase 9B name of the tab.
+		$tab  = self::SUMMARY === $tab || in_array( $tab, ReportData::REPORTS, true ) ? $tab : self::SUMMARY;
 		$cost = in_array( $tab, ReportData::COST_REPORTS, true ) || in_array( sanitize_key( $get( 'orderby' ) ), ReportData::COST_KEYS, true );
 
-		if ( 'dashboard' === $tab ) {
-			$preset = in_array( $get( 'range' ), array_merge( self::DASHBOARD_PRESETS, array( 'custom' ) ), true ) ? $get( 'range' ) : 'today';
+		if ( self::SUMMARY === $tab ) {
+			$preset = in_array( $get( 'range' ), array_merge( self::SUMMARY_PRESETS, array( 'custom' ) ), true ) ? $get( 'range' ) : 'today';
 		} else {
 			$preset = $get( 'range' );
 		}
 
-		$default = in_array( $tab, array( 'dashboard', 'eod' ), true ) ? 'today' : 'this_month';
+		$default = in_array( $tab, array( self::SUMMARY, 'eod' ), true ) ? 'today' : 'this_month';
 		$days    = $get( 'days' );
 
 		return array(
@@ -201,15 +171,6 @@ final class ReportsAdmin {
 	}
 
 	/**
-	 * URL of the reports page.
-	 *
-	 * @param array<string, string> $args Arguments.
-	 */
-	public static function url( array $args = array() ): string {
-		return add_query_arg( array_map( 'rawurlencode', array_merge( array( 'page' => self::SLUG ), $args ) ), admin_url( 'admin.php' ) );
-	}
-
-	/**
 	 * load-{page}: access and the cost-only refusals, before any output.
 	 */
 	public static function load(): void {
@@ -238,9 +199,10 @@ final class ReportsAdmin {
 		$ctx = self::$ctx;
 
 		echo '<div class="wrap pqbg-reports">';
+		AdminMenu::render_nav( AdminUrl::REPORTS );
 		echo '<h1 class="wp-heading-inline">' . esc_html__( 'In-store reports', 'product-qrcode-barcode-generator' ) . '</h1>';
 
-		if ( 'dashboard' !== $ctx['tab'] ) {
+		if ( self::SUMMARY !== $ctx['tab'] ) {
 			echo ' <a class="page-title-action" href="' . esc_url( ReportsExport::url( self::args( $ctx ) ) ) . '">' . esc_html__( 'Export CSV', 'product-qrcode-barcode-generator' ) . '</a>';
 		}
 
@@ -257,8 +219,8 @@ final class ReportsAdmin {
 		}
 
 		switch ( $ctx['tab'] ) {
-			case 'dashboard':
-				self::render_dashboard( $ctx );
+			case self::SUMMARY:
+				self::render_summary( $ctx );
 				break;
 			case 'peak':
 				self::render_peak( $ctx );
@@ -284,12 +246,12 @@ final class ReportsAdmin {
 		foreach ( self::tabs( $ctx['costs'] ) as $key => $label ) {
 			$args = array( 'tab' => $key );
 
-			if ( ! in_array( $key, array( 'stock', 'dead' ), true ) && 'dashboard' !== $key && 'dashboard' !== $ctx['tab'] ) {
+			if ( ! in_array( $key, array( 'stock', 'dead' ), true ) && self::SUMMARY !== $key && self::SUMMARY !== $ctx['tab'] ) {
 				$args = self::args( array_merge( $ctx, array( 'tab' => $key, 'group' => '', 'view' => 'item', 'mode' => 'best', 'by' => 'period', 'metric' => 'count' ) ) );
 			}
 
 			$current = $key === $ctx['tab'];
-			echo '<a href="' . esc_url( self::url( $args ) ) . '" class="nav-tab' . ( $current ? ' nav-tab-active' : '' ) . '"' . ( $current ? ' aria-current="page"' : '' ) . '>' . esc_html( $label ) . '</a>';
+			echo '<a href="' . esc_url( AdminUrl::reports( $args ) ) . '" class="nav-tab' . ( $current ? ' nav-tab-active' : '' ) . '"' . ( $current ? ' aria-current="page"' : '' ) . '>' . esc_html( $label ) . '</a>';
 		}
 
 		echo '</nav>';
@@ -328,17 +290,17 @@ final class ReportsAdmin {
 	private static function render_period( array $ctx ): void {
 		$p       = $ctx['period'];
 		$labels  = ReportPeriod::labels();
-		$presets = 'dashboard' === $ctx['tab'] ? self::DASHBOARD_PRESETS : ( 'eod' === $ctx['tab'] ? array( 'today', 'yesterday' ) : array_keys( $labels ) );
+		$presets = self::SUMMARY === $ctx['tab'] ? self::SUMMARY_PRESETS : ( 'eod' === $ctx['tab'] ? array( 'today', 'yesterday' ) : array_keys( $labels ) );
 		$links   = array();
 
 		foreach ( $presets as $preset ) {
 			$current = $preset === $p['preset'];
-			$links[] = '<li><a href="' . esc_url( self::url( self::args( $ctx, array( 'range' => $preset ) ) ) ) . '"' . ( $current ? ' class="current" aria-current="page"' : '' ) . '>' . esc_html( $labels[ $preset ] ) . '</a></li>';
+			$links[] = '<li><a href="' . esc_url( AdminUrl::reports( self::args( $ctx, array( 'range' => $preset ) ) ) ) . '"' . ( $current ? ' class="current" aria-current="page"' : '' ) . '>' . esc_html( $labels[ $preset ] ) . '</a></li>';
 		}
 
 		echo '<div class="pqbg-reports__period">';
 		echo '<ul class="subsubsub">' . implode( ' | ', $links ) . '</ul>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
-		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" class="pqbg-reports__custom">';
+		echo '<form method="get" action="' . esc_url( AdminUrl::admin_php() ) . '" class="pqbg-reports__custom">';
 
 		foreach ( self::args( $ctx, array( 'range' => 'custom' ) ) as $key => $value ) {
 			if ( ! in_array( $key, array( 'from', 'to', 'orderby', 'order', 'paged' ), true ) ) {
@@ -353,7 +315,7 @@ final class ReportsAdmin {
 		echo '</form>';
 		echo '<p class="pqbg-reports__span"><strong>' . esc_html( ReportPeriod::span_label( $p['from'], $p['to'] ) ) . '</strong>';
 
-		if ( in_array( $ctx['tab'], array( 'dashboard' ), true ) ) {
+		if ( self::SUMMARY === $ctx['tab'] ) {
 			echo ' · ' . esc_html( self::compare_label( $p ) );
 		}
 
@@ -393,11 +355,11 @@ final class ReportsAdmin {
 	}
 
 	/**
-	 * The owner dashboard.
+	 * The Summary tab (Phase 9B's owner dashboard, renamed in Phase 10B).
 	 *
 	 * @param array<string, mixed> $ctx Context.
 	 */
-	private static function render_dashboard( array $ctx ): void {
+	private static function render_summary( array $ctx ): void {
 		$costs   = $ctx['costs'];
 		$data    = self::dashboard_data( $ctx['period'], $costs );
 		$now     = $data['now'];
@@ -484,13 +446,13 @@ final class ReportsAdmin {
 		// Alerts.
 		$alerts = array(
 			/* translators: %s: number of items. */
-			array( sprintf( _n( '%s item low on stock', '%s items low on stock', $data['low'], 'product-qrcode-barcode-generator' ), number_format_i18n( $data['low'] ) ), self::url( array( 'tab' => 'stock', 'state' => 'low' ) ), $data['low'] > 0 ),
+			array( sprintf( _n( '%s item low on stock', '%s items low on stock', $data['low'], 'product-qrcode-barcode-generator' ), number_format_i18n( $data['low'] ) ), AdminUrl::reports( array( 'tab' => 'stock', 'state' => 'low' ) ), $data['low'] > 0 ),
 			/* translators: %s: number of items. */
-			array( sprintf( _n( '%s item out of stock', '%s items out of stock', $data['out'], 'product-qrcode-barcode-generator' ), number_format_i18n( $data['out'] ) ), self::url( array( 'tab' => 'stock', 'state' => 'out' ) ), $data['out'] > 0 ),
+			array( sprintf( _n( '%s item out of stock', '%s items out of stock', $data['out'], 'product-qrcode-barcode-generator' ), number_format_i18n( $data['out'] ) ), AdminUrl::reports( array( 'tab' => 'stock', 'state' => 'out' ) ), $data['out'] > 0 ),
 			/* translators: %s: number of sales. */
-			array( sprintf( _n( '%s voided sale in this period', '%s voided sales in this period', $data['voided'], 'product-qrcode-barcode-generator' ), number_format_i18n( $data['voided'] ) ), self::url( self::args( array_merge( $ctx, array( 'tab' => 'voids' ) ) ) ), $data['voided'] > 0 ),
+			array( sprintf( _n( '%s voided sale in this period', '%s voided sales in this period', $data['voided'], 'product-qrcode-barcode-generator' ), number_format_i18n( $data['voided'] ) ), AdminUrl::reports( self::args( array_merge( $ctx, array( 'tab' => 'voids' ) ) ) ), $data['voided'] > 0 ),
 			/* translators: %s: number of items. */
-			array( sprintf( _n( '%s active item without a QR code', '%s active items without a QR code', $data['nocode'], 'product-qrcode-barcode-generator' ), number_format_i18n( $data['nocode'] ) ), self::url( array( 'tab' => 'stock', 'state' => 'nocode' ) ), $data['nocode'] > 0 ),
+			array( sprintf( _n( '%s active item without a QR code', '%s active items without a QR code', $data['nocode'], 'product-qrcode-barcode-generator' ), number_format_i18n( $data['nocode'] ) ), AdminUrl::reports( array( 'tab' => 'stock', 'state' => 'nocode' ) ), $data['nocode'] > 0 ),
 		);
 
 		echo '<section class="pqbg-panel pqbg-alerts"><h2>' . esc_html__( 'Alerts', 'product-qrcode-barcode-generator' ) . '</h2><ul>';
@@ -500,12 +462,12 @@ final class ReportsAdmin {
 		}
 
 		echo '</ul>';
-		echo '<p class="description"><a href="' . esc_url( admin_url( 'edit.php?post_type=product' ) ) . '">' . esc_html__( 'Products list', 'product-qrcode-barcode-generator' ) . '</a> · ' . esc_html__( 'Stock alerts use the WooCommerce low and out-of-stock thresholds (published and private items).', 'product-qrcode-barcode-generator' ) . '</p>';
+		echo '<p class="description"><a href="' . esc_url( AdminUrl::products() ) . '">' . esc_html__( 'Products list', 'product-qrcode-barcode-generator' ) . '</a> · ' . esc_html__( 'Stock alerts use the WooCommerce low and out-of-stock thresholds (published and private items).', 'product-qrcode-barcode-generator' ) . '</p>';
 		echo '</section></div>';
 	}
 
 	/**
-	 * Everything the dashboard shows, in as few queries as possible: one grouped scan of the
+	 * Everything the Summary tab shows (and the plugin Dashboard's "today" figures, Phase 10B), in as few queries as possible: one grouped scan of the
 	 * period (cards, payment split, chart, voids and top sellers), one of the comparison
 	 * period, one per product, the stock holders and the missing codes.
 	 *
@@ -582,7 +544,7 @@ final class ReportsAdmin {
 			$links = array();
 			foreach ( $choices as $value => $label ) {
 				$current = (string) $ctx[ $key ] === (string) $value;
-				$links[] = $current ? '<strong aria-current="true">' . esc_html( $label ) . '</strong>' : '<a href="' . esc_url( self::url( self::args( $ctx, array( $key => (string) $value ) ) ) ) . '">' . esc_html( $label ) . '</a>';
+				$links[] = $current ? '<strong aria-current="true">' . esc_html( $label ) . '</strong>' : '<a href="' . esc_url( AdminUrl::reports( self::args( $ctx, array( $key => (string) $value ) ) ) ) . '">' . esc_html( $label ) . '</a>';
 			}
 			echo '<p class="pqbg-reports__switch">' . implode( ' | ', $links ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
 		};
@@ -646,7 +608,7 @@ final class ReportsAdmin {
 				);
 				break;
 			case 'stock':
-				echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" class="pqbg-reports__custom">';
+				echo '<form method="get" action="' . esc_url( AdminUrl::admin_php() ) . '" class="pqbg-reports__custom">';
 				echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '"><input type="hidden" name="tab" value="stock">';
 				echo '<label>' . esc_html__( 'Category', 'product-qrcode-barcode-generator' ) . ' ';
 				wp_dropdown_categories(
@@ -739,7 +701,7 @@ final class ReportsAdmin {
 
 		echo '<p class="pqbg-reports__switch">';
 		foreach ( array( 'count' => __( 'Number of sales', 'product-qrcode-barcode-generator' ), 'revenue' => __( 'Revenue', 'product-qrcode-barcode-generator' ) ) as $key => $label ) {
-			echo $key === $metric ? '<strong aria-current="true">' . esc_html( $label ) . '</strong>' : '<a href="' . esc_url( self::url( self::args( $ctx, array( 'metric' => $key ) ) ) ) . '">' . esc_html( $label ) . '</a>';
+			echo $key === $metric ? '<strong aria-current="true">' . esc_html( $label ) . '</strong>' : '<a href="' . esc_url( AdminUrl::reports( self::args( $ctx, array( 'metric' => $key ) ) ) ) . '">' . esc_html( $label ) . '</a>';
 			echo 'count' === $key ? ' | ' : '';
 		}
 		echo '</p>';
@@ -1041,7 +1003,7 @@ final class ReportsAdmin {
 		$table = new ReportTable( $spec, $rows, (string) $data['default_sort'], (string) $data['default_order'], 100, '', $numeric );
 		$table->prepare_items();
 
-		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '">';
+		echo '<form method="get" action="' . esc_url( AdminUrl::admin_php() ) . '">';
 		$table->display();
 		echo '</form>';
 

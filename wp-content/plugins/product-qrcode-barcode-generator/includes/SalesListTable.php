@@ -141,9 +141,9 @@ final class SalesListTable extends \WP_List_Table {
 
 		switch ( $column_name ) {
 			case 'date':
-				return '<a href="' . esc_url( SalesAdmin::detail_url( (int) $item['id'] ) ) . '">' . esc_html( SalePresenter::datetime( $item['created_at_gmt'] ) ) . '</a>';
+				return '<a href="' . esc_url( AdminUrl::sale( (int) $item['id'] ) ) . '">' . esc_html( SalePresenter::datetime( $item['created_at_gmt'] ) ) . '</a>';
 			case 'id':
-				return '<a href="' . esc_url( SalesAdmin::detail_url( (int) $item['id'] ) ) . '">' . esc_html( (string) $item['id'] ) . '</a>';
+				return '<a href="' . esc_url( AdminUrl::sale( (int) $item['id'] ) ) . '">' . esc_html( (string) $item['id'] ) . '</a>';
 			case 'product':
 				return esc_html( SalePresenter::item( $item ) );
 			case 'sku':

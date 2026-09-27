@@ -114,7 +114,7 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 require_once ABSPATH . 'wp-admin/includes/post.php';
 require_once ABSPATH . 'wp-admin/includes/admin.php';
 
-use ProductQrBarcode\{BulkGenerator, BulkLog, CodeRepository, CodesExport, CostImport, CostPrice, CsvUpload, Permissions, PrintAdmin, PrintJob, ProductCodeService, SalesExport, ScanUrl, Schema, SettingsPage, ToolsAdmin};
+use ProductQrBarcode\{AdminUrl, BulkGenerator, BulkLog, CodeRepository, CodesExport, CostImport, CostPrice, CsvUpload, Permissions, PrintAdmin, PrintJob, ProductCodeService, SalesExport, ScanUrl, Schema, SettingsPage, ToolsAdmin};
 
 global $wpdb;
 
@@ -265,7 +265,8 @@ $login = static function ( string $who, string $user, string $pass ) use ( $http
 	$r = $http( $who, 'POST', wp_login_url(), array( 'log' => $user, 'pwd' => $pass, 'wp-submit' => 'Log In', 'testcookie' => '1', 'redirect_to' => admin_url() ) );
 	return 302 === $r['code'];
 };
-$tab_url  = static fn( string $tab = '', array $args = array() ) => add_query_arg( array_merge( array( 'page' => SettingsPage::SLUG ), '' === $tab ? array() : array( 'tab' => $tab ), $args ), admin_url( 'admin.php' ) );
+// Phase 10B (approved): Settings is its own page; Code tools and Import cost prices are tabs of Bulk tools.
+$tab_url  = static fn( string $tab = '', array $args = array() ) => 'settings' === $tab ? AdminUrl::settings( $args ) : AdminUrl::bulk_tools( $tab, $args );
 $post_url = admin_url( 'admin-post.php' );
 $field    = static fn( string $html, string $name ) => preg_match( '/name="' . preg_quote( $name, '/' ) . '" value="([^"]*)"/', $html, $m ) ? html_entity_decode( $m[1] ) : '';
 $link_of  = static fn( string $html, string $action ) => preg_match( '/href="([^"]*action=' . preg_quote( $action, '/' ) . '[^"]*)"/', $html, $m ) ? html_entity_decode( $m[1] ) : '';
@@ -365,7 +366,7 @@ try {
 	// ------------------------------------------------------------------ capabilities and tabs
 	$sec( 'capabilities and tabs (D13 as changed: tabs in QR & Barcodes)' );
 	pqbg_t( 'no new capability: the eight Phase 9A capabilities, unchanged role map', 8 === count( Permissions::all_caps() ) && ! array_diff( Permissions::all_caps(), array( 'pqbg_view_products', 'pqbg_sell', 'pqbg_view_own_sales', 'pqbg_view_all_sales', 'pqbg_void_sale', 'pqbg_manage_codes', 'pqbg_manage_settings', 'pqbg_view_costs' ) ) );
-	pqbg_t( 'tabs: administrator Settings | Code tools | Import cost prices', array( 'settings', 'tools', 'costs' ) === ToolsAdmin::tabs( $A ) );
+	pqbg_t( 'tabs: administrator Code tools | Import cost prices (Phase 10B: Settings is its own page)', array( 'tools', 'costs' ) === ToolsAdmin::tabs( $A ) );
 	pqbg_t( 'tabs: shop manager only Code tools', array( 'tools' ) === ToolsAdmin::tabs( $SM ) );
 	pqbg_t( 'tabs: seller, customer and logged out none', array() === ToolsAdmin::tabs( $SE ) && array() === ToolsAdmin::tabs( $CU ) && array() === ToolsAdmin::tabs( 0 ) );
 	pqbg_t( 'options.php capability for the settings group is still pqbg_manage_settings', 'pqbg_manage_settings' === SettingsPage::capability() );
@@ -461,7 +462,7 @@ try {
 	$sec( 'print links (D3)' );
 	$chunks = BulkGenerator::print_chunks( array( 'created_ids' => range( 1, 650 ) ) );
 	pqbg_t( 'created items are grouped for the print setup: 300 + 300 + 50', array( 300, 300, 50 ) === array_map( 'count', $chunks ) && PrintJob::MAX_ITEMS === 300 );
-	$setup = wp_parse_url( PrintAdmin::setup_url( BulkGenerator::print_chunks( $state )[0] ), PHP_URL_QUERY );
+	$setup = wp_parse_url( AdminUrl::print_setup( BulkGenerator::print_chunks( $state )[0] ), PHP_URL_QUERY );
 	parse_str( (string) $setup, $setup_args );
 	pqbg_t( 'a print link of the run is the Phase 8 setup URL for exactly those items, with its nonce', PrintAdmin::SLUG === ( $setup_args['page'] ?? '' ) && implode( ',', $state['created_ids'] ) === ( $setup_args['items'] ?? '' ) && '' !== ( $setup_args[ Permissions::NONCE_FIELD ] ?? '' ) );
 
@@ -836,8 +837,9 @@ try {
 	// ------------------------------------------------------------------ HTTP
 	$sec( 'HTTP: the QR & Barcodes screen for every role' );
 	pqbg_t( 'logins succeed', $login( 'admin', $logins[ $A ], $pw[ $logins[ $A ] ] ) && $login( 'admin2', $logins[ $A2 ], $pw[ $logins[ $A2 ] ] ) && $login( 'sm', $logins[ $SM ], $pw[ $logins[ $SM ] ] ) && $login( 'seller', $logins[ $SE ], $pw[ $logins[ $SE ] ] ) && $login( 'customer', $logins[ $CU ], $pw[ $logins[ $CU ] ] ) );
-	$r = $http( 'admin', 'GET', $tab_url() );
-	pqbg_t( 'administrator, no tab: the Settings tab (200) with all three tab links', 200 === $r['code'] && str_contains( $r['body'], "name='option_page' value='pqbg_settings'" ) && str_contains( $r['body'], 'tab=settings' ) && str_contains( $r['body'], 'tab=tools' ) && str_contains( $r['body'], 'tab=costs' ) && str_contains( $r['body'], 'nav-tab-active' ) );
+	$r  = $http( 'admin', 'GET', $tab_url() );
+	$rs = $http( 'admin', 'GET', $tab_url( 'settings' ) );
+	pqbg_t( 'administrator: Bulk tools without a tab opens Code tools with both tab links; Settings is its own page with the form (Phase 10B)', 200 === $r['code'] && str_contains( $r['body'], 'Generate missing codes' ) && str_contains( $r['body'], 'tab=tools' ) && str_contains( $r['body'], 'tab=costs' ) && str_contains( $r['body'], 'nav-tab-active' ) && 200 === $rs['code'] && str_contains( $rs['body'], "name='option_page' value='pqbg_settings'" ) );
 	$r = $http( 'admin', 'GET', $tab_url( 'tools' ) );
 	$admin_tools = $r['body'];
 	pqbg_t( 'administrator, Code tools: 200 with the generate form, the export form and the recent runs (with cost entries)', 200 === $r['code'] && str_contains( $r['body'], 'Generate missing codes' ) && str_contains( $r['body'], 'name="action" value="pqbg_codes_csv"' ) && str_contains( $r['body'], 'Recent bulk runs' ) && str_contains( $r['body'], 'Cost price import' ) && ! str_contains( $r['body'], "name='option_page'" ) );
@@ -851,17 +853,17 @@ try {
 	pqbg_t( 'shop manager, no tab: 200, Code tools only', 200 === $r['code'] && str_contains( $r['body'], 'Generate missing codes' ) && ! str_contains( $r['body'], "name='option_page'" ) );
 	pqbg_t( 'shop manager: no Settings tab, no cost tab, no link to either, no cost wording or value anywhere on the page', ! str_contains( $r['body'], 'tab=settings' ) && ! str_contains( $r['body'], 'tab=costs' ) && ! str_contains( $wrap( $r['body'] ), 'Import cost prices' ) && ! str_contains( $r['body'], ToolsAdmin::TEMPLATE ) && ! preg_match( '/cost price/i', $wrap( $r['body'] ) ) && ! str_contains( $r['body'], '98765' ) && ! str_contains( $r['body'], '1200.50' ) );
 	pqbg_t( 'shop manager: the recent runs show no cost entries', ! str_contains( $r['body'], 'Cost price import' ) && ! str_contains( $r['body'], 'Cost price template' ) && str_contains( $r['body'], 'Generate missing codes' ) );
-	pqbg_t( 'shop manager: the Settings tab URL is refused (403)', 403 === $http( 'sm', 'GET', $tab_url( 'settings' ) )['code'] );
+	pqbg_t( 'shop manager: the Settings tab URL is refused (403) (Phase 10B: the old &tab=settings address; the plain Settings address redirects to Bulk tools)', 403 === $http( 'sm', 'GET', AdminUrl::settings( array( 'tab' => 'settings' ) ) )['code'] && 302 === $http( 'sm', 'GET', $tab_url( 'settings' ) )['code'] );
 	$r = $http( 'sm', 'GET', $tab_url( 'costs' ) );
 	pqbg_t( 'shop manager: the cost tab URL is refused (403) and shows no upload form', 403 === $r['code'] && ! str_contains( $r['body'], 'multipart' ) );
 	$r = $http( 'sm', 'GET', admin_url( 'index.php' ) );
-	pqbg_t( 'shop manager: the WooCommerce menu has the QR & Barcodes item (it opens Code tools)', 200 === $r['code'] && str_contains( $r['body'], 'page=pqbg-settings' ) );
+	pqbg_t( 'shop manager: the QR & Barcodes menu has the Bulk tools item and no Settings (Phase 10B)', 200 === $r['code'] && str_contains( $r['body'], 'page=' . AdminUrl::BULK_TOOLS ) && ! str_contains( $r['body'], 'page=' . AdminUrl::SETTINGS ) );
 	foreach ( array( 'seller', 'customer' ) as $who ) {
 		$r = $http( $who, 'GET', $tab_url( 'tools' ) );
 		pqbg_t( "$who: no access to the screen at all (not 200, no form)", 200 !== $r['code'] && ! str_contains( $r['body'], 'Generate missing codes' ) && ! str_contains( $r['body'], 'pqbg_codes_csv' ), $r['code'] . ' ' . $r['location'] );
 	}
 	$r = $http( 'seller', 'GET', admin_url( 'index.php' ) );
-	pqbg_t( 'seller: no QR & Barcodes menu item', ! str_contains( $r['body'], 'page=pqbg-settings' ) );
+	pqbg_t( 'seller: no QR & Barcodes menu item', ! str_contains( $r['body'], 'page=pqbg-settings' ) && ! str_contains( $r['body'], 'page=' . AdminUrl::BULK_TOOLS ) && ! str_contains( $r['body'], 'page=' . AdminUrl::DASHBOARD ) );
 	$r = $http( 'anon', 'GET', $tab_url( 'tools' ) );
 	pqbg_t( 'logged out: redirected to the login page', 302 === $r['code'] && str_contains( $r['location'], 'wp-login.php' ) );
 
@@ -1099,7 +1101,7 @@ try {
 	pqbg_t( 'the cost meta key never appears in the new classes; costs are written only by CostPrice::set()', ! str_contains( $all, '_pqbg_cost_price' ) && ! preg_match( '/update_post_meta|add_post_meta|delete_post_meta/', $all ) && str_contains( $src( 'includes/CostImport.php' ), 'CostPrice::set(' ) );
 	pqbg_t( 'the sale path is untouched (no reference to the sale classes or stock changes)', ! preg_match( '/SaleService|SaleRepository|wc_update_product_stock|StockLock::/', $all ) );
 	pqbg_t( 'scan URLs only from ScanUrl, and the codes export has no cost reference', str_contains( $src( 'includes/CodesExport.php' ), 'ScanUrl::for_code(' ) && ! preg_match( '/cost/i', $src( 'includes/CodesExport.php' ) ) );
-	pqbg_t( 'the only new hooks: 6 admin_post handlers and admin_enqueue_scripts in ToolsAdmin::register(), plus the page\'s load- hook in SettingsPage; no filters', 7 === preg_match_all( '/add_action\(/', $src( 'includes/ToolsAdmin.php' ) ) && ! preg_match( '/add_filter\(/', $all ) && ! preg_match( '/add_action\(/', implode( "\n", array_map( $src, array_diff( $new, array( 'includes/ToolsAdmin.php' ) ) ) ) ) && str_contains( $src( 'includes/SettingsPage.php' ), "add_action( 'load-' . \$hook, array( ToolsAdmin::class, 'load_page' ) )" ) );
+	pqbg_t( 'the only new hooks: 6 admin_post handlers and admin_enqueue_scripts in ToolsAdmin::register(), plus the page\'s load- hook (Phase 10B: registered by AdminMenu for Bulk tools); no filters', 7 === preg_match_all( '/add_action\(/', $src( 'includes/ToolsAdmin.php' ) ) && ! preg_match( '/add_filter\(/', $all ) && ! preg_match( '/add_action\(/', implode( "\n", array_map( $src, array_diff( $new, array( 'includes/ToolsAdmin.php' ) ) ) ) ) && str_contains( $src( 'includes/AdminMenu.php' ), "'load'   => array( ToolsAdmin::class, 'load_page' )" ) );
 	pqbg_t( 'ToolsAdmin is registered only for admin requests', (bool) preg_match( '/if \( is_admin\(\) \) \{.*ToolsAdmin::register\(\);.*\}/s', $src( 'includes/Plugin.php' ) ) );
 	$un = $src( 'uninstall.php' );
 	pqbg_t( 'uninstall: previews and the run state always removed; the log only with delete-all', (bool) preg_match( "/delete_metadata\( 'user', 0, 'pqbg_cost_import', '', true \);\s*delete_option\( 'pqbg_bulk_run' \);\s*if \( ! defined/", $un ) && strpos( $un, "delete_option( 'pqbg_bulk_log' )" ) > strpos( $un, 'PQBG_UNINSTALL_DELETE_ALL_DATA' ) );

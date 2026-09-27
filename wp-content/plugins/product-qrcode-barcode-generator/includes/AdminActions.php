@@ -59,15 +59,14 @@ final class AdminActions {
 	 * @param string $mode    "view" or "download".
 	 */
 	public static function image_url( int $item_id, string $type, string $mode ): string {
-		return add_query_arg(
+		return AdminUrl::admin_post(
 			array(
 				'action'                 => self::IMAGE,
 				'item'                   => $item_id,
 				'type'                   => $type,
 				'mode'                   => $mode,
 				Permissions::NONCE_FIELD => wp_create_nonce( self::nonce_action( 'code_image', $item_id ) ),
-			),
-			admin_url( 'admin-post.php' )
+			)
 		);
 	}
 
@@ -191,14 +190,7 @@ final class AdminActions {
 	private static function redirect( int $item_id, string $message ): void {
 		$product_id = 'product_variation' === get_post_type( $item_id ) ? (int) wp_get_post_parent_id( $item_id ) : $item_id;
 
-		$url = add_query_arg(
-			array(
-				'post'            => $product_id,
-				'action'          => 'edit',
-				self::MESSAGE_ARG => sanitize_key( $message ),
-			),
-			admin_url( 'post.php' )
-		);
+		$url = AdminUrl::product_edit( $product_id, array( self::MESSAGE_ARG => sanitize_key( $message ) ) );
 
 		wp_safe_redirect( $url, 303 );
 		exit;

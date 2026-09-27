@@ -32,7 +32,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class AdminProductPanel {
 
-	const CONFIRM_SLUG = 'pqbg-regenerate';
+	const CONFIRM_SLUG = AdminUrl::REGENERATE;
 
 	/**
 	 * POST forms printed outside the product form (forms cannot be nested), keyed by id.
@@ -167,7 +167,7 @@ final class AdminProductPanel {
 
 		if ( array() !== $codes ) {
 			/* translators: %d: variations with a code. */
-			echo '<p><a class="button pqbg-print-all" href="' . esc_url( PrintAdmin::setup_url( array( $product->get_id() ) ) ) . '">' . esc_html( sprintf( __( 'Print all variation labels (%d)', 'product-qrcode-barcode-generator' ), count( $codes ) ) ) . '</a></p>';
+			echo '<p><a class="button pqbg-print-all" href="' . esc_url( AdminUrl::print_setup( array( $product->get_id() ) ) ) . '">' . esc_html( sprintf( __( 'Print all variation labels (%d)', 'product-qrcode-barcode-generator' ), count( $codes ) ) ) . '</a></p>';
 		}
 
 		echo '<table class="widefat striped pqbg-variations"><thead><tr>';
@@ -390,23 +390,6 @@ final class AdminProductPanel {
 	}
 
 	/**
-	 * URL of the confirmation page for an item.
-	 *
-	 * @param int $item_id Product or variation ID.
-	 */
-	public static function confirm_url( int $item_id ): string {
-		return add_query_arg(
-			array(
-				'post_type'              => 'product',
-				'page'                   => self::CONFIRM_SLUG,
-				'item'                   => $item_id,
-				Permissions::NONCE_FIELD => wp_create_nonce( AdminActions::nonce_action( 'regenerate_confirm', $item_id ) ),
-			),
-			admin_url( 'edit.php' )
-		);
-	}
-
-	/**
 	 * Validates the confirmation request before any output, so refusals get their real status code.
 	 */
 	public static function load_confirm_page(): void {
@@ -444,7 +427,7 @@ final class AdminProductPanel {
 		$row     = self::$confirm['row'];
 		$item_id = $product->get_id();
 
-		$back = admin_url( 'post.php?post=' . ( $product->is_type( 'variation' ) ? $product->get_parent_id() : $item_id ) . '&action=edit' );
+		$back = AdminUrl::product_edit( $product->is_type( 'variation' ) ? $product->get_parent_id() : $item_id );
 		$name = $product->is_type( 'variation' ) ? wc_get_formatted_variation( $product, true, true, false ) : '';
 
 		echo '<div class="wrap pqbg-confirm"><h1>' . esc_html__( 'Regenerate product code', 'product-qrcode-barcode-generator' ) . '</h1>';
@@ -455,7 +438,7 @@ final class AdminProductPanel {
 		echo '<div class="notice notice-warning inline"><p><strong>' . esc_html__( 'Printed labels with the old code will stop working.', 'product-qrcode-barcode-generator' ) . '</strong> ';
 		echo esc_html__( 'The current code is retired permanently and a new code is created. The old code stays in the history and is never used again.', 'product-qrcode-barcode-generator' ) . '</p></div>';
 
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		echo '<form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( AdminActions::REGENERATE ) . '" />';
 		echo '<input type="hidden" name="item" value="' . esc_attr( (string) $item_id ) . '" />';
 		echo '<input type="hidden" name="expected" value="' . esc_attr( (string) $row['id'] ) . '" />';
@@ -554,8 +537,8 @@ final class AdminProductPanel {
 			$links[] = '<a class="button pqbg-download-barcode" href="' . esc_url( AdminActions::image_url( $item_id, 'barcode', 'download' ) ) . '">' . esc_html__( 'Download barcode (SVG)', 'product-qrcode-barcode-generator' ) . '</a>';
 		}
 
-		$links[] = '<a class="button pqbg-print-label" href="' . esc_url( PrintAdmin::setup_url( array( $item_id ) ) ) . '">' . esc_html__( 'Print label', 'product-qrcode-barcode-generator' ) . '</a>';
-		$links[] = '<a class="button pqbg-regenerate" href="' . esc_url( self::confirm_url( $item_id ) ) . '">' . esc_html__( 'Regenerate…', 'product-qrcode-barcode-generator' ) . '</a>';
+		$links[] = '<a class="button pqbg-print-label" href="' . esc_url( AdminUrl::print_setup( array( $item_id ) ) ) . '">' . esc_html__( 'Print label', 'product-qrcode-barcode-generator' ) . '</a>';
+		$links[] = '<a class="button pqbg-regenerate" href="' . esc_url( AdminUrl::regenerate_confirm( $item_id ) ) . '">' . esc_html__( 'Regenerate…', 'product-qrcode-barcode-generator' ) . '</a>';
 
 		return implode( ' ', $links ) . ( $with_view ? '<span class="pqbg-qr-slot"></span>' : '' );
 	}
@@ -577,7 +560,7 @@ final class AdminProductPanel {
 	private static function generate_button( int $item_id ): string {
 		$form_id = 'pqbg-f-generate-' . $item_id;
 
-		self::$forms[ $form_id ] = '<form id="' . esc_attr( $form_id ) . '" class="pqbg-hidden-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">'
+		self::$forms[ $form_id ] = '<form id="' . esc_attr( $form_id ) . '" class="pqbg-hidden-form" method="post" action="' . esc_url( AdminUrl::admin_post() ) . '">'
 			. '<input type="hidden" name="action" value="' . esc_attr( AdminActions::GENERATE ) . '" />'
 			. '<input type="hidden" name="item" value="' . esc_attr( (string) $item_id ) . '" />'
 			. wp_nonce_field( AdminActions::nonce_action( 'generate_code', $item_id ), Permissions::NONCE_FIELD, false, false )

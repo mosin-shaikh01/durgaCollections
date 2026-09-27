@@ -9,7 +9,7 @@
  *                                               then 303 → the print page (PrintPage)
  *   Products list bulk action "Print QR labels" → the setup screen
  *
- * Entry points in the product panel (AdminProductPanel) link to setup_url().
+ * Entry points in the product panel (AdminProductPanel) link to AdminUrl::print_setup().
  * Everything requires Permissions::MANAGE_CODES and a nonce bound to the product
  * selection. The setup screen is read-only; codes are never generated here.
  *
@@ -27,7 +27,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class PrintAdmin {
 
-	const SLUG = 'pqbg-print';
+	const SLUG = AdminUrl::PRINT;
 
 	const PREPARE = 'pqbg_print_prepare';
 
@@ -53,23 +53,6 @@ final class PrintAdmin {
 		add_filter( 'bulk_actions-edit-product', array( __CLASS__, 'bulk_actions' ) );
 		add_filter( 'handle_bulk_actions-edit-product', array( __CLASS__, 'handle_bulk_action' ), 10, 3 );
 		add_filter( 'removable_query_args', array( __CLASS__, 'removable_query_args' ) );
-	}
-
-	/**
-	 * URL of the setup screen for a selection of products and/or variations.
-	 *
-	 * @param int[] $ids Selection.
-	 */
-	public static function setup_url( array $ids ): string {
-		return add_query_arg(
-			array(
-				'post_type'              => 'product',
-				'page'                   => self::SLUG,
-				'items'                  => implode( ',', array_map( 'intval', $ids ) ),
-				Permissions::NONCE_FIELD => wp_create_nonce( PrintJob::nonce_action( 'print_view', $ids ) ),
-			),
-			admin_url( 'edit.php' )
-		);
 	}
 
 	/**
@@ -191,7 +174,7 @@ final class PrintAdmin {
 		echo '</div>';
 
 		// The options form.
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="pqbg-print-form">';
+		echo '<form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '" class="pqbg-print-form">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::PREPARE ) . '" />';
 		echo '<input type="hidden" name="items" value="' . esc_attr( implode( ',', $ids ) ) . '" />';
 		wp_nonce_field( PrintJob::nonce_action( 'print_prepare', $ids ), Permissions::NONCE_FIELD );
@@ -264,7 +247,7 @@ final class PrintAdmin {
 		echo '<p><label>' . esc_html__( 'Printer offset (label sheets only): right', 'product-qrcode-barcode-generator' ) . ' <input type="text" inputmode="decimal" size="4" name="opt[dx]" value="' . esc_attr( $prefs['dx'] ) . '" /> mm</label> <label>' . esc_html__( 'down', 'product-qrcode-barcode-generator' ) . ' <input type="text" inputmode="decimal" size="4" name="opt[dy]" value="' . esc_attr( $prefs['dy'] ) . '" /> mm</label> <span class="description">' . esc_html( sprintf( __( 'Moves everything by up to ±%s mm if your printer prints slightly off; negative values move left or up.', 'product-qrcode-barcode-generator' ), PrintLayout::mm( PrintLayout::MAX_OFFSET_MM ) ) ) . '</span></p>';
 
 		echo '<p class="submit"><button type="submit" class="button button-primary">' . esc_html__( 'Preview and print', 'product-qrcode-barcode-generator' ) . '</button> ';
-		echo '<a class="button" href="' . esc_url( admin_url( 'edit.php?post_type=product' ) ) . '">' . esc_html__( 'Cancel', 'product-qrcode-barcode-generator' ) . '</a></p>';
+		echo '<a class="button" href="' . esc_url( AdminUrl::products() ) . '">' . esc_html__( 'Cancel', 'product-qrcode-barcode-generator' ) . '</a></p>';
 		echo '<p class="description">' . esc_html__( 'Your choices are remembered for next time (for your user only).', 'product-qrcode-barcode-generator' ) . '</p>';
 		echo '</form></div>';
 	}
@@ -299,7 +282,7 @@ final class PrintAdmin {
 		$options = PrintJob::options( $raw );
 		$problem = is_wp_error( $options ) ? $options : self::check( PrintJob::resolve( $ids ), $options );
 
-		$target = null === $problem ? PrintPage::url( $ids, $options ) : add_query_arg( self::INVALID_ARG, '1', self::setup_url( $ids ) );
+		$target = null === $problem ? PrintPage::url( $ids, $options ) : add_query_arg( self::INVALID_ARG, '1', AdminUrl::print_setup( $ids ) );
 
 		wp_safe_redirect( $target, 303 );
 		exit;
@@ -337,7 +320,7 @@ final class PrintAdmin {
 		$ids = array_values( array_filter( array_map( 'intval', (array) $post_ids ), static fn( $id ) => $id > 0 ) );
 
 		// One more than the maximum is enough for the setup screen to say "too many".
-		return self::setup_url( array_slice( $ids, 0, PrintJob::MAX_ITEMS + 1 ) );
+		return AdminUrl::print_setup( array_slice( $ids, 0, PrintJob::MAX_ITEMS + 1 ) );
 	}
 
 	/**

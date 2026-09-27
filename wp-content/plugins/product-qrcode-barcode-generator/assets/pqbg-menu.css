@@ -1,0 +1,15 @@
+/*
+ * QR & Barcodes pages (Phase 10B): the shared tab row at the top of every plugin page.
+ * Loaded only on the plugin's own pages (AdminMenu, by stored hook suffix).
+ * Page-internal tabs (reports, Bulk tools) follow as a second, smaller row.
+ */
+.pqbg-plugin-nav { margin: 8px 0 4px; }
+.pqbg-plugin-nav + h1, .pqbg-plugin-nav + .wp-heading-inline { padding-top: 12px; }
+.pqbg-page-tabs, .pqbg-reports__tabs { margin-top: 8px; }
+.pqbg-page-tabs .nav-tab, .pqbg-reports__tabs .nav-tab { font-size: 13px; }
+
+@media (max-width: 782px) {
+	/* Tabs wrap onto several lines; each stays a comfortable tap target. */
+	.pqbg-plugin-nav, .pqbg-page-tabs, .pqbg-reports__tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #c3c4c7; padding-bottom: 0; }
+	.pqbg-plugin-nav .nav-tab, .pqbg-page-tabs .nav-tab, .pqbg-reports__tabs .nav-tab { margin: 0; min-height: 40px; box-sizing: border-box; display: inline-flex; align-items: center; }
+}

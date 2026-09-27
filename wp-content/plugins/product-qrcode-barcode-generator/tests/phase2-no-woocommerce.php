@@ -33,7 +33,7 @@ pqbg_t( 'requirements not met', ! Requirements::met() );
 pqbg_t( 'error names WooCommerce', str_contains( implode( ' ', Requirements::errors() ), 'WooCommerce' ), json_encode( Requirements::errors() ) );
 pqbg_t( 'requirements notice hooked', false !== has_action( 'admin_notices', array( Requirements::class, 'render_notice' ) ) );
 pqbg_t( 'plugin did not boot (no textdomain hook)', false === has_action( 'init', array( 'ProductQrBarcode\\Plugin', 'load_textdomain' ) ) );
-pqbg_t( 'settings page not registered', false === has_action( 'admin_menu', array( 'ProductQrBarcode\\SettingsPage', 'add_menu' ) ) && false === has_action( 'admin_notices', array( 'ProductQrBarcode\\SettingsPage', 'scan_url_notice' ) ) );
+pqbg_t( 'settings page not registered (Phase 10B: nor the QR & Barcodes menu)', false === has_action( 'admin_menu', array( 'ProductQrBarcode\\SettingsPage', 'add_menu' ) ) && false === has_action( 'admin_menu', array( 'ProductQrBarcode\\AdminMenu', 'add_pages' ) ) && false === has_action( 'admin_notices', array( 'ProductQrBarcode\\SettingsPage', 'scan_url_notice' ) ) );
 
 ob_start();
 Requirements::render_notice();

@@ -34,9 +34,8 @@ final class ReportsExport {
 	 * @param array<string, string> $args ReportsAdmin::args().
 	 */
 	public static function url( array $args ): string {
-		return add_query_arg(
-			array_map( 'rawurlencode', array_merge( array( 'action' => self::ACTION ), $args, array( '_wpnonce' => wp_create_nonce( self::ACTION ) ) ) ),
-			admin_url( 'admin-post.php' )
+		return AdminUrl::admin_post(
+			array_map( 'rawurlencode', array_merge( array( 'action' => self::ACTION ), $args, array( '_wpnonce' => wp_create_nonce( self::ACTION ) ) ) )
 		);
 	}
 
@@ -68,8 +67,8 @@ final class ReportsExport {
 			wp_die( esc_html__( 'Sorry, you are not allowed to see costs and profit.', 'product-qrcode-barcode-generator' ), '', array( 'response' => 403 ) );
 		}
 
-		if ( 'dashboard' === $ctx['tab'] ) {
-			wp_die( esc_html__( 'The dashboard has no export. Open a report and export it.', 'product-qrcode-barcode-generator' ), '', array( 'response' => 400 ) );
+		if ( ReportsAdmin::SUMMARY === $ctx['tab'] ) {
+			wp_die( esc_html__( 'The Summary has no export. Open a report and export it.', 'product-qrcode-barcode-generator' ), '', array( 'response' => 400 ) );
 		}
 
 		$data = ReportData::build( $ctx['tab'], $ctx );

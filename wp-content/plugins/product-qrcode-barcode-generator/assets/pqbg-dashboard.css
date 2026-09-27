@@ -1,0 +1,28 @@
+/*
+ * QR & Barcodes → Dashboard (Phase 10B). Reuses the card and panel styles of
+ * pqbg-reports.css; only the Dashboard's own layout is here. Loaded on the Dashboard only.
+ */
+.pqbg-dashboard__intro { margin: 4px 0 12px; }
+.pqbg-dashboard__attention { border-left: 4px solid #dba617; }
+.pqbg-dashboard__attention ul { margin: 0; list-style: disc; padding-left: 20px; }
+.pqbg-dashboard__today h2 { margin-bottom: 0; }
+.pqbg-dashboard .pqbg-cards { margin: 8px 0 12px; }
+.pqbg-dashboard .pqbg-card dd, .pqbg-dashboard .pqbg-card dt { margin: 0; }
+.pqbg-dashboard__methods { max-width: 480px; margin: 8px 0; }
+.pqbg-dashboard__methods .pqbg-num { text-align: right; font-variant-numeric: tabular-nums; }
+.pqbg-dashboard__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin: 12px 0; }
+.pqbg-dashboard__grid .pqbg-panel { margin: 0; }
+.pqbg-dashboard__list { margin: 0; }
+.pqbg-dashboard__list > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 6px 0; border-bottom: 1px solid #f0f0f1; }
+.pqbg-dashboard__list dt { color: var(--pqbg-text-2); }
+.pqbg-dashboard__list dd { margin: 0; overflow-wrap: anywhere; }
+.pqbg-dashboard__runs { margin: 0 0 8px 20px; list-style: disc; }
+.pqbg-dashboard__links { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.pqbg-dashboard__links .button { white-space: normal; height: auto; min-height: 32px; line-height: 1.4; padding-top: 4px; padding-bottom: 4px; }
+
+@media (max-width: 782px) {
+	.pqbg-dashboard__grid { grid-template-columns: 1fr; }
+	.pqbg-dashboard__links { flex-direction: column; }
+	.pqbg-dashboard__links .button { width: 100%; min-height: 44px; text-align: center; justify-content: center; display: flex; align-items: center; }
+	.pqbg-dashboard__methods { max-width: none; }
+}

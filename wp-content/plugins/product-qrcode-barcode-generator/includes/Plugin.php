@@ -52,11 +52,15 @@ final class Plugin {
 			SalesAdmin::register();
 			CostPrice::register_admin();
 
-			// In-store reports and the owner dashboard, their CSV and the end-of-day print page (Phase 9B).
+			// In-store reports (Summary and the reports), their CSV and the end-of-day print page (Phase 9B).
 			ReportsAdmin::register();
 
-			// Bulk tools in the QR & Barcodes tabs: missing codes, codes CSV, cost import (Phase 10).
+			// Bulk tools: missing codes, codes CSV, cost import (Phase 10).
 			ToolsAdmin::register();
+
+			// The "QR & Barcodes" top-level menu, its pages and old-URL redirects, and the Dashboard (Phase 10B).
+			AdminMenu::register();
+			DashboardAdmin::register();
 		}
 	}
 

@@ -1,16 +1,11 @@
 <?php
 /**
- * Admin screen WooCommerce > QR & Barcodes, with tabs (Phase 10):
+ * QR & Barcodes → Settings (Phase 4; its own page since Phase 10B): admin.php?page=pqbg-settings.
  *
- *   Settings            Permissions::MANAGE_SETTINGS (administrators)
- *   Code tools          Permissions::MANAGE_CODES (administrators, shop managers)  ToolsAdmin
- *   Import cost prices  Permissions::VIEW_COSTS (administrators)                   ToolsAdmin
- *
- * The page itself needs MANAGE_CODES, so Store Sellers get neither the menu item nor
- * the page. Each tab is checked on its own before any output (ToolsAdmin::load_page()):
- * a tab the user may not use is not shown and its URL is refused with 403. Without a
- * tab the page opens the user's first tab (Settings for administrators, Code tools for
- * shop managers).
+ * Needs Permissions::MANAGE_SETTINGS (administrators). Until Phase 10B this page was
+ * WooCommerce → QR & Barcodes with the tabs Settings | Code tools | Import cost prices;
+ * the tools are now QR & Barcodes → Bulk tools (ToolsAdmin), and the old ?tab= addresses
+ * redirect there (AdminMenu). A shop manager asking for Settings gets 403.
  *
  * Settings uses the Settings API: the form posts to options.php, which checks the
  * `pqbg_settings-options` nonce and, through the option_page_capability
@@ -31,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class SettingsPage {
 
-	const SLUG    = 'pqbg-settings';
+	const SLUG    = AdminUrl::SETTINGS;
 	const SECTION = 'pqbg_codes_section';
 
 	/** Phase 9A: in-store sales settings. */
@@ -44,7 +39,6 @@ final class SettingsPage {
 	 * Hooks the screen, the setting and the notice. Called on admin requests only.
 	 */
 	public static function register(): void {
-		add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 60 );
 		add_action( 'admin_init', array( __CLASS__, 'register_setting' ) );
 		add_filter( 'option_page_capability_' . self::GROUP, array( __CLASS__, 'capability' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'scan_url_notice' ) );
@@ -58,21 +52,21 @@ final class SettingsPage {
 	}
 
 	/**
-	 * Adds the page under the WooCommerce menu (for pqbg_manage_codes; the tabs are checked on their own).
+	 * load-{page}: administrators only (403 before any output); any tab left in the address
+	 * is unknown (the Phase 10 tabs redirect in AdminMenu before this runs) and gets 404.
+	 * Expired cost import previews are pruned here too, as on every Phase 10 tab.
 	 */
-	public static function add_menu(): void {
-		$hook = add_submenu_page(
-			'woocommerce',
-			__( 'Product QR Code and Barcode Generator', 'product-qrcode-barcode-generator' ),
-			__( 'QR & Barcodes', 'product-qrcode-barcode-generator' ),
-			Permissions::MANAGE_CODES,
-			self::SLUG,
-			array( __CLASS__, 'render' )
-		);
-
-		if ( $hook ) {
-			add_action( 'load-' . $hook, array( ToolsAdmin::class, 'load_page' ) );
+	public static function load(): void {
+		if ( ! Permissions::can_manage_settings() ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'product-qrcode-barcode-generator' ), '', array( 'response' => 403 ) );
 		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- navigation only.
+		if ( isset( $_GET['tab'] ) && '' !== $_GET['tab'] ) {
+			wp_die( esc_html__( 'This page does not exist.', 'product-qrcode-barcode-generator' ), '', array( 'response' => 404 ) );
+		}
+
+		CostImport::prune();
 	}
 
 	/**
@@ -124,36 +118,19 @@ final class SettingsPage {
 	 * Renders the page.
 	 */
 	public static function render(): void {
-		$tab = ToolsAdmin::requested_tab();
-
-		if ( ! in_array( $tab, ToolsAdmin::tabs(), true ) ) {
-			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'product-qrcode-barcode-generator' ), 403 );
-		}
-
-		echo '<div class="wrap"><h1>' . esc_html( get_admin_page_title() ) . '</h1>';
-		ToolsAdmin::render_nav( $tab );
-
-		if ( ToolsAdmin::TAB_TOOLS === $tab ) {
-			ToolsAdmin::render_tools();
-			echo '</div>';
-			return;
-		}
-
-		if ( ToolsAdmin::TAB_COSTS === $tab ) {
-			ToolsAdmin::render_costs();
-			echo '</div>';
-			return;
-		}
-
 		if ( ! Permissions::can_manage_settings() ) {
 			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'product-qrcode-barcode-generator' ), 403 );
 		}
+
+		echo '<div class="wrap">';
+		AdminMenu::render_nav( AdminUrl::SETTINGS );
+		echo '<h1>' . esc_html__( 'Settings', 'product-qrcode-barcode-generator' ) . '</h1>';
 
 		// Pages outside Settings must print Settings API messages themselves. No filter:
 		// options.php files "Settings saved." under "general", validation errors under pqbg_settings.
 		settings_errors();
 
-		echo '<form method="post" action="' . esc_url( admin_url( 'options.php' ) ) . '">';
+		echo '<form method="post" action="' . esc_url( AdminUrl::options() ) . '">';
 		settings_fields( self::GROUP );
 		do_settings_sections( self::SLUG );
 		submit_button();
@@ -238,6 +215,6 @@ final class SettingsPage {
 
 		echo '<div class="notice notice-warning"><p><strong>' . esc_html__( 'Product QR Code and Barcode Generator:', 'product-qrcode-barcode-generator' ) . '</strong> ';
 		echo esc_html( $message );
-		echo ' <a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG ) ) . '">' . esc_html__( 'Scan base URL settings', 'product-qrcode-barcode-generator' ) . '</a></p></div>';
+		echo ' <a href="' . esc_url( AdminUrl::settings() ) . '">' . esc_html__( 'Scan base URL settings', 'product-qrcode-barcode-generator' ) . '</a></p></div>';
 	}
 }
