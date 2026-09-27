@@ -47,19 +47,12 @@ final class Install {
 	}
 
 	/**
-	 * Activation hook.
+	 * Activation hook. Multisite (network or per-site activation) is refused by
+	 * Requirements since Phase 11 (decision D19).
 	 *
-	 * @param bool $network_wide Whether the plugin is being network-activated.
+	 * @param bool $network_wide Whether the plugin is being network-activated (unused: any multisite is refused).
 	 */
-	public static function activate( $network_wide = false ): void {
-		if ( is_multisite() && $network_wide ) {
-			wp_die(
-				esc_html__( 'Product QR Code and Barcode Generator cannot be network activated. Activate it on each site individually.', 'product-qrcode-barcode-generator' ),
-				esc_html__( 'Plugin activation failed', 'product-qrcode-barcode-generator' ),
-				array( 'back_link' => true )
-			);
-		}
-
+	public static function activate( $network_wide = false ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- activation hook signature.
 		$errors = Requirements::errors();
 
 		if ( array() !== $errors ) {

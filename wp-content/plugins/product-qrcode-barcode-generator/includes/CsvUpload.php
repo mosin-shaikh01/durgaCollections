@@ -205,7 +205,7 @@ final class CsvUpload {
 	/**
 	 * Undoes what a spreadsheet or our own export did to a cell: surrounding spaces
 	 * (including no-break spaces), the apostrophe SalesExport::neutralise() adds before
-	 * = + - @ tab CR, and Excel's ="…" text wrapper.
+	 * a cell SalesExport::formula_risk() flags, and Excel's ="…" text wrapper.
 	 *
 	 * @param string $cell Cell.
 	 */
@@ -216,7 +216,7 @@ final class CsvUpload {
 			$cell = str_replace( '""', '"', $m[1] );
 		}
 
-		if ( strlen( $cell ) > 1 && "'" === $cell[0] && false !== strpos( "=+-@\t\r", $cell[1] ) ) {
+		if ( strlen( $cell ) > 1 && "'" === $cell[0] && SalesExport::formula_risk( substr( $cell, 1 ) ) ) {
 			$cell = substr( $cell, 1 );
 		}
 

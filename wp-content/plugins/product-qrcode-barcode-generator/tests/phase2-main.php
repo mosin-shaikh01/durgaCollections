@@ -32,6 +32,12 @@ $test_rows = static fn() => (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C WHERE
 $base_c    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" );
 $base_s    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $S" );
 
+$ao = fn( $n ) => $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM {$wpdb->options} WHERE option_name=%s", $n ) );
+
+// Phase 11: every section heading is a safe point for the runner's stop file; the body runs in
+// try/finally so the cleanup always runs (the body is not re-indented, to keep its history readable).
+try {
+
 pqbg_section( 'bootstrap' );
 pqbg_t( 'constants defined', defined( 'PQBG_VERSION' ) && defined( 'PQBG_PLUGIN_FILE' ) && defined( 'PQBG_PLUGIN_DIR' ) && defined( 'PQBG_PLUGIN_URL' ), PQBG_VERSION );
 pqbg_t( 'autoload classes', class_exists( Install::class ) && class_exists( Schema::class ) && class_exists( Permissions::class ) && class_exists( CodeRepository::class ) );
@@ -71,7 +77,6 @@ pqbg_t( 'dbDelta re-run is a no-op', array() === $dd, json_encode( $dd ) );
 
 pqbg_section( 'options' );
 pqbg_t( 'pqbg_db_version = Install::DB_VERSION (2 since Phase 7)', Install::DB_VERSION === Install::stored_version() );
-$ao = fn( $n ) => $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM {$wpdb->options} WHERE option_name=%s", $n ) );
 pqbg_t( 'pqbg_settings exists, not autoloaded', is_array( get_option( 'pqbg_settings' ) ) && in_array( $ao( 'pqbg_settings' ), array( 'off', 'no' ), true ), $ao( 'pqbg_settings' ) );
 $settings_before = get_option( 'pqbg_settings' );
 pqbg_t(
@@ -229,7 +234,21 @@ pqbg_t( 'no pqbg REST namespace/routes', ! array_filter( rest_get_server()->get_
 pqbg_t( 'no pqbg shortcodes', ! array_filter( array_keys( $GLOBALS['shortcode_tags'] ), $hit ) );
 pqbg_t( 'no pqbg ajax actions', ! array_filter( array_keys( $GLOBALS['wp_filter'] ), fn( $h ) => str_starts_with( $h, 'wp_ajax' ) && $hit( $h ) ) );
 
+} finally {
+
 pqbg_section( 'cleanup' );
+// A stop at a section boundary can leave the schema version option at 1 (the migration and lock
+// sections), the canary capability or the test user; each repair is idempotent.
+if ( Install::DB_VERSION !== Install::stored_version() && null === $ao( 'pqbg_install_lock' ) ) {
+	Install::install();
+}
+foreach ( array_keys( wp_roles()->roles ) as $rn ) {
+	get_role( $rn )->remove_cap( 'zz_pqbg_test_canary' );
+}
+if ( get_user_by( 'login', 'pqbg_phase2_test_seller' ) ) {
+	require_once ABSPATH . 'wp-admin/includes/user.php';
+	wp_delete_user( get_user_by( 'login', 'pqbg_phase2_test_seller' )->ID );
+}
 $wpdb->query( "DELETE FROM $S WHERE note = 'PQBG_PHASE2_TEST'" );
 $wpdb->query( "DELETE FROM $C WHERE code LIKE 'TEST-PQBG-%'" );
 $wpdb->query( "ALTER TABLE $C AUTO_INCREMENT = 1" );
@@ -237,6 +256,8 @@ $wpdb->query( "ALTER TABLE $S AUTO_INCREMENT = 1" );
 pqbg_t( 'tables back to their starting row counts', $base_c === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" ) && $base_s === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $S" ) );
 pqbg_t( 'test user removed', ! get_user_by( 'login', 'pqbg_phase2_test_seller' ) );
 pqbg_t( 'pqbg_db_version = Install::DB_VERSION, no lock', Install::DB_VERSION === Install::stored_version() && null === $ao( 'pqbg_install_lock' ) );
-pqbg_t( 'no canary capability left on any role', ! str_contains( (string) wp_json_encode( get_option( wp_roles()->role_key ) ), $canary ) );
+pqbg_t( 'no canary capability left on any role', ! str_contains( (string) wp_json_encode( get_option( wp_roles()->role_key ) ), 'zz_pqbg_test_canary' ) );
+
+}
 
 pqbg_test_done();

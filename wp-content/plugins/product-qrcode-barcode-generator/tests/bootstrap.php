@@ -25,6 +25,55 @@ $GLOBALS['pqbg_test_fail']   = 0;
 $GLOBALS['pqbg_test_skip']   = 0;
 $GLOBALS['pqbg_test_errors'] = array();
 
+// Cooperative stop (Phase 11: every suite). The runner's memory watchdog creates the file named
+// by PQBG_STOP_FILE; the next safe point (every section heading, and the long loops that call
+// pqbg_test_stop_point()) throws PqbgTestStop once, so the suite's `finally` cleanup still runs.
+// From the "cleanup" section on, stop points do nothing: a cleanup is never interrupted.
+$GLOBALS['pqbg_test_stopped']    = false;
+$GLOBALS['pqbg_test_in_cleanup'] = false;
+
+/**
+ * Thrown once at a safe point when PQBG_STOP_FILE exists.
+ */
+class PqbgTestStop extends RuntimeException {
+}
+
+/**
+ * A safe point: throws PqbgTestStop when the runner asked the suite to stop (once, and never
+ * during cleanup).
+ *
+ * @throws PqbgTestStop When PQBG_STOP_FILE exists.
+ */
+function pqbg_test_stop_point(): void {
+	if ( $GLOBALS['pqbg_test_stopped'] || $GLOBALS['pqbg_test_in_cleanup'] ) {
+		return;
+	}
+
+	$file = (string) getenv( 'PQBG_STOP_FILE' );
+
+	if ( '' !== $file && file_exists( $file ) ) {
+		$GLOBALS['pqbg_test_stopped'] = true;
+		throw new PqbgTestStop( 'Stopped on request (PQBG_STOP_FILE): the machine is low on free memory.' );
+	}
+}
+
+/*
+ * A suite without a catch block lets PqbgTestStop through after its `finally` cleanup:
+ * report it as stopped (exit 3), never as a pass.
+ */
+set_exception_handler(
+	static function ( Throwable $e ): void {
+		if ( $e instanceof PqbgTestStop ) {
+			echo "\nSTOPPED: {$e->getMessage()} The cleanup ran.\n";
+			echo "\nRESULT: {$GLOBALS['pqbg_test_pass']} passed, {$GLOBALS['pqbg_test_fail']} failed; STOPPED\n";
+			exit( 3 );
+		}
+
+		fwrite( STDERR, 'PHP Fatal error:  Uncaught ' . get_class( $e ) . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString() . "\n" );
+		exit( 255 );
+	}
+);
+
 /**
  * Path to wp-load.php: PQBG_WP_LOAD, or four levels above this directory.
  */
@@ -95,6 +144,11 @@ function pqbg_skip( string $name, string $reason ): void {
  * @param string $title Section name.
  */
 function pqbg_section( string $title ): void {
+	if ( 'cleanup' === $title ) {
+		$GLOBALS['pqbg_test_in_cleanup'] = true;
+	}
+
+	pqbg_test_stop_point();
 	echo "== {$title} ==\n";
 }
 
@@ -105,6 +159,13 @@ function pqbg_test_done(): void {
 	pqbg_t( 'no PHP notices, warnings or deprecations from plugin code', array() === $GLOBALS['pqbg_test_errors'], implode( ' | ', $GLOBALS['pqbg_test_errors'] ) );
 
 	$skipped = $GLOBALS['pqbg_test_skip'] > 0 ? ", {$GLOBALS['pqbg_test_skip']} skipped" : '';
+
+	if ( $GLOBALS['pqbg_test_stopped'] ) {
+		// A suite with a catch block records the stop as a failed check; a stopped run is never a pass.
+		echo "\nSTOPPED: stopped on request (PQBG_STOP_FILE). The cleanup ran.\n";
+		echo "\nRESULT: {$GLOBALS['pqbg_test_pass']} passed, {$GLOBALS['pqbg_test_fail']} failed{$skipped}; STOPPED\n";
+		exit( 3 );
+	}
 
 	echo "\nRESULT: {$GLOBALS['pqbg_test_pass']} passed, {$GLOBALS['pqbg_test_fail']} failed{$skipped}\n";
 	exit( 0 === $GLOBALS['pqbg_test_fail'] ? 0 : 1 );

@@ -5,7 +5,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–10B (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard)
+## Current scope: Phases 2–11 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard, hardening)
 
 Implemented:
 
@@ -25,6 +25,7 @@ Implemented:
 - **Phase 9B:** **In-store reports**: the owner dashboard (called **Summary** since Phase 10B) and ten reports (sales over time, products, categories, sellers, peak times, end of day / payments with "Cash expected in drawer", profit & margin, voids & failed, stock, dead stock), server-rendered SVG charts, CSV exports and a print-friendly end of day. Schema version 4 (`void_restock`). Also the fix of a Phase 7 idempotency race (a duplicate submission arriving mid-sale was answered "failed"). See [In-store reports](#in-store-reports).
 - **Phase 10:** bulk and CSV tools (Code tools | Import cost prices, each tab with its own capability; under WooCommerce → QR & Barcodes until Phase 10B): resumable generation of missing codes with "Print labels" links, the codes CSV export, the administrator-only cost price import (preview, apply, report, template) and an audit log. No schema change. See [Bulk tools](#bulk-tools).
 - **Phase 10B:** the plugin's own top-level menu **QR & Barcodes** (Dashboard, In-store sales, In-store reports, Bulk tools, Settings; nothing under WooCommerce), a shared tab row on every plugin page, redirects from the old addresses, one source for admin URLs (`AdminUrl`) and screen detection by stored hook suffix (`AdminMenu`), and the plugin **Dashboard**. No schema, capability or data change. See [Admin menu](#admin-menu) and [Dashboard](#dashboard).
+- **Phase 11 (hardening):** the read-only [Health check](#health-check) (Settings → Health check, and a count on the Dashboard for administrators); the Undo button hides itself when its 10 minutes end (no reload, no JavaScript); the bulk log's writes run under a lock; an administrators-only [performance signal](#performance-signal) on the Dashboard; CSV formula neutralisation also after leading spaces, for line feeds and for full-width characters; multisite refused; uninstall also removes the Phase 11 runtime state and the save-failure notices. No schema change (`DB_VERSION` 4), no new capability, the sale path unchanged. Tests for migrations from real v1–v3 tables, both uninstall branches on a cloned database, time and money edge cases and malformed input on every entry point.
 
 **Not implemented yet (later phases):**
 - CSV import of codes (left out of Phase 10 by decision D6; in the backlog), an undo of a cost import, bulk regeneration or retirement of codes
@@ -42,6 +43,7 @@ The plugin adds **no REST routes, AJAX handlers or shortcodes**. Its request han
 - Phase 9A cost price: two WooCommerce product-editor save actions for users with `pqbg_view_costs`, and filters that keep the cost out of WooCommerce's meta data, REST, exports and imports (see [Cost price](#cost-price))
 - Phase 10 (see [Bulk tools](#bulk-tools)): the Code tools and Import cost prices tabs (the Bulk tools page since Phase 10B), and six `admin-post.php` handlers: `pqbg_bulk_generate` (POST) and `pqbg_codes_csv` (GET/HEAD) for `pqbg_manage_codes`; `pqbg_cost_upload`, `pqbg_cost_apply` (POST), `pqbg_cost_report` and `pqbg_cost_template` (GET/HEAD) for `pqbg_view_costs`; every one with a nonce
 - Phase 10B (see [Admin menu](#admin-menu)): the **Dashboard** page (a wp-admin page, GET, `pqbg_view_all_sales`) and the old-address redirects (GET/HEAD); no new handler
+- Phase 11: the **Health check** tab of the Settings page (GET, `pqbg_manage_settings`, read-only); no new handler
 - Phase 9B (see [In-store reports](#in-store-reports)): the **In-store reports** page (a wp-admin page, GET, `pqbg_view_all_sales`; cost parts `pqbg_view_costs`), the report CSV (`admin-post.php?action=pqbg_report_csv`, GET/HEAD, nonce) and the end-of-day print page (`admin-post.php?action=pqbg_report_print`, GET/HEAD, nonce)
 
 ## QR codes and barcodes
@@ -113,6 +115,7 @@ Since Phase 10B the plugin has its own top-level wp-admin menu, **QR & Barcodes*
 | Bulk tools → Code tools | `admin.php?page=pqbg-bulk-tools&tab=tools` | `pqbg_manage_codes` | yes | yes | no | no |
 | Bulk tools → Import cost prices | `admin.php?page=pqbg-bulk-tools&tab=costs` | `pqbg_view_costs` | yes | no | no | no |
 | Settings | `admin.php?page=pqbg-settings` | `pqbg_manage_settings` | yes | no | no | no |
+| Settings → Health check (Phase 11) | `admin.php?page=pqbg-settings&tab=health` | `pqbg_manage_settings` | yes | no | no | no |
 
 - **Shared tab row.** Every plugin page starts with one row of tabs: Dashboard | In-store sales | In-store reports | Bulk tools | Settings. It shows only the pages the user may open (a Shop Manager has no Settings tab), in menu order, with the current page marked (`aria-current="page"`). A page's own tabs (the reports; Code tools | Import cost prices) are a second, smaller row below it.
 - **The top-level item** needs `pqbg_view_all_sales`, like the Dashboard. If a custom role can open a sub-item but not the Dashboard, WordPress points the top-level item at the first sub-item that role may open.
@@ -143,9 +146,9 @@ In-store sales and In-store reports kept their slugs, so their addresses (with e
 
 ## Dashboard
 
-QR & Barcodes → **Dashboard** (Phase 10B), `pqbg_view_all_sales`. Today at a glance and shortcuts; for trends and analysis, use In-store reports. GET only; opening it writes nothing.
+QR & Barcodes → **Dashboard** (Phase 10B), `pqbg_view_all_sales`. Today at a glance and shortcuts; for trends and analysis, use In-store reports. GET only. Since Phase 11 its only write is the timing sample of the [performance signal](#performance-signal) (one small non-autoloaded option, at most one write per 60 seconds); nothing else changes.
 
-- **Needs attention** (only when something does): QR codes point to a local address ("Do not print labels until the production URL is set"), or a public host on plain `http://`; shown to everyone who may print labels (`pqbg_manage_codes`), with the Settings link only for administrators (the site-wide admin notice stays administrators-only). Also: scan links unavailable with the current permalinks, content taking over `/scan/`, and a code-generation run in progress, interrupted or stopped (with "Continue in Bulk tools").
+- **Needs attention** (only when something does), Phase 11, **administrators only** (`pqbg_manage_settings`): "The health check found N problems in the plugin's data. Open Health check" (errors and warnings of the [Health check](#health-check); information is left out), and the [performance signal](#performance-signal). For everyone who may see them: QR codes point to a local address ("Do not print labels until the production URL is set"), or a public host on plain `http://`; shown to everyone who may print labels (`pqbg_manage_codes`), with the Settings link only for administrators (the site-wide admin notice stays administrators-only). Also: scan links unavailable with the current permalinks, content taking over `/scan/`, and a code-generation run in progress, interrupted or stopped (with "Continue in Bulk tools").
 - **Today in the shop** (in-store, completed sales, site timezone): revenue, sales, items sold; for `pqbg_view_costs` also gross profit, margin and the unknown-cost note. Revenue and sales per payment method, and the sales voided today. Links: End of day, Today's sales, In-store reports.
 - **Products and codes** (`pqbg_manage_codes`): **Published products without a code** (with a link to Bulk tools → Code tools), low on stock and out of stock (links to the Stock report).
 - **Recent bulk runs** (`pqbg_manage_codes`): the last 5 entries of the bulk log; cost-import entries only for `pqbg_view_costs`.
@@ -210,6 +213,36 @@ When the effective base URL points to a **public** host over plain `http://`, th
 - This is a warning only. An `http://` URL is valid and is saved.
 - At most one of the two notices is shown, and the local-address warning takes priority. A local `http://` address, such as the development site, shows only the local-address warning.
 
+## Health check
+
+Phase 11. QR & Barcodes → Settings → **Health check** (`admin.php?page=pqbg-settings&tab=health`), administrators only (`pqbg_manage_settings`; the Settings page's own gate answers 403 before any output). **Read-only and report-only:** every query is a SELECT; nothing is repaired, cached or stored, and there are no repair buttons (decision D4). Each check shows its severity, what it means, the complete count and up to 50 rows (10 for information), with links to the product or the sale.
+
+| Check | Severity | Finds | What to do |
+|---|---|---|---|
+| Database tables | error | a plugin table missing, or `pqbg_db_version` different from the code | deactivate and reactivate the plugin |
+| Negative stock | error | stock below zero on an item with an active code, or on the parent product holding a variation's stock | count the item, correct the stock on the product screen |
+| Sales without a stock snapshot | warning | completed sales with `stock_after` NULL (the Phase 7 crash window after the atomic statement) | nothing: stock and sale agree, only the snapshot is missing |
+| Interrupted sales | warning | sales still `pending` after 15 minutes (a request that died before changing stock) | nothing: the next sale of the same stock holder marks them failed ("interrupted") automatically |
+| Codes on missing or unsuitable items | error | active codes whose item was deleted, is not a product or variation, is no longer a simple product, is a variation whose parent is missing or no longer variable, or is an auto-draft | check the product; labels with these codes will not sell |
+| One active code per item | error | an item with more than one active code, or a code row that breaks the `active_product_id` rule (should be impossible: a UNIQUE key and a CHECK constraint prevent it) | keep a backup and investigate before changing anything |
+| Cost prices | warning | stored cost meta that `CostPrice::set()` would never write: not a valid amount, a second row for the same item, or on something that is not a product | re-enter the cost on the product screen or with Import cost prices |
+| Codes on trashed items | information | codes kept active on trashed items (the Phase 5 rule) | nothing |
+| Sales of deleted items | information | sales whose product or variation no longer exists (allowed: sales keep snapshots) | nothing |
+
+- **Never a cost value:** the cost check reports only the item and the reason.
+- **Dashboard:** administrators see "The health check found N problems" in Needs attention, counting errors and warnings only (information is left out); shop managers never see it.
+- **Speed** (dev machine, 2,000 coded items; in-process, best of 3): the whole tab 96 ms at 5,000 sales and 180 ms at 50,000 (target under 1 s); the Dashboard's set (errors and warnings) 91 ms at 5,000 and 81 ms at 50,000 (target under 150 ms, so the Dashboard shows the count); the tab over HTTP 0.78 s at 50,000. The completed-sales check reads the sales table without the `status_created` index on purpose: almost every row is completed, and one sequential scan is about 4× faster than an index lookup per row. See the Phase 11 section of `progress.md` for the measured values.
+- Classes: `HealthCheck` (the checks, no output) and `HealthCheckAdmin` (the tab). `CostPrice::invalid_values()` reads the cost meta (the meta key stays in `CostPrice`).
+
+## Performance signal
+
+Phase 11 (decision D9, as changed by the owner). The reports have no daily summary table and no result cache (Phase 9B, decision D7): build one only when it is needed. The Dashboard tells administrators when that may be the case, only for a **repeated** condition, never after one slow page:
+
+- at least **3 of the last 10** Dashboard loads took more than **2 s** to compute their figures (`ReportsAdmin::dashboard_data()` for today, timed on every load), or
+- completed in-store sales over the last **30 days** average more than **300 a day**.
+
+The message names the numbers and points here. Stored: only the last 10 compute times in whole milliseconds and the time of the last write, in the non-autoloaded option `pqbg_perf_samples` (runtime state; removed on every uninstall). **At most one write per 60 seconds**: renders in between are not sampled, so busy Dashboards cause no extra database writes. Nothing is scheduled. Thresholds are the constants of `PerfSignal`.
+
 ## Bundled libraries
 
 The libraries are bundled inside the plugin; no Composer is needed on the server.
@@ -236,7 +269,7 @@ The libraries are bundled inside the plugin; no Composer is needed on the server
 
 ## Tests
 
-The CLI regression suites for Phases 2–8 are in [`tests/`](tests/README.md): a runner with an Action Scheduler leak guard, round-trip QR/barcode decoding (also at printed size, 203 and 300 dpi), HTTP checks of the admin, scan, sale and print flows, concurrency tests with worker processes, and optional headless Chrome/Edge checks of the print page. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
+The CLI regression suites for Phases 2–11 are in [`tests/`](tests/README.md): a runner with an Action Scheduler leak guard, a cooperative stop for low memory in every suite (Phase 11), an optional error capture that counts every PHP notice, warning and deprecation from plugin code over CLI and HTTP (Phase 11), round-trip QR/barcode decoding (also at printed size, 203 and 300 dpi), HTTP checks of the admin, scan, sale and print flows, concurrency tests with worker processes, and optional headless Chrome/Edge checks of the print page. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
 
 ## Production deployment
 
@@ -844,7 +877,8 @@ Every response carries the Phase 6 security headers. There is still no JavaScrip
 
 ### Undo and void
 
-- **Undo** (sale page): the **same seller**, with `pqbg_sell`, their own `completed` sale, within **10 minutes** of the sale, **once**. After 10 minutes the button is gone, and a kept form is refused server-side.
+- **Undo** (sale page): the **same seller**, with `pqbg_sell`, their own `completed` sale, within **10 minutes** of the sale, **once**. After 10 minutes the button is gone, and a kept form is refused server-side (409, "Undo is no longer available (10-minute limit).").
+  - **The button hides itself when the window ends** (Phase 11), without a reload (a seller may be scanning the next item) and without JavaScript: the sale page carries one `<style>` element with this response's CSP nonce that sets the seconds left as the delay of a zero-length CSS animation (`animation-fill-mode: forwards`), which hides the Undo form and shows "Undo is no longer available. Ask a manager to void the sale if needed.". Only that response's `Content-Security-Policy` allows that nonce (`style-src 'self' 'nonce-…'`; still no script). Without the style element the stylesheet's fallback delay is the whole window (600 s), so the button can never vanish early.
   - Under the lock of the recorded `stock_holder_id`, one statement puts the quantity back and sets `voided`, `voided_by`, `voided_at_gmt`, `void_reason = 'undo'`, only if the row is still `completed`. A second undo changes nothing ("This sale was already undone.").
   - The row is never deleted. GET cannot undo.
   - Refused if stock tracking was turned off or moved (parent ↔ variation) since the sale.
@@ -864,7 +898,7 @@ Every response carries the Phase 6 security headers. There is still no JavaScrip
 ### Limitations
 
 - The live total is per option in the quantity list; above 100 in stock the number field shows only the formula (no JavaScript).
-- The undo window is measured on the server clock from the sale's `created_at_gmt`. The page does not refresh itself, so the Undo button can still be visible after the 10 minutes; pressing it is then refused.
+- The undo window is measured on the server clock from the sale's `created_at_gmt`; the button hides itself on the phone's timeline (the page never refreshes itself). If a browser pauses animations while a tab is in the background, the button can reappear briefly when the tab is shown again; pressing it is refused.
 - Held stock for pending online checkouts is not subtracted (decision D2).
 - Taxes are off in this store; the recorded price is `get_price()` as entered. Tax/GST handling is out of scope.
 
@@ -1025,7 +1059,8 @@ From the sale detail, **Void sale** (for `pqbg_void_sale`) opens a confirmation 
 
 - UTF-8 **with a byte order mark** (Excel shows ₹ correctly); `text/csv; charset=utf-8`, attachment `in-store-sales-{from}[-to-{to}].csv`, `nosniff`, `no-store`.
 - Columns: date (site timezone, `Y-m-d H:i:s`), sale #, status, product, attributes, SKU, code, quantity, unit price, total, currency, paid by, seller, voided at/by, void reason, failure; for `pqbg_view_costs` also unit cost, cost, profit. Amounts are plain decimals.
-- **Formula injection:** a text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading apostrophe; plain numbers we generate (such as a negative profit `-60.00`) stay numbers.
+- **Formula injection:** a text cell starting with `=`, `+`, `-`, `@`, a tab, a carriage return or (Phase 11) a line feed, or whose first character after spaces (including no-break and ideographic spaces) is one of `= + - @` or their full-width forms (`＝ ＋ － ＠`), gets a leading apostrophe; plain numbers we generate (such as a negative profit `-60.00`) stay numbers. The same rule is used by every CSV (`SalesExport::put()`), and the cost-price importer removes exactly that apostrophe again (`SalesExport::formula_risk()`).
+- **Numbers:** amounts are plain decimals with a `.` and the store's decimals, no thousands separator (neither Western nor Indian grouping), no currency sign and never `-0.00`, so Excel reads them as numbers. The screens use WooCommerce's own price format.
 - **Streamed:** IDs are read by keyset paging (5,000 at a time, continuing after the last sort value and ID) and rows fetched 1,000 at a time by primary key, written and flushed; memory stays flat and a sale recorded during the export never shifts a page.
 
 ### My sales (sellers)
@@ -1147,7 +1182,7 @@ Final run (2026-09-26, in-process, best of 3):
 
 Over HTTP at 50,000 sales (median of 3), an empty wp-admin page took 800 ms and the report pages added −70 to +870 ms (the dashboard +690 ms, products +870 ms).
 
-Why, and what was measured: grouping 50,000 rows costs 350–450 ms per query in MariaDB 10.4 (a temporary table), and the dashboard needs two such scans (the period with its payment split, chart and sellers in one; the top products in the other) plus the stock counts. PHP overhead was removed first (amounts summed once, meta read by key, costs in one query). A covering index `(created_at_gmt, status, payment_method, seller_id, product_id, variation_id, quantity, line_total, unit_cost)` was measured on a temporary copy: products and peak times about 40 % faster, the dashboard scan unchanged, +0.4 ms per sale insert, 14 s to build per 50,000 rows: **not added**. A daily roll-up table or a permission-keyed result cache would meet the target; they are deferred (see the Phase 11 open item in `progress.md`) and the sale path is unchanged.
+Why, and what was measured: grouping 50,000 rows costs 350–450 ms per query in MariaDB 10.4 (a temporary table), and the dashboard needs two such scans (the period with its payment split, chart and sellers in one; the top products in the other) plus the stock counts. PHP overhead was removed first (amounts summed once, meta read by key, costs in one query). A covering index `(created_at_gmt, status, payment_method, seller_id, product_id, variation_id, quantity, line_total, unit_cost)` was measured on a temporary copy: products and peak times about 40 % faster, the dashboard scan unchanged, +0.4 ms per sale insert, 14 s to build per 50,000 rows: **not added**. A daily roll-up table or a permission-keyed result cache would meet the target; they are deferred and the sale path is unchanged. Since Phase 11 the Dashboard tells administrators when they may be needed (the [performance signal](#performance-signal)); the 50,000-sale stress checks of Phase 11 are recorded in `progress.md`.
 
 ### Limitations
 
@@ -1214,6 +1249,8 @@ Row by row rather than all-or-nothing: each row is one independent, idempotent m
 
 `BulkLog`: the option `pqbg_bulk_log` (not autoloaded), the last 200 entries, newest first, shown as **Recent bulk runs** on the Code tools tab. Each entry: time, user, tool (code generation, codes export, cost template download, cost import), and counts; for an import also the file name and its SHA-256. No cost value is ever logged. Generation and export entries are shown to `pqbg_manage_codes`; **cost entries only to `pqbg_view_costs`**. Each entry is also one line in the WooCommerce log (source `product-qrcode-barcode-generator`).
 
+Since Phase 11 every write re-reads the log under a MySQL named lock (`BulkLog::lock_name()`, per database and prefix, 5 s), so two requests writing at the same instant both keep their entries. An activity log never blocks a tool: without the lock after 5 s the entry is written anyway and a warning goes to the WooCommerce log.
+
 ### Classes
 
 `BulkGenerator`, `CodesExport`, `CsvUpload`, `CostImport`, `BulkLog`, `ToolsAdmin` (the two tabs and the six handlers), `assets/pqbg-tools.js` and `assets/pqbg-tools.css`. `SettingsPage` renders the tab navigation and hands the two new tabs to `ToolsAdmin`. `ProductCodeService::get_or_create()` gained an optional `&$created` out-parameter (true only when that call created the code).
@@ -1246,6 +1283,12 @@ Row by row rather than all-or-nothing: each row is one independent, idempotent m
 4. **Old bookmarks:** `…/wp-admin/admin.php?page=pqbg-settings&tab=tools` lands on Bulk tools → Code tools. As the administrator, `…&tab=settings` lands on Settings.
 5. **Phone:** the menu folds into the ☰ button, the tabs wrap onto several lines without sideways scrolling, and the Dashboard shows one column with full-width buttons.
 
+**Phase 11 checklist (hardening).** Part of the pre-launch acceptance checklist in `progress.md`.
+
+1. **Health check on the real data** (after a database backup, as an administrator): QR & Barcodes → Settings → Health check shows "No problems found.", or every finding is understood and handled as its row says. The Dashboard shows no "health check found" line then. As the Shop Manager, the Settings page and `…&tab=health` give "Sorry, you are not allowed to access this page."
+2. **Undo on the phone:** sell an item on the scan page and leave the sale page open without touching it. The "Undo this sale" button is there; about 10 minutes after the sale it disappears by itself (the page does not reload) and "Undo is no longer available. Ask a manager to void the sale if needed." appears. Void the test sale in In-store sales afterwards.
+3. **50,000-sale stress checks** once more before launch (`PQBG_STRESS=1` with the Phase 9B, 10B and 11 suites; see `tests/README.md`).
+
 ### Limitations
 
 - Code CSV **import** is not implemented (decision D6: a database move keeps codes; importing codes could point printed labels at the wrong product). It is in the backlog.
@@ -1263,12 +1306,14 @@ Row by row rather than all-or-nothing: each row is one independent, idempotent m
 | Database | MariaDB 10.2+ / MySQL 5.7+ | MariaDB 10.4.32 |
 
 WooCommerce must be active. The `Requires Plugins: woocommerce` header makes WordPress enforce this at activation.
-If WooCommerce is later deactivated, this plugin does nothing except show an admin notice to users who can manage plugins.
+If WooCommerce is later deactivated, or is older than the minimum, this plugin does nothing except show an admin notice to users who can manage plugins (no menu, no scan route, no product hooks); the scan URLs are then ordinary WordPress addresses. Every requirement branch is tested with given versions (`Requirements::errors_for()`), and WooCommerce 8.9 in a separate process (Phase 11).
+
+**Single sites only** (Phase 11, decision D19): WordPress multisite is refused, both network and per-site activation, with "works on single sites only; WordPress multisite is not supported". The plugin was never tested on multisite, its uninstall cleans only the site it runs on, and roles, capabilities and tables are per site.
 
 ## Installation
 
 1. Copy the plugin to `wp-content/plugins/product-qrcode-barcode-generator/`.
-2. Activate it under **Plugins**. Network activation on multisite is refused; activate it per site.
+2. Activate it under **Plugins**. Multisite is not supported: activation is refused there (Phase 11).
 
 Activation creates or updates the tables, runs pending migrations, creates `pqbg_settings` and syncs roles and capabilities. It is safe to run repeatedly.
 
@@ -1343,6 +1388,8 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 | `pqbg_svg_cache_index` | no | Phase 8 render cache index: `{transient key} => last used`, at most 2,000 entries. Not data; removed on every uninstall. |
 | `_transient_pqbg_svg_{md5}` (+ `_transient_timeout_…`) | no | Phase 8 cached QR/barcode SVGs, 30-day expiry (in the object cache instead when the host has a persistent one). Not data; removed on every uninstall. |
 | `pqbg_bulk_run` | no | Phase 10: the current or last code-generation run (status, statuses, cursor, counts, created item IDs for the print links). Exists only after a run until it is dismissed. Not data; removed on every uninstall. |
+| `pqbg_perf_samples` | no | Phase 11: the last 10 Dashboard compute times in whole milliseconds and the time of the last write (`at`), written at most once per 60 seconds (the [performance signal](#performance-signal)). Exists once the Dashboard was opened. Not data; removed on every uninstall. |
+| `_transient_pqbg_save_failure_{user ID}` | no | Phase 5: a user's one-time "code could not be assigned" notice (an error code), one day. Removed on every uninstall since Phase 11. |
 | `pqbg_bulk_log` | no | Phase 10: the bulk tools' audit log, the last 200 entries (time, user, tool, counts; file name and SHA-256 for imports; never a cost). Removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`. |
 
 User meta `pqbg_print_prefs` (Phase 8) holds each user's last-used print options; it is removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`.
@@ -1426,7 +1473,7 @@ Deactivation is non-destructive. Tables, codes, sales, settings, the role and ca
 
 ## Uninstall
 
-**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only runtime state: the transient install lock, the `pqbg_rewrite_version` flag, the render cache of QR/barcode images (Phase 8; the cache is not data), every user's cost-import preview (`pqbg_cost_import` user meta) and the code-generation run state (`pqbg_bulk_run`) (Phase 10; codes already created stay). Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
+**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only runtime state: the transient install lock, the `pqbg_rewrite_version` flag, the render cache of QR/barcode images (Phase 8; the cache is not data), every user's cost-import preview (`pqbg_cost_import` user meta) and the code-generation run state (`pqbg_bulk_run`) (Phase 10; codes already created stay), the Dashboard timing samples (`pqbg_perf_samples`) and every user's one-time "code could not be assigned" notice (the `pqbg_save_failure_{user ID}` transients) (Phase 11). Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
 
 To permanently delete all plugin data, add this to `wp-config.php` **before** deleting the plugin:
 
@@ -1435,12 +1482,18 @@ define( 'PQBG_UNINSTALL_DELETE_ALL_DATA', true );
 ```
 
 This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings`, `pqbg_db_version` and the bulk tools' audit log (`pqbg_bulk_log`, Phase 10), every user's remembered print options (`pqbg_print_prefs` user meta) and every cost price (`_pqbg_cost_price` post meta, Phase 9A), removes every `pqbg_*` capability (including `pqbg_view_costs`), and deletes the Store Seller role. Affected users keep their accounts.
-**This cannot be undone. Back up the database first.** On multisite, only the site running the uninstall is affected.
+**This cannot be undone. Back up the database first.**
+
+Both branches are executed for real by the Phase 11 suite on a cloned copy of the database tables (a temporary table prefix): exactly the items listed here are removed, and every other option, user meta, post meta, table, role and capability is unchanged.
 
 ## Operational notes
 
 - QR codes point to the scan base URL: `home_url()` unless it is overridden on the settings page. **Do not print labels until the production URL is set.** The admin warning stays visible while the URL is local, and a second warning appears while a public URL uses `http://`. While the URL is local, the print page only prints labels marked "TEST – NOT FOR USE", after an explicit confirmation (see [Label printing](#label-printing)).
 - The site timezone is Asia/Kolkata (set 2026-09-25). The plugin stores UTC (`*_gmt`) and displays times in the site timezone with `wp_date()`.
+  - A sale at 23:59:59 counts on that day and one at 00:00:00 on the next, everywhere (history, reports, end of day, Dashboard, CSV dates).
+  - **If the site timezone is changed later**, every screen, report and CSV shows the same stored sales in the new timezone's days: past days are regrouped, nothing is rewritten. A manual offset (e.g. UTC+5:30) behaves like the matching city.
+  - In a timezone with daylight saving time, the hourly report of the spring day has 23 buckets and the autumn day 24, the repeated hour being one 2-hour bucket; no sale falls outside a bucket (tested with Europe/London).
+- **Amounts:** stored as `decimal(26,8)`; totals are summed by MariaDB and in PHP and rounded to the store's decimals at the end. They are exact to the paisa well beyond any realistic total (tested: 1,000 paise amounts equal MariaDB's DECIMAL sum; 5 × ₹99,99,999.99 × 999 = ₹49,949,999,950.05 exactly). PHP's floating point stays exact to the paisa up to about ₹10 trillion (10^13).
 - WooCommerce "Coming Soon" mode is on for the whole site. The scan page works with it (see [WooCommerce Coming Soon](#woocommerce-coming-soon)). Logged-out staff log in through `wp-login.php`, because Coming Soon hides the My Account login form.
 - Scan URLs need pretty permalinks (see [Permalinks](#permalinks)).
 - Mail is not configured on this local XAMPP, so the low/no-stock e-mails sent after scan sales fail locally (about 2 s each, after the stock lock is released). Configure mail on the production server.

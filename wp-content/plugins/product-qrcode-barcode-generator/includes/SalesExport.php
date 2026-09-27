@@ -224,9 +224,8 @@ final class SalesExport {
 	}
 
 	/**
-	 * Neutralises a cell against spreadsheet formula injection: a cell starting with
-	 * = + - @, a tab or a carriage return gets a leading apostrophe, unless it is a
-	 * plain decimal number.
+	 * Neutralises a cell against spreadsheet formula injection: a cell that formula_risk()
+	 * flags gets a leading apostrophe, unless it is a plain decimal number.
 	 *
 	 * @param string $cell Cell.
 	 */
@@ -235,7 +234,30 @@ final class SalesExport {
 			return $cell;
 		}
 
-		return '' !== $cell && false !== strpos( "=+-@\t\r", $cell[0] ) ? "'" . $cell : $cell;
+		return self::formula_risk( $cell ) ? "'" . $cell : $cell;
+	}
+
+	/**
+	 * Whether a spreadsheet could read a cell as a formula: it starts with a tab, carriage
+	 * return or line feed, or its first character after any spaces (including no-break and
+	 * ideographic spaces) is = + - @ or their full-width forms (Phase 11, finding F1).
+	 * CsvUpload::unwrap() uses the same test to undo neutralise().
+	 *
+	 * @param string $cell Cell.
+	 */
+	public static function formula_risk( string $cell ): bool {
+		if ( '' === $cell ) {
+			return false;
+		}
+
+		if ( false !== strpos( "\t\r\n", $cell[0] ) ) {
+			return true;
+		}
+
+		$unicode = preg_match( '/^[\s\x{00A0}\x{202F}\x{3000}]*[=+\-@\x{FF1D}\x{FF0B}\x{FF0D}\x{FF20}]/u', $cell );
+
+		// Not valid UTF-8: test the bytes for the ASCII triggers only.
+		return false === $unicode ? 1 === preg_match( '/^\s*[=+\-@]/', $cell ) : 1 === $unicode;
 	}
 
 	/**

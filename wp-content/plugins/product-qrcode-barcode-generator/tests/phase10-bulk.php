@@ -157,14 +157,11 @@ add_filter(
 
 // Cooperative stop: when the runner's watchdog creates PQBG_STOP_FILE (free memory below its limit),
 // the suite throws at the next section or loop step, so the cleanup in `finally` still runs.
-$stop_file = (string) getenv( 'PQBG_STOP_FILE' );
-$guard     = static function () use ( $stop_file ): void {
-	if ( '' !== $stop_file && file_exists( $stop_file ) ) {
-		throw new RuntimeException( 'Stopped on request (PQBG_STOP_FILE): the machine is low on free memory.' );
-	}
+// Since Phase 11 the shared bootstrap helper does this for every suite.
+$guard = static function (): void {
+	pqbg_test_stop_point();
 };
-$sec = static function ( string $title ) use ( $guard ): void {
-	$guard();
+$sec   = static function ( string $title ): void {
 	pqbg_section( $title );
 };
 
@@ -1104,7 +1101,10 @@ try {
 	pqbg_t( 'the only new hooks: 6 admin_post handlers and admin_enqueue_scripts in ToolsAdmin::register(), plus the page\'s load- hook (Phase 10B: registered by AdminMenu for Bulk tools); no filters', 7 === preg_match_all( '/add_action\(/', $src( 'includes/ToolsAdmin.php' ) ) && ! preg_match( '/add_filter\(/', $all ) && ! preg_match( '/add_action\(/', implode( "\n", array_map( $src, array_diff( $new, array( 'includes/ToolsAdmin.php' ) ) ) ) ) && str_contains( $src( 'includes/AdminMenu.php' ), "'load'   => array( ToolsAdmin::class, 'load_page' )" ) );
 	pqbg_t( 'ToolsAdmin is registered only for admin requests', (bool) preg_match( '/if \( is_admin\(\) \) \{.*ToolsAdmin::register\(\);.*\}/s', $src( 'includes/Plugin.php' ) ) );
 	$un = $src( 'uninstall.php' );
-	pqbg_t( 'uninstall: previews and the run state always removed; the log only with delete-all', (bool) preg_match( "/delete_metadata\( 'user', 0, 'pqbg_cost_import', '', true \);\s*delete_option\( 'pqbg_bulk_run' \);\s*if \( ! defined/", $un ) && strpos( $un, "delete_option( 'pqbg_bulk_log' )" ) > strpos( $un, 'PQBG_UNINSTALL_DELETE_ALL_DATA' ) );
+	// Phase 11 (false by design): the Phase 11 runtime state (timing samples, save-failure notices) is also
+	// removed on every uninstall, between these lines and the delete-all guard; so positions are compared.
+	$guard_at = strpos( $un, "if ( ! defined( 'PQBG_UNINSTALL_DELETE_ALL_DATA' )" );
+	pqbg_t( 'uninstall: previews and the run state always removed (before the delete-all guard); the log only with delete-all', (bool) preg_match( "/delete_metadata\( 'user', 0, 'pqbg_cost_import', '', true \);\s*delete_option\( 'pqbg_bulk_run' \);/", $un ) && false !== $guard_at && strpos( $un, "delete_option( 'pqbg_bulk_run' )" ) < $guard_at && strpos( $un, "delete_option( 'pqbg_bulk_log' )" ) > $guard_at );
 	pqbg_t( 'direct HTTP to the new files: empty output', ! array_filter( array_merge( $new, array( 'assets/pqbg-tools.css' ) ), static fn( $f ) => str_ends_with( $f, '.php' ) && '' !== $http( 'anon', 'GET', PQBG_PLUGIN_URL . $f )['body'] ) );
 } catch ( Throwable $e ) {
 	pqbg_t( 'suite ran without an exception', false, get_class( $e ) . ': ' . $e->getMessage() . ' @ ' . basename( $e->getFile() ) . ':' . $e->getLine() );

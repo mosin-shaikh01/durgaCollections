@@ -73,6 +73,24 @@ if ( isset( $argv[1] ) && '--worker' === $argv[1] ) {
 		usleep( 2000 );
 	}
 
+	if ( 'sample' === $mode ) {
+		// Phase 11: reads the stock row directly (no cache) every ~2 ms while the sellers run.
+		global $wpdb;
+		$min   = null;
+		$n     = 0;
+		$until = microtime( true ) + (float) $argv[4];
+		while ( microtime( true ) < $until ) {
+			$v = $wpdb->get_var( $wpdb->prepare( "SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_stock'", (int) $argv[3] ) );
+			if ( null !== $v && '' !== $v ) {
+				$min = null === $min ? (float) $v : min( $min, (float) $v );
+				++$n;
+			}
+			usleep( 2000 );
+		}
+		echo wp_json_encode( array( 'min' => $min, 'samples' => $n ) ), "\n";
+		exit( 0 );
+	}
+
 	if ( 'sell' === $mode ) {
 		$r = ProductQrBarcode\SaleService::sell(
 			array(
@@ -251,6 +269,11 @@ $sale_id_of = static function ( array $r ): int {
 
 $expected_headers = ScanRoute::security_headers();
 $headers_ok       = static function ( array $r ) use ( $expected_headers ): bool {
+	// Phase 11 (false by design, D7): a sale page with an Undo form has one style element with this
+	// response's nonce (the seconds left), and its CSP allows exactly that nonce; every other header is the same.
+	if ( preg_match( '/<style nonce="([A-Za-z0-9_-]+)">/', (string) ( $r['body'] ?? '' ), $m ) ) {
+		$expected_headers['Content-Security-Policy'] = ScanRoute::csp( $m[1] );
+	}
 	foreach ( $expected_headers as $name => $value ) {
 		if ( ( $r['headers'][ strtolower( $name ) ] ?? null ) !== $value ) {
 			return false;
@@ -878,14 +901,21 @@ try {
 
 	pqbg_section( 'concurrency: N workers selling the last K items' );
 	$pk  = $make_simple( $A, array( 'stock_quantity' => 3 ) );
-	$res = $run_workers( array_map( static fn( $i ) => array( 'sell', $code_of( $pk ), 1, wp_generate_uuid4(), 0 === $i % 2 ? $SE : $S2 ), range( 0, 7 ) ) );
+	// Phase 11: a ninth worker samples the stock row every ~2 ms while the 8 sellers run.
+	$res = $run_workers( array_merge( array_map( static fn( $i ) => array( 'sell', $code_of( $pk ), 1, wp_generate_uuid4(), 0 === $i % 2 ? $SE : $S2 ), range( 0, 7 ) ), array( array( 'sample', $pk, 4 ) ) ) );
+	$smp = array_pop( $res );
 	$ok  = array_filter( $res, static fn( $x ) => 'completed' === ( $x['status'] ?? '' ) );
 	pqbg_t( '8 workers, 3 in stock → exactly 3 completed sales, 5 × out of stock', 3 === count( $ok ) && 5 === count( array_filter( $res, static fn( $x ) => in_array( $x['error'] ?? '', array( 'pqbg_out_of_stock', 'pqbg_insufficient_stock' ), true ) ) ), wp_json_encode( $res ) );
+	pqbg_t( 'concurrency (Phase 11): minimum stock observed while the 8 workers sold is never negative', isset( $smp['min'] ) && $smp['min'] >= 0 && (int) $smp['samples'] > 50, 'minimum observed ' . wp_json_encode( $smp['min'] ?? null ) . ' in ' . ( $smp['samples'] ?? 0 ) . ' samples' );
 	$kr = $rows_for( $pk );
 	pqbg_t( '...stock ends at 0, never negative; 3 rows with stock_after 2, 1, 0', 0 === $stock( $pk ) && 3 === count( $kr ) && array( 2, 1, 0 ) === array_map( static fn( $x ) => (int) $x['stock_after'], $kr ) && array( 3, 2, 1 ) === array_map( static fn( $x ) => (int) $x['stock_before'], $kr ) );
 	list( $kp, $kv ) = $make_variable( $A, 2, 3 );
-	$res = $run_workers( array_map( static fn( $i ) => array( 'sell', $code_of( $kv[ $i % 2 ] ), 1, wp_generate_uuid4(), $SE ), range( 0, 7 ) ) );
+	$res = $run_workers( array_merge( array_map( static fn( $i ) => array( 'sell', $code_of( $kv[ $i % 2 ] ), 1, wp_generate_uuid4(), $SE ), range( 0, 7 ) ), array( array( 'sample', $kp, 4 ) ) ) );
+	$smp = array_pop( $res );
 	pqbg_t( 'parent-level stock: 8 workers across two sibling variations, 3 in the parent → exactly 3 sales, parent 0', 3 === count( array_filter( $res, static fn( $x ) => 'completed' === ( $x['status'] ?? '' ) ) ) && 0 === $stock( $kp ) && 3 === count( $rows_for( $kp ) ), wp_json_encode( $res ) );
+	pqbg_t( 'parent-level stock (Phase 11): minimum parent stock observed while the 8 workers sold is never negative', isset( $smp['min'] ) && $smp['min'] >= 0 && (int) $smp['samples'] > 50, 'minimum observed ' . wp_json_encode( $smp['min'] ?? null ) . ' in ' . ( $smp['samples'] ?? 0 ) . ' samples' );
+	$kpr = $rows_for( $kp );
+	pqbg_t( 'parent-level stock (Phase 11): 3 rows in order with stock_before 3, 2, 1 and stock_after 2, 1, 0, each on the parent (stock_holder_id = product_id = parent) and one of the two variations', 3 === count( $kpr ) && array( 3, 2, 1 ) === array_map( static fn( $x ) => (int) $x['stock_before'], $kpr ) && array( 2, 1, 0 ) === array_map( static fn( $x ) => (int) $x['stock_after'], $kpr ) && array() === array_filter( $kpr, static fn( $x ) => $kp !== (int) $x['stock_holder_id'] || $kp !== (int) $x['product_id'] || ! in_array( (int) $x['variation_id'], $kv, true ) ), wp_json_encode( array_map( static fn( $x ) => array( (int) $x['stock_before'], (int) $x['stock_after'], (int) $x['variation_id'] ), $kpr ) ) );
 	pqbg_t( 'no pending rows and every lock free after the workers', 0 === (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $S WHERE id > %d AND status = 'pending'", $start_s ) ) && StockLock::is_free( $pk ) && StockLock::is_free( $kp ) );
 
 	pqbg_section( 'the online-checkout race (a real WooCommerce order from another process)' );
@@ -1093,7 +1123,9 @@ try {
 	pqbg_t( 'no transactions in the sale code (no START TRANSACTION, COMMIT or ROLLBACK)', ! preg_match( '/START TRANSACTION|COMMIT|ROLLBACK|wc_transaction_query/i', $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleService.php', PQBG_PLUGIN_DIR . 'includes/SaleRepository.php', PQBG_PLUGIN_DIR . 'includes/SaleRequest.php', PQBG_PLUGIN_DIR . 'includes/StockLock.php' ) ) ) );
 	pqbg_t( 'no WooCommerce order creation, REST routes, AJAX or nopriv handlers anywhere', ! preg_match( '/wc_create_order|new WC_Order|register_rest_route|wp_ajax_|admin_post_nopriv/', $all_src ) );
 	pqbg_t( 'stock is changed only through wc_update_product_stock, only in SaleService (update_post_meta also allowed in CostPrice since Phase 9A: its own cost key only)', 1 === count( array_filter( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), static fn( $f ) => str_contains( $src_of( array( $f ) ), 'wc_update_product_stock' ) ) ) && str_contains( $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleService.php' ) ), 'wc_update_product_stock' ) && ! preg_match( '/set_stock_quantity/', $all_src ) && ! preg_match( '/update_post_meta/', $src_of( array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array( PQBG_PLUGIN_DIR . 'includes/CostPrice.php' ) ) ) ) && ! preg_match( '/update_post_meta\(\s*\$[a-z_]+,\s*+(?!self::META_KEY)/', $src_of( array( PQBG_PLUGIN_DIR . 'includes/CostPrice.php' ) ) ) );
-	pqbg_t( 'sales rows are written only by SaleRepository (no DELETE of sales anywhere; Install only migrates the table; since Phase 9A SalesQuery and since Phase 9B ReportsQuery read it and never write)',! preg_match( '/DELETE\s+FROM\s+\{?\$table/i', $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleRepository.php' ) ) ) && ! str_contains( $src_of( array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array( PQBG_PLUGIN_DIR . 'includes/SaleRepository.php', PQBG_PLUGIN_DIR . 'includes/Schema.php', PQBG_PLUGIN_DIR . 'includes/Install.php', PQBG_PLUGIN_DIR . 'includes/SalesQuery.php', PQBG_PLUGIN_DIR . 'includes/ReportsQuery.php' ) ) ), 'sales_table()' ) && ! preg_match( '/\$wpdb->(insert|update|query|delete|replace)\b/', $src_of( array( PQBG_PLUGIN_DIR . 'includes/SalesQuery.php', PQBG_PLUGIN_DIR . 'includes/ReportsQuery.php' ) ) ) );
+	// Phase 11 (false by design): HealthCheck and PerfSignal also read the sales table (SELECT only) and are checked never to write.
+	$readers = array( PQBG_PLUGIN_DIR . 'includes/SalesQuery.php', PQBG_PLUGIN_DIR . 'includes/ReportsQuery.php', PQBG_PLUGIN_DIR . 'includes/HealthCheck.php', PQBG_PLUGIN_DIR . 'includes/PerfSignal.php' );
+	pqbg_t( 'sales rows are written only by SaleRepository (no DELETE of sales anywhere; Install only migrates the table; since Phase 9A SalesQuery, since Phase 9B ReportsQuery and since Phase 11 HealthCheck and PerfSignal read it and never write)',! preg_match( '/DELETE\s+FROM\s+\{?\$table/i', $src_of( array( PQBG_PLUGIN_DIR . 'includes/SaleRepository.php' ) ) ) && ! str_contains( $src_of( array_diff( glob( PQBG_PLUGIN_DIR . 'includes/*.php' ), array_merge( array( PQBG_PLUGIN_DIR . 'includes/SaleRepository.php', PQBG_PLUGIN_DIR . 'includes/Schema.php', PQBG_PLUGIN_DIR . 'includes/Install.php' ), $readers ) ) ), 'sales_table()' ) && ! preg_match( '/\$wpdb->(insert|update|query|delete|replace)\b/', $src_of( $readers ) ) );
 	pqbg_t( 'the template still has no JavaScript', ! str_contains( (string) file_get_contents( PQBG_PLUGIN_DIR . 'templates/pqbg-scan.php' ), '<script' ) );
 	pqbg_t( 'direct HTTP to the new PHP files: empty output', array() === array_filter( array( 'includes/SaleService.php', 'includes/SaleRepository.php', 'includes/SaleRequest.php', 'includes/StockLock.php' ), static fn( $f ) => '' !== $http( 'anon', 'GET', PQBG_PLUGIN_URL . $f )['body'] ) );
 

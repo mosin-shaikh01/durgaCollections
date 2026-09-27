@@ -2,7 +2,7 @@
 /**
  * QR & Barcodes → Dashboard (Phase 10B): today at a glance and shortcuts.
  *
- *   admin.php?page=pqbg-dashboard   GET, read-only, pqbg_view_all_sales
+ *   admin.php?page=pqbg-dashboard   GET, pqbg_view_all_sales; read-only except the timing sample (Phase 11)
  *
  * An overview, not an analysis screen (that is In-store reports): what needs attention,
  * today's in-store sales, products and codes, recent bulk runs, the scan setup and quick
@@ -12,7 +12,10 @@
  *     function and period as In-store reports → Summary → Today;
  *   - recent bulk runs: BulkLog::visible() (cost-import entries only for pqbg_view_costs);
  *   - the run in progress: BulkGenerator::state();
- *   - setup: ScanUrl, Settings, ScanRoute, PaymentMethods.
+ *   - setup: ScanUrl, Settings, ScanRoute, PaymentMethods;
+ *   - Phase 11, administrators (pqbg_manage_settings) only: the health check's error and
+ *     warning count (HealthCheck) and the performance signal (PerfSignal). Every render
+ *     records how long its figures took (PerfSignal::record(), the only write on this page).
  * Profit, margin and anything about cost only for pqbg_view_costs; products, codes, stock
  * and bulk runs only for pqbg_manage_codes; the Settings links only for pqbg_manage_settings.
  *
@@ -124,6 +127,32 @@ final class DashboardAdmin {
 	}
 
 	/**
+	 * What needs attention for administrators only (Phase 11): the health check's errors and
+	 * warnings (HealthCheck::run() without the information checks) and the performance signal.
+	 *
+	 * @param int[]    $samples Dashboard compute times, newest last (PerfSignal).
+	 * @param int|null $now     Unix time (tests).
+	 * @return array<int, array{0: string, 1: string, 2: string}>
+	 */
+	public static function admin_attention( array $samples, ?int $now = null ): array {
+		$items    = array();
+		$problems = HealthCheck::problems( HealthCheck::run( false, $now ) );
+
+		if ( $problems > 0 ) {
+			/* translators: %s: number of problems. */
+			$items[] = array( sprintf( _n( 'The health check found %s problem in the plugin\'s data.', 'The health check found %s problems in the plugin\'s data.', $problems, 'product-qrcode-barcode-generator' ), number_format_i18n( $problems ) ), AdminUrl::health(), __( 'Open Health check', 'product-qrcode-barcode-generator' ) );
+		}
+
+		$message = PerfSignal::message( PerfSignal::evaluate( $samples, PerfSignal::sales_per_day( $now ) ) );
+
+		if ( '' !== $message ) {
+			$items[] = array( $message, '', '' );
+		}
+
+		return $items;
+	}
+
+	/**
 	 * Renders the page.
 	 */
 	public static function render(): void {
@@ -134,7 +163,9 @@ final class DashboardAdmin {
 		$costs    = Permissions::can_view_costs();
 		$codes    = Permissions::can_manage_codes();
 		$settings = Permissions::can_manage_settings();
+		$start    = microtime( true );
 		$data     = self::data( $costs );
+		$samples  = PerfSignal::record( ( microtime( true ) - $start ) * 1000 );
 
 		echo '<div class="wrap pqbg-reports pqbg-dashboard">';
 		AdminMenu::render_nav( AdminUrl::DASHBOARD );
@@ -142,7 +173,7 @@ final class DashboardAdmin {
 		/* translators: %s: link to In-store reports. */
 		echo '<p class="pqbg-dashboard__intro">' . wp_kses( sprintf( __( 'Today at a glance. For trends and analysis, open %s.', 'product-qrcode-barcode-generator' ), '<a href="' . esc_url( AdminUrl::reports() ) . '">' . esc_html__( 'In-store reports', 'product-qrcode-barcode-generator' ) . '</a>' ), array( 'a' => array( 'href' => true ) ) ) . '</p>';
 
-		self::render_attention( self::attention( $codes, $settings ) );
+		self::render_attention( array_merge( self::attention( $codes, $settings ), $settings ? self::admin_attention( $samples ) : array() ) );
 		self::render_today( $data, $costs );
 
 		echo '<div class="pqbg-dashboard__grid">';

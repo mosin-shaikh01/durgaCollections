@@ -13,7 +13,8 @@ namespace ProductQrBarcode;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Checks WordPress, PHP and WooCommerce versions against the supported minimums.
+ * Checks WordPress, PHP and WooCommerce versions against the supported minimums, and
+ * refuses multisite (Phase 11).
  */
 class Requirements {
 
@@ -29,23 +30,43 @@ class Requirements {
 	public static function errors() {
 		global $wp_version;
 
+		return self::errors_for( PHP_VERSION, (string) $wp_version, self::woocommerce_version(), is_multisite() );
+	}
+
+	/**
+	 * The reasons for given versions (Phase 11: every branch is tested with given values).
+	 * An empty WooCommerce version means WooCommerce is not active. Multisite is not
+	 * supported (Phase 11, decision D19): the plugin was never tested there, its uninstall
+	 * only cleans the site it runs on, and roles, capabilities and tables are per site.
+	 *
+	 * @param string $php       PHP version.
+	 * @param string $wp        WordPress version.
+	 * @param string $wc        WooCommerce version, or ''.
+	 * @param bool   $multisite Whether this is a multisite network.
+	 * @return string[]
+	 */
+	public static function errors_for( $php, $wp, $wc, $multisite ) {
 		$errors = array();
 
-		if ( version_compare( PHP_VERSION, self::MIN_PHP, '<' ) ) {
+		if ( version_compare( $php, self::MIN_PHP, '<' ) ) {
 			/* translators: 1: required PHP version, 2: current PHP version. */
-			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires PHP %1$s or newer. This site runs PHP %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_PHP, PHP_VERSION );
+			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires PHP %1$s or newer. This site runs PHP %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_PHP, $php );
 		}
 
-		if ( version_compare( $wp_version, self::MIN_WP, '<' ) ) {
+		if ( version_compare( $wp, self::MIN_WP, '<' ) ) {
 			/* translators: 1: required WordPress version, 2: current WordPress version. */
-			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires WordPress %1$s or newer. This site runs WordPress %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_WP, $wp_version );
+			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires WordPress %1$s or newer. This site runs WordPress %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_WP, $wp );
 		}
 
-		if ( ! self::woocommerce_version() ) {
+		if ( '' === $wc ) {
 			$errors[] = __( 'Product QR Code and Barcode Generator requires WooCommerce to be installed and active.', 'product-qrcode-barcode-generator' );
-		} elseif ( version_compare( self::woocommerce_version(), self::MIN_WC, '<' ) ) {
+		} elseif ( version_compare( $wc, self::MIN_WC, '<' ) ) {
 			/* translators: 1: required WooCommerce version, 2: current WooCommerce version. */
-			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires WooCommerce %1$s or newer. This site runs WooCommerce %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_WC, self::woocommerce_version() );
+			$errors[] = sprintf( __( 'Product QR Code and Barcode Generator requires WooCommerce %1$s or newer. This site runs WooCommerce %2$s.', 'product-qrcode-barcode-generator' ), self::MIN_WC, $wc );
+		}
+
+		if ( $multisite ) {
+			$errors[] = __( 'Product QR Code and Barcode Generator works on single sites only; WordPress multisite is not supported.', 'product-qrcode-barcode-generator' );
 		}
 
 		return $errors;

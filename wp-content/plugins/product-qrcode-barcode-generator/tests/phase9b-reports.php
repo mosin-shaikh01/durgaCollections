@@ -809,10 +809,14 @@ try {
 		$cats[] = (int) wp_insert_term( 'PQBG9B Perf ' . $i, 'product_cat', 0 === $i ? array() : array( 'parent' => $cats[0] ) )['term_id'];
 	}
 	for ( $i = 0; $i < 300; $i++ ) {
+		if ( 0 === $i % 25 ) {
+			pqbg_test_stop_point();
+		}
 		$pid     = $make_simple( $A, array( 'manage_stock' => true, 'stock_quantity' => $i % 7, 'regular_price' => (string) ( 300 + $i ) ), array( $cats[ $i % 10 ] ) );
 		$items[] = array( $pid, 0 );
 	}
 	for ( $i = 0; $i < 70; $i++ ) {
+		pqbg_test_stop_point();
 		list( $pp, $vv ) = $make_variable( $A, array(), array_fill( 0, 10, array( 'manage_stock' => true, 'stock_quantity' => 3, 'regular_price' => '499' ) ), array( $cats[ $i % 10 ] ) );
 		foreach ( $vv as $v ) {
 			$items[] = array( $pp, $v );
@@ -840,6 +844,7 @@ try {
 			$c      = mt_rand( 1, 10 ) <= 7 ? number_format( $p * 0.6, 2, '.', '' ) : '';
 			$vals[] = $wpdb->prepare( '(%s, %d, %d, %d, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', wp_generate_uuid4(), $it[0], $it[1], $sellers[ mt_rand( 0, 9 ) ], $q, $p, $p * $q, 'INR', 'Perf item ' . $it[0], $status, gmdate( 'Y-m-d H:i:s', $now_ts - mt_rand( 0, 89 * 86400 ) ), (string) $methods[ mt_rand( 0, 99 ) ], $c, 'Perf Seller', $PERF_NOTE );
 			if ( 1000 === count( $vals ) || $i === $n - 1 ) {
+				pqbg_test_stop_point(); // Phase 11: a safe point between batches (the cleanup deletes by note).
 				$wpdb->query( "INSERT INTO $S (request_id, product_id, variation_id, seller_id, quantity, unit_price, line_total, currency, product_name, status, created_at_gmt, payment_method, unit_cost, seller_name, note) VALUES " . implode( ',', $vals ) );
 				$vals = array();
 			}

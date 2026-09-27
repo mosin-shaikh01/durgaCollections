@@ -10,7 +10,7 @@
  *   admin.php?page=pqbg-sales         In-store sales (slug kept from Phase 9A)
  *   admin.php?page=pqbg-reports       In-store reports (slug kept from Phase 9B)
  *   admin.php?page=pqbg-bulk-tools    Bulk tools (&tab=tools|costs)
- *   admin.php?page=pqbg-settings      Settings (slug kept; the old &tab= forms redirect, see AdminMenu)
+ *   admin.php?page=pqbg-settings      Settings (slug kept; the old &tab= forms redirect, see AdminMenu); &tab=health: Health check (Phase 11)
  *   edit.php?post_type=product&page=pqbg-print       hidden print setup (Phase 8)
  *   edit.php?post_type=product&page=pqbg-regenerate  hidden Regenerate confirmation (Phase 5)
  *
@@ -111,6 +111,13 @@ final class AdminUrl {
 	 */
 	public static function settings( array $args = array() ): string {
 		return self::page( self::SETTINGS, $args );
+	}
+
+	/**
+	 * Settings → Health check (Phase 11).
+	 */
+	public static function health(): string {
+		return self::settings( array( 'tab' => HealthCheckAdmin::TAB ) );
 	}
 
 	/**

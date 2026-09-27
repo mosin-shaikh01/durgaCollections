@@ -40,6 +40,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 9A was committed as a single commit as `5495b05` ("Phase 9A: sales history, payment method, admin-only cost price, seller My sales (schema v3)") and pushed to `origin/main`, with the user's approval on the automated tests, before their manual test (normal fast-forward, no force).
 - Phase 9B was committed as two commits, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist), and pushed to `origin/main` (normal fast-forward, no force): first the Phase 7 race fix as `072f4d6` ("Fix Phase 7 idempotency race: duplicate request mid-sale reported failed"), then Phase 9B as `716600d` ("Phase 9B: in-store reports and owner dashboard (end of day, profit, stock, dead stock; schema v4)"). Recorded at the start of Phase 10 (2026-09-26).
 - Phase 10 was committed as `5b746a7` ("Phase 10: bulk code generation, codes CSV export, admin-only cost-price import") and pushed to `origin/main`, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist; normal fast-forward, no force). Recorded at the start of Phase 10B (2026-09-27); this record is committed together with Phase 10B.
+- Phase 10B was committed as `0145aff` ("Phase 10B: own QR & Barcodes menu, plugin Dashboard, shared navigation") and pushed to `origin/main`, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist; normal fast-forward, no force). Recorded at the start of Phase 11 (2026-09-27), after checking that `HEAD` = `origin/main` = `0145aff` and the working tree was clean; this record is committed together with Phase 11.
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -53,6 +54,7 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `0145aff` | Phase 10B: own QR & Barcodes menu, plugin Dashboard, shared navigation |
 | `5b746a7` | Phase 10: bulk code generation, codes CSV export, admin-only cost-price import |
 | `716600d` | Phase 9B: in-store reports and owner dashboard (end of day, profit, stock, dead stock; schema v4) |
 | `072f4d6` | Fix Phase 7 idempotency race: duplicate request mid-sale reported failed |
@@ -108,10 +110,10 @@ every other plugin stays ignored. For a future custom theme the pattern is:
 - [ ] **Optional, later (owner's decision A, 2026-09-27: plugin first):** decide on the theme approach (customize twentytwentyfive, a child theme, or a custom theme). All plugin phases are completed before any theme work; the theme phases are at the end of the roadmap.
 - [ ] The manual checks that must pass before launch are in the **Pre-launch acceptance checklist** below (Phase 8 printer test with its interim no-printer check, Phase 9A, 9B, 10 and 10B manual checks, the 50,000-sale stress checks).
 - [ ] The user's label stock → possibly a new default print preset (A4 3 × 7 until then).
-- [ ] **Phase 11 (hardening):** the reconciliation check and the concurrency-test items from Phase 7.
+- [x] **Phase 11 (hardening):** the reconciliation check and the concurrency-test items from Phase 7. **Done in Phase 11:** the read-only Health check (Settings → Health check; a count on the Dashboard for administrators) and the minimum-stock / parent-level snapshot checks in the Phase 7 suite. See the Phase 11 section.
 - [x] **Phase 10B = MENU RESTRUCTURE** (added 2026-09-27 in Phase 10; owner's decision Option 1): the plugin's own top-level "QR & Barcodes" menu with Dashboard, In-store sales, In-store reports, Bulk tools, Settings; nothing under WooCommerce; old addresses redirect. **Implemented 2026-09-27; see the Phase 10B section.**
 - [ ] **Phase 12 (theme compatibility, owner's decision B, 2026-09-27):** plan it after Phase 11. The plugin must work with any WooCommerce theme: every front-end / staff-facing screen it outputs (the scan page, My sales, the login round trip, anything on product pages or My Account) works and looks usable with classic themes (e.g. Storefront) and block themes (e.g. Twenty Twenty-Five), with block and classic cart/checkout present; no theme-specific code; only WordPress/WooCommerce APIs and the plugin's own scoped CSS.
-- [ ] **Phase 11 (performance):** If the dashboard exceeds 2 s on real data, or in-store sales exceed ~300/day, implement a daily roll-up table (option B) or a permission-keyed result cache (option C). Do not change the sale path for this before then. (Phase 9B measured the dashboard at about 1.4–1.55 s for 90 days with 50,000 sales in 90 days; every report meets the 1 s / 2 s targets at 5,000 sales in 90 days. See the Phase 9B section.)
+- [ ] **Performance (was the Phase 11 open item; still open by design):** If the dashboard exceeds 2 s on real data, or in-store sales exceed ~300/day, implement a daily roll-up table (option B) or a permission-keyed result cache (option C). Do not change the sale path for this before then. **Since Phase 11 the Dashboard tells administrators when this condition repeats** (3 of the last 10 Dashboard loads over 2 s, or more than 300 completed in-store sales a day over 30 days; `PerfSignal`); build nothing before it does. (Phase 9B measured the dashboard at about 1.4–1.55 s for 90 days with 50,000 sales in 90 days; every report meets the 1 s / 2 s targets at 5,000 sales in 90 days. See the Phase 9B section.)
 
 ### Pre-launch acceptance checklist
 
@@ -125,7 +127,8 @@ All pending. Each item must pass before production launch; the detailed steps ar
 - [ ] **Phase 9B manual checks:** the Summary figures (the reports' "Dashboard" tab until Phase 10B) look right (against In-store sales for the same day), the end-of-day "Cash expected in drawer" and its print page, a report CSV opened in Excel, and a shop manager sees no profit, margin or cost anywhere in the reports. Steps: the "Phase 9B checklist" in the plugin README.
 
 - [ ] **Phase 10B manual checks:** click through QR & Barcodes as an administrator and as a shop manager, on a desktop and on a phone: the menu below Products with Dashboard, In-store sales, In-store reports, Bulk tools, Settings (no Settings for the shop manager) and nothing under WooCommerce; the tab row and highlighting on every page; the Dashboard figures against In-store reports → Summary → Today; an old bookmark `admin.php?page=pqbg-settings&tab=tools` lands on Bulk tools; on the phone the menu folds, tabs wrap and the Dashboard is one column. Steps: the "Phase 10B checklist" in the plugin README.
-- [ ] **50,000-sale stress checks (owner's decision C, 2026-09-27):** run in Phase 11 (hardening) and once more before launch: `PQBG_STRESS=1` with the Phase 9B and 10B suites (the reports and the Dashboard under 2 s at 50,000 sales in 90 days). Default runs use the 5,000-sale checks.
+- [ ] **50,000-sale stress checks (owner's decision C, 2026-09-27):** run in Phase 11 (hardening; done, see the Phase 11 section) and **once more before launch**: `PQBG_STRESS=1` with the Phase 9B, 10B and 11 suites (the reports and the Dashboard under 2 s, the Health check under 1 s at 50,000 sales). Default runs use the 5,000-sale checks.
+- [ ] **Phase 11 manual checks:** open Settings → Health check on the real data after a backup (no errors, or each finding understood; a shop manager gets 403); on the phone, leave a sale page open and watch the Undo button disappear by itself about 10 minutes after the sale, then void the test sale. Steps: the "Phase 11 checklist" in the plugin README.
 
 ### Backlog
 _To be filled in — site structure, pages, content, plugins._
@@ -151,10 +154,10 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **9A** | **Sales history, payment method & cost price** | **Done 2026-09-26. Approved on the automated tests; committed `5495b05`, pushed. Manual check pending (pre-launch acceptance checklist).** |
 | **9B** | **Reports & owner dashboard** | **Done 2026-09-26. Approved on the automated tests; committed as `072f4d6` (Phase 7 race fix) and `716600d` (Phase 9B), pushed. Manual checks pending (pre-launch acceptance checklist).** |
 | **10** | **Bulk / CSV tools** | **Done 2026-09-27. Approved on the automated tests; committed `5b746a7`, pushed. Manual checks pending (pre-launch acceptance checklist).** |
-| **10B** | **Menu restructure (own "QR & Barcodes" menu) and plugin Dashboard** | **Implemented and tested 2026-09-27; waiting for the user's review. Not committed.** Manual checks in the pre-launch acceptance checklist. |
-| 11 | Hardening and performance (incl. the 50,000-sale stress checks) | Not started |
+| **10B** | **Menu restructure (own "QR & Barcodes" menu) and plugin Dashboard** | **Done 2026-09-27. Approved on the automated tests; committed `0145aff`, pushed. Manual checks pending (pre-launch acceptance checklist).** |
+| **11** | **Hardening and performance (incl. the 50,000-sale stress checks)** | **Implemented and tested 2026-09-27; waiting for the user's review. Not committed.** Manual checks in the pre-launch acceptance checklist. |
 | 12 | Theme compatibility (owner's decision B: any WooCommerce theme, classic and block, block and classic cart/checkout; no theme-specific code) | Not started; plan after Phase 11 |
-| 13 | Plugin QA, documentation and packaging | Not started |
+| 13 | Plugin QA, documentation and packaging | Not started. Note from Phase 11 (owner's decision): **Revisit coding-standards cleanup if the plugin is ever published on WordPress.org.** (PHPCS findings recorded in the Phase 11 section; only the 3 missing translator comments were fixed.) |
 | later | Theme work (optional, later; owner's decision A: plugin first) | Not started |
 
 > **Pre-rename records.**
@@ -1661,7 +1664,7 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 
 ### Phase 10B: Menu restructure and plugin Dashboard (2026-09-27)
 
-**Status:** implemented and tested; **NOT committed, waiting for the user's review** (the commit will also carry the record of `5b746a7`). No schema, capability, option or stored-data change (`DB_VERSION` 4); the sale path is untouched.
+**Status:** done; approved on the automated tests, committed as `0145aff` (together with the record of `5b746a7`) and pushed to `origin/main`. _Originally written before approval as:_ implemented and tested; NOT committed, waiting for the user's review. No schema, capability, option or stored-data change (`DB_VERSION` 4); the sale path is untouched.
 
 **Start state:** `HEAD` = `origin/main` = `5b746a7`, clean. Roadmap: the MENU RESTRUCTURE open item became Phase 10B (owner's decision: Option 1, the plugin's own top-level menu).
 
@@ -1720,6 +1723,68 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 **Manual checks:** not asked for in this phase; added to the Pre-launch acceptance checklist ("Phase 10B manual checks") with the steps in the plugin README ("Phase 10B checklist").
 
 **Final report:** `C:\xampp\backups\sharayu\phase10b-report.txt`.
+### Phase 11: Hardening (2026-09-27)
+
+**Status:** implemented and tested; **NOT committed, waiting for the user's review.** No schema change (`DB_VERSION` 4), no new capability, the sale path unchanged (`SaleService`, `SaleRepository`, `SaleRequest`, `StockLock` and `Schema` byte-identical to `0145aff`; a scope check in the new suite). One new non-autoloaded runtime option, `pqbg_perf_samples` (the owner's change 2).
+
+**Start state:** `HEAD` = `origin/main` = `0145aff`, clean. Housekeeping: `0145aff` recorded here. Plan (D1–D22): `C:\xampp\backups\sharayu\phase11-plan.txt`.
+
+**Backups** (`C:\xampp\backups\sharayu\`, outside the web root, never committed): `sharayu-20260927-165517-before-phase11.sql` (961,712 bytes, before the baseline), `sharayu-20260927-184304-before-phase11-tests.sql` (967,061 bytes, before the first test run), `sharayu-20260927-192134-before-phase11-final.sql` (967,071 bytes, before the final runs), `sharayu-20260927-232450-before-phase11-stress-cleanup.sql` (2,154,471 bytes, before the approved cleanup below). All 53 tables, "Dump completed".
+
+**Baseline:** 1,826 passed, 0 failed, 0 skipped (suite by suite; the watchdog tripped in phase 8 at 430 MB, which still passed; the user closed the browsers for 9A–10B). Crash count 139 throughout.
+
+**Approved plan:** D1–D22 as recommended, with six changes by the owner: (1) D7: no reload; hide the Undo button with a CSS animation whose delay is set server-side (no JavaScript); (2) D9: warn only on a repeated condition (3 of the last 10 renders over 2 s, or more than 300 sales a day over 30 days), storing the minimum; (3) D13: the temporary must-use logger lives only for the test runs, logs outside the web root, removed afterwards; (4) every suite honours the stop file, before the stress run, which needs 2.5 GB free; (5) nothing may change the sale path, the schema or stored data, or add features, without asking; (6) PHPCS: fix only the 3 translator comments; the Phase 13 note. **Asked during implementation:** a late Undo is refused with 409 (not 403); the owner kept 409.
+
+**Implemented:**
+- **Health check** (D1–D5): `HealthCheck` (9 read-only checks: schema; negative stock on coded items and their stock holders; completed sales without `stock_after`; pending sales older than 15 minutes; codes on missing/unsuitable items; the one-active-code invariant; invalid cost meta via the new read-only `CostPrice::invalid_values()`; information: codes on trashed items, sales of deleted items) and `HealthCheckAdmin` (Settings → Health check, `&tab=health`, second-row tabs Settings | Health check; `SettingsPage::tab()`; `AdminUrl::health()`). Report only. Dashboard: administrators get "The health check found N problems" (errors and warnings; `DashboardAdmin::admin_attention()`). Speed: product types read in one grouped query; the tables checked with two `SELECT 1 … LIMIT 0` (not `SHOW TABLES`); the completed-sales check ignores `status_created` (a sequential scan, about 4× faster at 50,000 rows than an index lookup per completed row).
+- **Undo expiry** (D7, owner's version): the sale page with an Undo form carries one `<style nonce>` with `animation-delay:{seconds left}s`; `pqbg-scan.css` has the zero-length animation (`animation-fill-mode: forwards`, fallback delay 600 s) that hides the form and shows "Undo is no longer available. Ask a manager to void the sale if needed."; `ScanRoute::csp()` adds `'nonce-…'` to `style-src` for that response only (`ScanScreen::style_nonce()`, 18 random bytes). No JavaScript, no reload; a late Undo is still refused (409).
+- **BulkLog lock** (D8): `BulkLog::add()` re-reads and writes under `GET_LOCK` (`BulkLog::lock_name()`, 5 s; without it, writes anyway and logs a WooCommerce warning).
+- **Performance signal** (D9, owner's version): `PerfSignal` (the last 10 Dashboard compute times in `pqbg_perf_samples`, written at most once per 60 s after the review; `evaluate()`, `message()`, `sales_per_day()`), shown to administrators on the Dashboard.
+- **Security fixes** (D11): F1 `SalesExport::formula_risk()` (also after spaces, LF, full-width `＝＋－＠`), used by `neutralise()` and by `CsvUpload::unwrap()` (round trip); F2 uninstall removes the `pqbg_save_failure_*` transients (and `pqbg_perf_samples`). F4 needed no change: the invalid-code page already shows at most 100 characters (I had missed that in the plan). No High or Medium finding.
+- **Requirements and multisite** (D18, D19): `Requirements::errors_for( $php, $wp, $wc, $multisite )`; multisite refused (network and per-site); `Install::activate()` lost its network-only branch.
+- **PHPCS** (D12, owner's change 6): the 3 translator comments in `CostPrice` only; the `SettingsPage::tab()` annotation fixed.
+- **Tests:** `tests/phase11-hardening.php` (130 checks); `tests/bootstrap.php` (`pqbg_test_stop_point()`, `PqbgTestStop`, STOPPED handling); `tests/run.php` (STOPPED, the error-capture summary, the new suite); every suite honours the stop file (phase2-main wrapped in `try`/`finally`; stop points in the long loops); Phase 2 lifecycle +5 (D16); Phase 7 +3 (D6: minimum stock observed 0 in 220–244 samples in every run; parent-level snapshots).
+
+**False by design** (listed with reasons in `tests/README.md`): Phase 3 (the options list allows `pqbg_perf_samples`); Phase 7 (the sale page's CSP allows its own style nonce; the sales-table scope check also allows the read-only `HealthCheck` and `PerfSignal`); Phase 10 (the uninstall source check compares positions: the Phase 11 runtime state is removed before the delete-all guard too); Phase 10B (GET-never-writes leaves out `pqbg_perf_samples`, plus a check that the timing sample is the only write). Phase 5's "no raw writes" rule was **not** loosened: `HealthCheck` was changed to read with `get_var()` instead.
+
+**Final tests** (`PQBG_TESTS_ALLOW_PRODUCTION=1`, tools from `C:\xampp\tools\pqbg\`, the 500 MB watchdog, the error capture), 2026-09-27, one suite at a time, free memory 3.0–3.4 GB:
+
+| Suite | Result | Crashes |
+|---|---|---|
+| phase11-hardening | 129/129 (final code: 129/129 again, twice; 130/130 after the review's 60-s throttle, with phase10b 92/92 again) | 139 → 139 |
+| phase2-main | 83/83 | 139 → 139 |
+| phase2-lifecycle | 22/22 | 139 → 139 |
+| phase2-no-woocommerce | 12/12 | 139 → 139 |
+| phase3-codes | 110/110 | 139 → 139 |
+| phase4-rendering | 165/165 (and 165/165 after the last comment fix) | 139 → 139 |
+| phase5-admin | 157/158 (the raw-write rule; fixed in `HealthCheck`) → re-run 158/158 | 139 → 139 |
+| phase6-scan | 214/214 | 139 → 139 |
+| phase7-sales | 215/216 (a false-by-design scope check) → 216/216 twice | 139 → 139 |
+| phase8-printing | 167/167 | 139 → 139 |
+| phase9a-sales-history | 253/253 | 139 → 139 |
+| phase9b-reports | 146/146 | 139 → 139 |
+| phase10-bulk | 196/197 (a false-by-design uninstall check) → re-run 197/197 | 139 → 139 |
+| phase10b-menu | 92/92 (spanned a sleep, see below) → re-run 92/92 | 139 → 139 |
+| **Total (final code)** | **1,965 passed, 0 failed, 0 skipped; AS guard PASS for every suite; no suite skipped its decoder, print or importer checks** | |
+
+**Error capture** (the temporary must-use logger, all final runs): **0 notices, warnings or deprecations from plugin code**, 0 from the tests; 18 "Array to string conversion" warnings in `wp-includes/pluggable.php:2475`, raised by WooCommerce's `WC_Form_Handler::process_login` (it passes the malformed-input sweep's `_wpnonce[]` array to `wp_verify_nonce()`); not plugin code. The logger and the `wp-content/mu-plugins` folder (created for it) were removed afterwards; neither was ever in git.
+
+**50,000-sale stress runs** (`PQBG_STRESS=1`, 3.0 GB free): phase9b 149/149, phase10b 94/94, phase11 129/129; crashes 139. In-process at 50,000 sales in 90 days: Summary 1,035 ms, products 599, slow sellers 582, the rest under 470 ms; 12 months: Summary 822 ms. HTTP (added over an empty wp-admin page of 507 ms): Summary +925 ms, products +641 ms, sellers +338 ms. Dashboard: 219 ms in-process, +360 ms over HTTP. Health check: the tab 180 ms, the Dashboard's set 81 ms (under the 150 ms of D2, so the Dashboard keeps the count), the tab over HTTP 0.78 s. All under the 2 s regression guard.
+
+**Incidents:**
+- A parse error in `DashboardAdmin.php` for about a minute during development (a quote-escaping mistake in a scripted edit; only the Dashboard page loads that class). Fixed at once; later edits were linted on a scratch copy first.
+- **The machine slept from 19:57:58 to 22:44:03** (Kernel-Power 42 / Power-Troubleshooter 1) during the final phase10b run; it paused and continued (92/92) but was not counted and was re-run. Sleep is "never" on AC but 30 minutes on battery (`powercfg`: DC 0x708).
+- **The first stress run was killed by Claude Code for low memory** (the browsers had reopened; 1.48 GB free) during the Phase 9B suite's cleanup. Its measurements finished (the in-process guard passed; one HTTP guard failed under the memory pressure and is not counted). Leftovers: 844 products/variations (IDs 74724–75814), 1,017 codes, 5 `pqbg9b_` users, 14 PQBG9B categories, 4 cost meta rows, 252 lookup jobs. **With the user's approval**, removed by a guarded script (dry run first; it refused until the code range was widened to 75824 with a creation-time window, because the killed cleanup had already deleted items 75548–75824); 1,096 lookup jobs removed (the 252 plus 844 queued by the deletions). Clean state confirmed; the stress runs were then repeated and passed.
+
+**Verified outside the suites:** the stop file on phase2-main (at its first section), phase6-scan (after 40 s, no catch block) and phase7-sales (after 60 s, with a catch block): each reported STOPPED, ran its cleanup and left the site clean. PHP 8.2.34 (official NTS build, SHA-256 verified, in `C:\xampp\tools\pqbg\php82\`): `php -l` on all 251 plugin PHP files, 0 errors.
+
+**PHPCS** (final): 280 errors, 311 warnings (591) in 66 files; 0 PHP 8.2+ compatibility findings, 0 i18n findings, 0 nonce findings; the security-sniff reports are the reviewed false positives (plan, section F). Coding-style cleanup: Phase 13, only if the plugin is ever published on WordPress.org.
+
+**Known limitations:** the health check is report-only (no repairs, by decision); if a browser pauses animations while the scan page is in the background, the Undo button can reappear briefly after the window (pressing it is refused); in DST timezones the autumn day's hourly report has one 2-hour bucket for the repeated hour (no sale is lost); multisite is not supported; the roll-up table / result cache is still deferred (now with the signal).
+
+**Manual checks:** added to the Pre-launch acceptance checklist ("Phase 11 manual checks") with the steps in the plugin README ("Phase 11 checklist").
+
+**Final report:** `C:\xampp\backups\sharayu\phase11-report.txt`.
 ### Instructions for the next Claude session
 
 - Read this file and `wp-content/plugins/product-qrcode-barcode-generator/README.md` first. Re-verify the environment; don't trust these notes blindly.
@@ -1747,12 +1812,21 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 - **Run `php tests/run.php` before and after every phase** (see `tests/README.md`). Preferred: `define( 'WP_ENVIRONMENT_TYPE', 'local' );` in the local `wp-config.php`, which the user will add themselves; never edit or commit `wp-config.php`. The fallback is `PQBG_TESTS_ALLOW_PRODUCTION=1`. The round-trip checks need `npm ci` in `tests/decoder`, or `PQBG_DECODER` pointing to a copy outside the web root. Add each new phase's suite to `tests/` and to `run.php`.
 - **Exclude `tests/` and `build/` from any production deployment** (see "Production deployment" in the plugin README).
 - **Never edit `vendor-prefixed/` by hand.** Change `build/` and run `php build/build.php` (see `build/README.md`).
-- The PHP minimum is now **8.2**.
+- The PHP minimum is now **8.2**. Since Phase 11, `C:\xampp\tools\pqbg\php82\` holds the official PHP 8.2.34 NTS build for `php -l` on the minimum version (only 8.5.6 runs the site).
+- **Hardening rules** (Phase 11):
+  - The Health check (`HealthCheck`, `HealthCheckAdmin`; Settings → Health check, `pqbg_manage_settings`) is read-only and report-only: SELECT queries only, no repair buttons, no cache. A repair needs its own decision. Never show a cost value there (`CostPrice::invalid_values()` returns reasons only).
+  - The Dashboard's only write is `PerfSignal::record()` (the last 10 compute times in `pqbg_perf_samples`, at most one write per 60 s); the signal warns only on a repeated condition. Do not build the roll-up table or result cache before it says so.
+  - The Undo button hides itself with a zero-length CSS animation whose delay is set in a nonce'd `<style>` element; `ScanRoute::csp( $nonce )` allows exactly that nonce on that response. No JavaScript and no reload on the scan page.
+  - `BulkLog::add()` writes under a named lock (5 s, then writes anyway).
+  - Multisite is refused by `Requirements` (network and per-site). Test requirement branches with `Requirements::errors_for()`.
+  - Every suite honours `PQBG_STOP_FILE` (`pqbg_test_stop_point()`; `pqbg_section()` is a safe point; nothing stops during "cleanup"). New suites must keep their body in `try`/`finally` with every section inside it, and call `pqbg_test_stop_point()` in long loops.
+  - For test runs only, the error logger `C:\xampp\tools\pqbg\errors\pqbg-error-capture.php` may be copied to `wp-content/mu-plugins/` with `PQBG_ERROR_CAPTURE=C:\xampp\tools\pqbg\errors`; remove it (and the `mu-plugins` folder, which did not exist before) afterwards. Target: zero events from plugin code.
+  - PHPCS: `C:\xampp\tools\pqbg\phpcs\` (see `tests/README.md`).
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
 - **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25).
 - **Phase 8 (Printing) is done, approved, committed as `753613c` and pushed** (2026-09-25). **The physical printer test is NOT done** (no printer was available): it must be done before printing real labels / before production launch (see the Status open items).
 - **Phase 9A (Sales history, payment method & cost price) is done, approved on the automated tests, committed as `5495b05` and pushed** (2026-09-26). **Its manual check is NOT done** (the "Phase 9A checklist" in the plugin README): it is in the pre-launch acceptance checklist.
-- **Phase 9B (Reports & owner dashboard) is done, approved on the automated tests, committed as `072f4d6` (the Phase 7 race fix) and `716600d` (Phase 9B) and pushed** (2026-09-26). **Its manual checks are NOT done** (the "Phase 9B checklist" in the plugin README): they are in the pre-launch acceptance checklist. **Phase 10 (Bulk / CSV tools) is done, approved on the automated tests, committed as `5b746a7` and pushed** (2026-09-27); its manual checks are in the pre-launch acceptance checklist. **Phase 10B (menu restructure and plugin Dashboard) is implemented and tested, NOT committed** (2026-09-27; waiting for the user's review).
+- **Phase 9B (Reports & owner dashboard) is done, approved on the automated tests, committed as `072f4d6` (the Phase 7 race fix) and `716600d` (Phase 9B) and pushed** (2026-09-26). **Its manual checks are NOT done** (the "Phase 9B checklist" in the plugin README): they are in the pre-launch acceptance checklist. **Phase 10 (Bulk / CSV tools) is done, approved on the automated tests, committed as `5b746a7` and pushed** (2026-09-27); its manual checks are in the pre-launch acceptance checklist. **Phase 10B (menu restructure and plugin Dashboard) is done, approved on the automated tests, committed as `0145aff` and pushed** (2026-09-27); its manual checks are in the pre-launch acceptance checklist.
 - **Bulk tools rules** (Phase 10):
   - Since Phase 10B the tools are QR & Barcodes → Bulk tools (`page=pqbg-bulk-tools&tab=tools|costs`; the page needs `pqbg_manage_codes`) and Settings is its own page (`page=pqbg-settings`, `pqbg_manage_settings`); each tab and handler checks its own capability (Code tools `pqbg_manage_codes`, Import cost prices `pqbg_view_costs`) before the nonce.
   - Bulk codes only through `BulkGenerator` → `ProductCodeService::get_or_create()`; never a stored queue; keep the batch `GET_LOCK` and the re-check before each code.
@@ -1967,3 +2041,15 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
   - Backup `sharayu-20260927-152746-before-phase10b-final.sql`. Final: 10B 91/91 alone, then every other suite one at a time; Phase 9A and 10 re-run after three test-only corrections; total 1,826 passed, 0 failed, 0 skipped; AS guard PASS everywhere; crash count 139 throughout. The one-off 50,000-sale Dashboard check: 93/93, 148 ms in-process, +221 ms over HTTP.
   - Updated the plugin README, `tests/README.md` and this file; report `C:\xampp\backups\sharayu\phase10b-report.txt`.
   - Not committed; waiting for the user's review.
+  - Approved on the automated tests; committed as `0145aff` and pushed to `origin/main` (normal push).
+- **Phase 11 (hardening), planning:**
+  - `HEAD` = `origin/main` = `0145aff`, clean. Recorded `0145aff`. Collected every open item and known limitation into one list (in the plan).
+  - Backup `sharayu-20260927-165517-before-phase11.sql` (961,712 bytes, 53 tables, complete). Baseline suite by suite: 1,826 passed, 0 failed, 0 skipped; AS guard PASS; no decoder/print/importer check skipped; crash count 139 throughout. Free memory was 1,294 MB at the start; the watchdog tripped during phase 8 (430 MB; the suite still completed and passed); the user closed the browsers and 9A, 9B, 10 and 10B ran with about 3.5 GB free. Clean state confirmed afterwards.
+  - Installed PHP_CodeSniffer 3.13.6 + WPCS 3.4.1 + PHPCompatibilityWP 2.1.8 outside the repository in `C:\xampp\tools\pqbg\phpcs\` (ruleset `pqbg.xml`); first run: 276 errors, 280 warnings, 0 PHP 8.2+ compatibility findings; every security-sniff report is a false positive. Security review: no High/Medium findings; two Low (CSV neutralisation edge cases, uninstall leaves save-failure transients), two Info.
+  - Wrote the plan (D1–D22): `C:\xampp\backups\sharayu\phase11-plan.txt`. Waiting for approval; nothing implemented.
+- **Phase 11 (hardening):**
+  - The user approved D1–D22 with six changes (Undo hidden by CSS without a reload; a repeated-condition performance signal; the temporary logger only for the runs; the stop file in every suite before the stress run; ask before touching the sale path, schema or stored data; PHPCS: only the translator comments, plus a Phase 13 note). Kept 409 for a late Undo when asked.
+  - Added `HealthCheck`, `HealthCheckAdmin`, `PerfSignal`; changed `SettingsPage`, `AdminUrl`, `DashboardAdmin`, `ScanScreen`, `ScanRoute`, the scan template and CSS, `BulkLog`, `SalesExport`, `CsvUpload`, `CostPrice`, `Requirements`, `Install`, `uninstall.php`; `tests/phase11-hardening.php` (130 checks), the stop file in every suite, the runner's STOPPED and error-capture reporting. Class files were created before anything referenced them.
+  - Final: 1,965 passed, 0 failed, 0 skipped; 0 notices from plugin code; crash count 139 throughout. Stress (50,000 sales): 9B, 10B, 11 all passed.
+  - Incidents: a minute-long parse error in `DashboardAdmin.php` during development; the machine slept 19:58–22:44 (a run re-done); the first stress run killed for low memory, its leftovers removed with the user's approval by a guarded script.
+  - Not committed; waiting for the user's review. Report: `C:\xampp\backups\sharayu\phase11-report.txt`.

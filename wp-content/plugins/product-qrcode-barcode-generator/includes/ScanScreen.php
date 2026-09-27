@@ -224,10 +224,12 @@ final class ScanScreen {
 
 		if ( SaleRepository::STATUS_COMPLETED === $sale['status'] && SaleService::can_undo( $sale, get_current_user_id() ) ) {
 			$undo = array(
-				'action'  => ScanUrl::site_url( $code ),
-				'nonce'   => wp_create_nonce( Permissions::nonce_action( 'undo_' . $sale['id'] ) ),
-				'sale_id' => (string) $sale['id'],
-				'until'   => wp_date( get_option( 'time_format' ), SaleService::undo_until( $sale ) ),
+				'action'    => ScanUrl::site_url( $code ),
+				'nonce'     => wp_create_nonce( Permissions::nonce_action( 'undo_' . $sale['id'] ) ),
+				'sale_id'   => (string) $sale['id'],
+				'until'     => wp_date( get_option( 'time_format' ), SaleService::undo_until( $sale ) ),
+				// Phase 11: seconds left, for the CSS that hides the form when the window ends.
+				'remaining' => max( 0, SaleService::undo_until( $sale ) - time() ),
 			);
 		}
 
@@ -235,8 +237,8 @@ final class ScanScreen {
 			200,
 			array( $notice ),
 			array(
-				'code'      => $code,
-				'sale'      => array(
+				'code'        => $code,
+				'sale'        => array(
 					'status'     => $sale['status'],
 					'name'       => $sale['product_name'],
 					'attributes' => implode( ', ', $pairs ),
@@ -248,8 +250,9 @@ final class ScanScreen {
 					'payment'    => PaymentMethods::label( $sale['payment_method'] ?? null ),
 					'time'       => wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), SaleService::created_ts( $sale ) ),
 				),
-				'undo'      => $undo,
-				'box_label' => __( 'Scan next item', 'product-qrcode-barcode-generator' ),
+				'undo'        => $undo,
+				'style_nonce' => null === $undo ? '' : self::style_nonce(),
+				'box_label'   => __( 'Scan next item', 'product-qrcode-barcode-generator' ),
 			)
 		);
 	}
@@ -619,21 +622,30 @@ final class ScanScreen {
 	private static function view( int $status, array $notices, array $extra = array() ): array {
 		return array_merge(
 			array(
-				'status'    => $status,
-				'notices'   => $notices,
-				'product'   => null,
-				'summary'   => null,
-				'code'      => '',
-				'links'     => array(),
-				'box'       => true,
-				'value'     => '',
-				'sell'      => null,
-				'sale'      => null,
-				'undo'      => null,
-				'box_label' => '',
-				'mine'      => null,
+				'status'      => $status,
+				'notices'     => $notices,
+				'product'     => null,
+				'summary'     => null,
+				'code'        => '',
+				'links'       => array(),
+				'box'         => true,
+				'value'       => '',
+				'sell'        => null,
+				'sale'        => null,
+				'undo'        => null,
+				'box_label'   => '',
+				'mine'        => null,
+				'style_nonce' => '',
 			),
 			$extra
 		);
+	}
+
+	/**
+	 * A fresh CSP nonce for the page's one style element (Phase 11: the Undo expiry delay).
+	 * ScanRoute adds it to the Content-Security-Policy of that response only.
+	 */
+	private static function style_nonce(): string {
+		return rtrim( strtr( base64_encode( random_bytes( 18 ) ), '+/', '-_' ), '=' );
 	}
 }

@@ -38,6 +38,12 @@ if ( ! class_exists( '\ProductQrBarcode\PrintCache', false ) ) {
 delete_metadata( 'user', 0, 'pqbg_cost_import', '', true );
 delete_option( 'pqbg_bulk_run' );
 
+// Phase 11 runtime state, never data: the Dashboard timing samples (PerfSignal) and every
+// user's one-time "code could not be saved" notice (CodeLifecycle; transients that expire
+// anyway; with a persistent object cache they are not in the options table and expire there).
+delete_option( 'pqbg_perf_samples' );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_pqbg_save_failure_' ) . '%', $wpdb->esc_like( '_transient_timeout_pqbg_save_failure_' ) . '%' ) );
+
 if ( ! defined( 'PQBG_UNINSTALL_DELETE_ALL_DATA' ) || true !== PQBG_UNINSTALL_DELETE_ALL_DATA ) {
 	return;
 }

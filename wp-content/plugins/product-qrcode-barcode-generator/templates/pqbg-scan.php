@@ -3,7 +3,9 @@
  * Scan page template. A complete, standalone HTML document: it does not use
  * the active theme (no get_header()/get_footer()) and does not call
  * wp_head()/wp_footer(), so nothing but this markup and the plugin's own
- * stylesheet is sent. No JavaScript.
+ * stylesheet is sent. No JavaScript. The only inline CSS is one style element with
+ * the response's CSP nonce, on a sale page with an Undo form: it sets how many
+ * seconds are left before the form hides itself (Phase 11; see pqbg-scan.css).
  *
  * Every value is escaped here. The only HTML taken from elsewhere is the
  * price (WooCommerce's price functions, passed through wp_kses_post()) and
@@ -44,6 +46,9 @@ $pqbg_undo    = $view['undo'];
 <meta name="referrer" content="same-origin">
 <title><?php echo esc_html( __( 'Scan', 'product-qrcode-barcode-generator' ) . ' – ' . get_bloginfo( 'name' ) ); ?></title>
 <?php wp_print_styles( \ProductQrBarcode\ScanScreen::STYLE_HANDLE ); ?>
+<?php if ( is_array( $pqbg_undo ) && '' !== $view['style_nonce'] ) : ?>
+<style nonce="<?php echo esc_attr( $view['style_nonce'] ); ?>">.pqbg-scan__undo,.pqbg-scan__undo-expired{animation-delay:<?php echo (int) $pqbg_undo['remaining']; ?>s}</style>
+<?php endif; ?>
 </head>
 <body class="pqbg-scan">
 <header class="pqbg-scan__bar">
@@ -234,6 +239,7 @@ $pqbg_undo    = $view['undo'];
 				?>
 			</p>
 		</form>
+		<p class="pqbg-scan__hint pqbg-scan__undo-expired"><?php esc_html_e( 'Undo is no longer available. Ask a manager to void the sale if needed.', 'product-qrcode-barcode-generator' ); ?></p>
 	<?php endif; ?>
 <?php elseif ( is_array( $pqbg_summary ) ) : ?>
 	<article class="pqbg-scan__product">

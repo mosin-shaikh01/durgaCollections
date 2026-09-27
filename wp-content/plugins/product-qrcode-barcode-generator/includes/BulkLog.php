@@ -29,6 +29,9 @@ final class BulkLog {
 
 	const MAX = 200;
 
+	/** Seconds add() waits for another request's log write (Phase 11, D8). */
+	const LOCK_TIMEOUT = 5;
+
 	const TOOL_GENERATE      = 'generate';
 	const TOOL_CODES_EXPORT  = 'codes_export';
 	const TOOL_COST_TEMPLATE = 'cost_template';
@@ -55,22 +58,64 @@ final class BulkLog {
 			'details'   => $details,
 		);
 
-		// Re-read the stored log: another request may have added an entry since this one first read it.
-		wp_cache_delete( self::OPTION, 'options' );
-		wp_cache_delete( 'notoptions', 'options' );
-		$entries = self::all();
-		array_unshift( $entries, $entry );
-		$entries = array_slice( $entries, 0, self::MAX );
+		// Two requests writing at the same instant would each re-read the log and one entry would be
+		// lost, so the read-modify-write runs under a named lock (Phase 11, D8). An activity log must
+		// never block a tool: without the lock after LOCK_TIMEOUT seconds the entry is written anyway.
+		$locked = self::lock();
 
-		if ( false === get_option( self::OPTION, false ) ) {
-			add_option( self::OPTION, $entries, '', false );
-		} else {
-			update_option( self::OPTION, $entries, false );
+		try {
+			// Re-read the stored log: another request may have added an entry since this one first read it.
+			wp_cache_delete( self::OPTION, 'options' );
+			wp_cache_delete( 'notoptions', 'options' );
+			$entries = self::all();
+			array_unshift( $entries, $entry );
+			$entries = array_slice( $entries, 0, self::MAX );
+
+			if ( false === get_option( self::OPTION, false ) ) {
+				add_option( self::OPTION, $entries, '', false );
+			} else {
+				update_option( self::OPTION, $entries, false );
+			}
+		} finally {
+			if ( $locked ) {
+				self::unlock();
+			}
+		}
+
+		if ( ! $locked && function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->warning( 'Bulk log written without its lock (another write took longer than ' . self::LOCK_TIMEOUT . ' s).', array( 'source' => 'product-qrcode-barcode-generator' ) );
 		}
 
 		if ( function_exists( 'wc_get_logger' ) ) {
 			wc_get_logger()->info( 'Bulk tool ' . $tool . ' by user #' . $user_id . ': ' . wp_json_encode( $details ), array( 'source' => 'product-qrcode-barcode-generator' ) );
 		}
+	}
+
+	/**
+	 * The log lock's name (per database and table prefix, like StockLock).
+	 */
+	public static function lock_name(): string {
+		global $wpdb;
+
+		return 'pqbg:' . substr( md5( DB_NAME . '|' . $wpdb->prefix ), 0, 12 ) . ':bulklog';
+	}
+
+	/**
+	 * Takes the log lock, waiting up to LOCK_TIMEOUT seconds.
+	 */
+	private static function lock(): bool {
+		global $wpdb;
+
+		return '1' === (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', self::lock_name(), self::LOCK_TIMEOUT ) );
+	}
+
+	/**
+	 * Releases the log lock.
+	 */
+	private static function unlock(): void {
+		global $wpdb;
+
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', self::lock_name() ) );
 	}
 
 	/**

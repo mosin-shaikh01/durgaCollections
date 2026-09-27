@@ -1313,6 +1313,7 @@ try {
 		$c      = mt_rand( 1, 10 ) <= 7 ? number_format( $p * 0.6, 2, '.', '' ) : null;
 		$vals[] = $wpdb->prepare( '(%s, 1, 0, %d, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', wp_generate_uuid4(), $sellers[ mt_rand( 0, 9 ) ], $q, $p, $p * $q, 'INR', 'Perf Product ' . mt_rand( 1, 2000 ), 'PERF-' . mt_rand( 1, 2000 ), $status, gmdate( 'Y-m-d H:i:s', $now_ts - mt_rand( 0, 89 * 86400 ) ), (string) $m, (string) $c, 'Perf Seller', 'voided' === $status ? 'perf' : '', $PERF_NOTE );
 		if ( 1000 === count( $vals ) ) {
+			pqbg_test_stop_point(); // Phase 11: a safe point between batches (the cleanup deletes by note).
 			$wpdb->query( "INSERT INTO $S (request_id, product_id, variation_id, seller_id, quantity, unit_price, line_total, currency, product_name, sku, status, created_at_gmt, payment_method, unit_cost, seller_name, void_reason, note) VALUES " . implode( ',', $vals ) );
 			$vals = array();
 		}

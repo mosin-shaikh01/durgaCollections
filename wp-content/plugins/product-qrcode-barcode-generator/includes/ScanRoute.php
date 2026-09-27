@@ -356,8 +356,21 @@ final class ScanRoute {
 			'Referrer-Policy'         => 'same-origin',
 			'X-Frame-Options'         => 'DENY',
 			'X-Content-Type-Options'  => 'nosniff',
-			'Content-Security-Policy' => "default-src 'none'; style-src 'self'; img-src 'self' https: data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+			'Content-Security-Policy' => self::csp(),
 		);
+	}
+
+	/**
+	 * The scan pages' Content-Security-Policy. No scripts at all. Styles only from this site,
+	 * plus, when a page needs one (Phase 11: the Undo expiry delay), one style element
+	 * carrying this response's nonce.
+	 *
+	 * @param string $style_nonce Nonce of the page's style element, or ''.
+	 */
+	public static function csp( string $style_nonce = '' ): string {
+		$style = "style-src 'self'" . ( '' === $style_nonce ? '' : " 'nonce-" . $style_nonce . "'" );
+
+		return "default-src 'none'; {$style}; img-src 'self' https: data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 	}
 
 	/**
@@ -505,7 +518,13 @@ final class ScanRoute {
 	 * @param array{status: int, location?: string, view?: array<string, mixed>, headers?: array<string, string>} $response Response.
 	 */
 	private static function send( array $response ): void {
-		foreach ( array_merge( self::security_headers(), $response['headers'] ?? array() ) as $name => $value ) {
+		$headers = array_merge( self::security_headers(), $response['headers'] ?? array() );
+
+		if ( isset( $response['view']['style_nonce'] ) && '' !== $response['view']['style_nonce'] ) {
+			$headers['Content-Security-Policy'] = self::csp( (string) $response['view']['style_nonce'] );
+		}
+
+		foreach ( $headers as $name => $value ) {
 			header( $name . ': ' . $value );
 		}
 

@@ -171,6 +171,50 @@
 	font-size: 16px;
 }
 
+/*
+ * Phase 11: the Undo form disappears when the undo window ends, without a reload and
+ * without JavaScript. The page sets the exact delay (the seconds left) in a nonce'd
+ * style element; 600 s (the whole window) is only a fallback, so the form can never
+ * vanish early. The server refuses a late undo in any case.
+ */
+.pqbg-scan__undo,
+.pqbg-scan__undo-expired {
+	animation-duration: 0s;
+	animation-delay: 600s;
+	animation-fill-mode: forwards;
+}
+
+.pqbg-scan__undo {
+	animation-name: pqbg-undo-expire;
+}
+
+.pqbg-scan__undo-expired {
+	visibility: hidden;
+	height: 0;
+	margin: 0;
+	overflow: hidden;
+	animation-name: pqbg-undo-note;
+}
+
+@keyframes pqbg-undo-expire {
+	to {
+		visibility: hidden;
+		height: 0;
+		margin: 0;
+		padding: 0;
+		border-width: 0;
+		overflow: hidden;
+	}
+}
+
+@keyframes pqbg-undo-note {
+	to {
+		visibility: visible;
+		height: auto;
+		margin: 20px 0 0;
+	}
+}
+
 .pqbg-scan__total {
 	font-size: 24px;
 	font-weight: 700;

@@ -55,7 +55,7 @@ $base_cost  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $PM WH
 $base_user  = (int) count_users()['total_users'];
 $raw_option = static fn( string $name ) => $wpdb->get_row( $wpdb->prepare( "SELECT option_value, autoload FROM {$wpdb->options} WHERE option_name = %s", $name ), ARRAY_A );
 $saved      = array();
-foreach ( array( Plugin::SETTINGS_OPTION, BulkGenerator::OPTION, BulkLog::OPTION, 'pqbg_svg_cache_index' ) as $name ) {
+foreach ( array( Plugin::SETTINGS_OPTION, BulkGenerator::OPTION, BulkLog::OPTION, 'pqbg_svg_cache_index', 'pqbg_perf_samples' ) as $name ) {
 	$saved[ $name ] = $raw_option( $name );
 }
 $svg_rows   = static fn() => $wpdb->get_col( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_pqbg\\_svg\\_%' OR option_name LIKE '\\_transient\\_timeout\\_pqbg\\_svg\\_%'" );
@@ -71,12 +71,9 @@ add_filter(
 	}
 );
 
-// Cooperative stop (the runner's memory watchdog creates PQBG_STOP_FILE): throw, so the cleanup still runs.
-$stop_file = (string) getenv( 'PQBG_STOP_FILE' );
-$sec       = static function ( string $title ) use ( $stop_file ): void {
-	if ( '' !== $stop_file && file_exists( $stop_file ) ) {
-		throw new RuntimeException( 'Stopped on request (PQBG_STOP_FILE): the machine is low on free memory.' );
-	}
+// Cooperative stop (the runner's memory watchdog creates PQBG_STOP_FILE): pqbg_section() throws at
+// the next section, so the cleanup still runs (the shared bootstrap helper since Phase 11).
+$sec = static function ( string $title ): void {
 	pqbg_section( $title );
 };
 
@@ -132,7 +129,8 @@ $state = static function () use ( $wpdb, $S ): string {
 				(string) $wpdb->get_var( "SELECT CONCAT(COUNT(*), ':', COALESCE(SUM(CRC32(CONCAT(post_id, meta_key, meta_value))), 0)) FROM {$wpdb->postmeta} WHERE meta_key IN ('_pqbg_cost_price', '_stock', '_stock_status', '_price')" ),
 				(string) $wpdb->get_var( "SELECT CONCAT(COUNT(*), ':', MAX(ID)) FROM {$wpdb->posts}" ),
 				(string) $wpdb->get_var( "SELECT CONCAT(COUNT(*), ':', COALESCE(MAX(id), 0)) FROM {$wpdb->prefix}pqbg_codes" ),
-				(string) $wpdb->get_var( "SELECT GROUP_CONCAT(CONCAT(option_name, '=', MD5(option_value)) ORDER BY option_name) FROM {$wpdb->options} WHERE option_name LIKE 'pqbg%'" ),
+				// Phase 11 (false by design): every Dashboard render records its timing in pqbg_perf_samples (PerfSignal), checked on its own below.
+				(string) $wpdb->get_var( "SELECT GROUP_CONCAT(CONCAT(option_name, '=', MD5(option_value)) ORDER BY option_name) FROM {$wpdb->options} WHERE option_name LIKE 'pqbg%' AND option_name <> 'pqbg_perf_samples'" ),
 			)
 		)
 	);
@@ -635,7 +633,10 @@ try {
 	}
 
 	$sec( 'GET and HEAD never write' );
-	$before = $state();
+	// Phase 11: the timing sample may be written once (the last write is made old, so the first render writes).
+	update_option( 'pqbg_perf_samples', array( 'at' => 0, 'samples' => \ProductQrBarcode\PerfSignal::samples() ), false );
+	$before  = $state();
+	$samples = count( \ProductQrBarcode\PerfSignal::samples() );
 	foreach ( array( 'admin', 'sm' ) as $who ) {
 		foreach ( $all_pages as $url ) {
 			$http( $who, 'GET', $url );
@@ -644,6 +645,10 @@ try {
 		$http( $who, 'GET', $old( array( 'tab' => 'tools' ) ) );
 	}
 	pqbg_t( 'every page and old address (GET and HEAD, both roles) changes nothing (sales, costs, stock, posts, codes, options)', $before === $state() );
+	wp_cache_flush();
+	$perf = $wpdb->get_row( "SELECT option_value, autoload FROM {$wpdb->options} WHERE option_name = 'pqbg_perf_samples'", ARRAY_A );
+	$at   = (int) ( maybe_unserialize( (string) ( $perf['option_value'] ?? '' ) )['at'] ?? 0 );
+	pqbg_t( 'Phase 11: the only write is the Dashboard\'s timing sample, throttled: all these Dashboard renders together wrote exactly one sample (at most one write per 60 s), not autoloaded', min( 10, $samples + 1 ) === count( \ProductQrBarcode\PerfSignal::samples() ) && abs( time() - $at ) < 600 && in_array( $perf['autoload'] ?? '', array( 'off', 'no' ), true ) );
 
 	// ------------------------------------------------------------------ accessibility
 	$sec( 'accessibility and narrow screens' );
@@ -679,6 +684,7 @@ try {
 		}
 	}
 	for ( $i = 0; $i < 70; $i++ ) {
+		pqbg_test_stop_point();
 		list( $pp_, $vv ) = $make_variable( $A, array_fill( 0, 10, array( 'manage_stock' => true, 'stock_quantity' => 3, 'regular_price' => '499' ) ) );
 		foreach ( $vv as $v ) {
 			$items[] = array( $pp_, $v );
@@ -703,6 +709,7 @@ try {
 			$c      = mt_rand( 1, 10 ) <= 7 ? number_format( $p * 0.6, 2, '.', '' ) : '';
 			$vals[] = $wpdb->prepare( '(%s, %d, %d, %d, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', wp_generate_uuid4(), $it[0], $it[1], $sellers[ mt_rand( 0, 4 ) ], $q, $p, $p * $q, 'INR', 'Perf item ' . $it[0], $status, gmdate( 'Y-m-d H:i:s', $now_ts - mt_rand( 0, 89 * 86400 ) ), $methods[ mt_rand( 0, 7 ) ], $c, 'Perf Seller', $PERF_NOTE );
 			if ( 1000 === count( $vals ) || $i === $n - 1 ) {
+				pqbg_test_stop_point(); // Phase 11: a safe point between batches (the cleanup deletes by note).
 				$wpdb->query( "INSERT INTO $S (request_id, product_id, variation_id, seller_id, quantity, unit_price, line_total, currency, product_name, status, created_at_gmt, payment_method, unit_cost, seller_name, note) VALUES " . implode( ',', $vals ) );
 				$vals = array();
 			}

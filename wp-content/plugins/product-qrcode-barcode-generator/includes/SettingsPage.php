@@ -52,8 +52,9 @@ final class SettingsPage {
 	}
 
 	/**
-	 * load-{page}: administrators only (403 before any output); any tab left in the address
-	 * is unknown (the Phase 10 tabs redirect in AdminMenu before this runs) and gets 404.
+	 * load-{page}: administrators only (403 before any output). The only tab is Health check
+	 * (Phase 11, &tab=health); any other tab left in the address is unknown (the Phase 10 tabs
+	 * redirect in AdminMenu before this runs) and gets 404.
 	 * Expired cost import previews are pruned here too, as on every Phase 10 tab.
 	 */
 	public static function load(): void {
@@ -61,12 +62,20 @@ final class SettingsPage {
 			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'product-qrcode-barcode-generator' ), '', array( 'response' => 403 ) );
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- navigation only.
-		if ( isset( $_GET['tab'] ) && '' !== $_GET['tab'] ) {
+		if ( null === self::tab() ) {
 			wp_die( esc_html__( 'This page does not exist.', 'product-qrcode-barcode-generator' ), '', array( 'response' => 404 ) );
 		}
 
 		CostImport::prune();
+	}
+
+	/**
+	 * The requested tab: '' (Settings) or HealthCheckAdmin::TAB; null for anything else.
+	 */
+	public static function tab(): ?string {
+		$tab = isset( $_GET['tab'] ) ? $_GET['tab'] : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- navigation only; only compared with fixed strings.
+
+		return '' === $tab || HealthCheckAdmin::TAB === $tab ? $tab : null;
 	}
 
 	/**
@@ -122,9 +131,29 @@ final class SettingsPage {
 			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'product-qrcode-barcode-generator' ), 403 );
 		}
 
+		$tab = (string) self::tab();
+
 		echo '<div class="wrap">';
 		AdminMenu::render_nav( AdminUrl::SETTINGS );
 		echo '<h1>' . esc_html__( 'Settings', 'product-qrcode-barcode-generator' ) . '</h1>';
+
+		// The page's own tabs (second row), as on Bulk tools.
+		$tabs = array(
+			''                    => array( __( 'Settings', 'product-qrcode-barcode-generator' ), AdminUrl::settings() ),
+			HealthCheckAdmin::TAB => array( __( 'Health check', 'product-qrcode-barcode-generator' ), AdminUrl::health() ),
+		);
+		echo '<nav class="nav-tab-wrapper wp-clearfix pqbg-page-tabs" aria-label="' . esc_attr__( 'Settings', 'product-qrcode-barcode-generator' ) . '">';
+		foreach ( $tabs as $key => $item ) {
+			$current = (string) $key === $tab;
+			echo '<a href="' . esc_url( $item[1] ) . '" class="nav-tab' . ( $current ? ' nav-tab-active' : '' ) . '"' . ( $current ? ' aria-current="page"' : '' ) . '>' . esc_html( $item[0] ) . '</a>';
+		}
+		echo '</nav>';
+
+		if ( HealthCheckAdmin::TAB === $tab ) {
+			HealthCheckAdmin::render();
+			echo '</div>';
+			return;
+		}
 
 		// Pages outside Settings must print Settings API messages themselves. No filter:
 		// options.php files "Settings saved." under "general", validation errors under pqbg_settings.

@@ -122,6 +122,52 @@ final class CostPrice {
 	}
 
 	/**
+	 * Stored cost meta that set() would never have written (Phase 11 health check),
+	 * read-only: not a plain number with at most the store's decimals and
+	 * MAX_INTEGER_DIGITS integer digits, more than one row for a post, or a row on
+	 * something that is not a product or variation. Never returns the values, so
+	 * the result can be shown to users without pqbg_view_costs.
+	 *
+	 * @return array<int, array{post_id: int, reason: string}> Oldest row first.
+	 */
+	public static function invalid_values(): array {
+		global $wpdb;
+
+		$decimals = wc_get_price_decimals();
+		$pattern  = $decimals > 0
+			? '/^[0-9]{1,' . self::MAX_INTEGER_DIGITS . '}(\.[0-9]{1,' . $decimals . '})?$/D'
+			: '/^[0-9]{1,' . self::MAX_INTEGER_DIGITS . '}$/D';
+		$rows     = (array) $wpdb->get_results( $wpdb->prepare( "SELECT pm.post_id, pm.meta_value, p.post_type FROM {$wpdb->postmeta} pm LEFT JOIN {$wpdb->posts} p ON p.ID = pm.post_id WHERE pm.meta_key = %s ORDER BY pm.meta_id", self::META_KEY ), ARRAY_A );
+		$seen     = array();
+		$out      = array();
+
+		foreach ( $rows as $row ) {
+			$id = (int) $row['post_id'];
+
+			if ( ! in_array( (string) $row['post_type'], array( 'product', 'product_variation' ), true ) ) {
+				$out[] = array(
+					'post_id' => $id,
+					'reason'  => 'not_product',
+				);
+			} elseif ( isset( $seen[ $id ] ) ) {
+				$out[] = array(
+					'post_id' => $id,
+					'reason'  => 'duplicate',
+				);
+			} elseif ( 1 !== preg_match( $pattern, (string) $row['meta_value'] ) ) {
+				$out[] = array(
+					'post_id' => $id,
+					'reason'  => 'not_number',
+				);
+			}
+
+			$seen[ $id ] = true;
+		}
+
+		return $out;
+	}
+
+	/**
 	 * The effective cost of a sellable item: its own, else (for a variation) the
 	 * parent's default; null when unknown.
 	 *
@@ -267,6 +313,7 @@ final class CostPrice {
 		woocommerce_wp_text_input(
 			array(
 				'id'            => self::FIELD,
+				/* translators: %s: currency symbol. */
 				'label'         => self::label( __( 'Cost price (%s)', 'product-qrcode-barcode-generator' ) ),
 				'value'         => wc_format_localized_price( self::get( (int) $post->ID ) ),
 				'data_type'     => 'price',
@@ -291,6 +338,7 @@ final class CostPrice {
 		woocommerce_wp_text_input(
 			array(
 				'id'          => self::DEFAULT_FIELD,
+				/* translators: %s: currency symbol. */
 				'label'       => self::label( __( 'Default cost price (%s)', 'product-qrcode-barcode-generator' ) ),
 				'value'       => wc_format_localized_price( self::get( (int) $post->ID ) ),
 				'data_type'   => 'price',
@@ -319,6 +367,7 @@ final class CostPrice {
 			array(
 				'id'            => self::FIELD . '_' . (int) $loop,
 				'name'          => self::FIELD . '[' . (int) $loop . ']',
+				/* translators: %s: currency symbol. */
 				'label'         => self::label( __( 'Cost price (%s)', 'product-qrcode-barcode-generator' ) ),
 				'value'         => wc_format_localized_price( self::get( (int) $variation->ID ) ),
 				'data_type'     => 'price',
