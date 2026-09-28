@@ -47,6 +47,23 @@ $scan_http = static function (): array {
 /** Cron events of this plugin. */
 $pqbg_cron = static fn(): array => array_filter( array_keys( array_merge( ...array_values( array_map( static fn( $e ) => is_array( $e ) ? $e : array(), (array) _get_cron_array() ) ) ) ), static fn( $h ) => str_contains( (string) $h, 'pqbg' ) );
 
+/*
+ * Phase 13: the default uninstall below runs for real on this site, so it removes the runtime
+ * state uninstall.php always removes. Keep what the site had and restore it byte for byte
+ * afterwards: the Dashboard timing samples and the code-generation run state (options) and every
+ * user's cost-import preview (user meta). The install lock and the rewrite flag come back with
+ * reactivation; the render cache stays cleared (a cache, cleared as a real uninstall clears it).
+ */
+$RUNTIME_OPTIONS = array( 'pqbg_perf_samples', 'pqbg_bulk_run' );
+$runtime_state   = static function () use ( $wpdb, $RUNTIME_OPTIONS ): array {
+	$in = implode( ',', array_fill( 0, count( $RUNTIME_OPTIONS ), '%s' ) );
+	return array(
+		'options' => $wpdb->get_results( $wpdb->prepare( "SELECT option_name, option_value, autoload FROM {$wpdb->options} WHERE option_name IN ($in) ORDER BY option_name", ...$RUNTIME_OPTIONS ), ARRAY_A ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		'meta'    => $wpdb->get_results( $wpdb->prepare( "SELECT user_id, meta_key, meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s ORDER BY user_id, umeta_id", 'pqbg_cost_import' ), ARRAY_A ),
+	);
+};
+$saved_runtime = $runtime_state();
+
 $before = $scan_http();
 pqbg_t( 'active: rules and flag present, /scan/ sends logged-out visitors to the login page', $scan_rules() && false !== get_option( 'pqbg_rewrite_version' ) && 302 === $before[0] && str_contains( $before[1], 'wp-login.php' ), $before[0] . ' ' . $before[1] );
 
@@ -79,7 +96,18 @@ try {
 	if ( ! is_plugin_active( $pf ) ) {
 		$r = activate_plugin( $pf );
 	}
+	// Phase 13: put back the runtime state the real uninstall removed (see $saved_runtime).
+	foreach ( $saved_runtime['options'] as $row ) {
+		$wpdb->delete( $wpdb->options, array( 'option_name' => $row['option_name'] ) );
+		$wpdb->insert( $wpdb->options, $row );
+	}
+	$wpdb->delete( $wpdb->usermeta, array( 'meta_key' => 'pqbg_cost_import' ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+	foreach ( $saved_runtime['meta'] as $row ) {
+		$wpdb->insert( $wpdb->usermeta, $row );
+	}
+	wp_cache_flush();
 }
+pqbg_t( 'cleanup: the runtime state the uninstall removed (timing samples, run state, cost-import previews) is restored byte for byte', $saved_runtime === $runtime_state(), count( $saved_runtime['options'] ) . ' option(s), ' . count( $saved_runtime['meta'] ) . ' preview(s)' );
 
 pqbg_t( 'reactivated', ( ! isset( $r ) || ! is_wp_error( $r ) ) && is_plugin_active( $pf ) );
 pqbg_t( 'marker row survives reactivation', null !== CodeRepository::find_by_code( 'TEST-PQBG-LIFE' ) );

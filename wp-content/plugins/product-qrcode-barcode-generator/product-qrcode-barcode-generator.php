@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:          Product QR Code and Barcode Generator
- * Description:          Product QR/barcode inventory for a WooCommerce shop's own staff: secure product codes, QR code and optional barcode rendering, seller role and capabilities.
- * Version:              0.1.0
+ * Description:          QR code and barcode labels for a WooCommerce shop's own staff: secure product codes, label printing, in-store selling by scanning, sales history, reports and bulk tools.
+ * Version:              1.0.0
  * Author:               Mosin Shaikh
  * Author URI:           https://www.linkedin.com/in/mosin-shaikh01s/
  * Text Domain:          product-qrcode-barcode-generator
@@ -13,6 +13,7 @@
  * WC requires at least: 9.0
  * WC tested up to:      11.1
  * License:              GPL-2.0-or-later
+ * License URI:          https://www.gnu.org/licenses/gpl-2.0.html
  * Update URI:           false
  *
  * Update URI: the plugin name and slug are generic, so this stops WordPress
@@ -22,7 +23,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'PQBG_VERSION', '0.1.0' );
+define( 'PQBG_VERSION', '1.0.0' );
 define( 'PQBG_PLUGIN_FILE', __FILE__ );
 define( 'PQBG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PQBG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

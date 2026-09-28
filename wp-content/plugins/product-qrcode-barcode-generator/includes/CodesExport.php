@@ -217,7 +217,7 @@ final class CodesExport {
 			__( 'Scan URL', 'product-qrcode-barcode-generator' ),
 			/* translators: %s: site timezone, e.g. Asia/Kolkata. */
 			sprintf( __( 'Code created (%s)', 'product-qrcode-barcode-generator' ), $tz ),
-			/* translators: %s: site timezone, e.g. Asia/Kolkata. */
+			/* translators: %s: site timezone, e.g. Asia/Kolkata or +05:30. */
 			sprintf( __( 'Retired at (%s)', 'product-qrcode-barcode-generator' ), $tz ),
 		);
 	}

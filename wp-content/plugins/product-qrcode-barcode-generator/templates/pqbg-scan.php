@@ -148,7 +148,7 @@ $pqbg_undo    = $view['undo'];
 			echo esc_html(
 				null === $pqbg_product['stock_qty']
 					? $pqbg_product['stock']
-					/* translators: 1: stock status, 2: quantity in stock. */
+					/* translators: 1: an amount or a stock status, 2: the number of sales or the quantity in stock. */
 					: sprintf( __( '%1$s (%2$s)', 'product-qrcode-barcode-generator' ), $pqbg_product['stock'], number_format_i18n( $pqbg_product['stock_qty'] ) )
 			);
 			?>

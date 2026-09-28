@@ -7,7 +7,9 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–12 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard, hardening, theme compatibility)
+**Version 1.0.0.** For shop owners and sellers, the plain-language guides are in [`docs/`](docs/): the [owner guide](docs/owner-guide.md) and the one-page seller guide (`docs/seller-guide.html`, also as `docs/seller-guide.pdf` to send to staff). What changed is in [`CHANGELOG.md`](CHANGELOG.md); `readme.txt` has the WordPress-format metadata. This README is the developer documentation.
+
+## Current scope: version 1.0.0, Phases 2–13 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard, hardening, theme compatibility, release packaging)
 
 Implemented:
 
@@ -29,6 +31,7 @@ Implemented:
 - **Phase 10B:** the plugin's own top-level menu **QR & Barcodes** (Dashboard, In-store sales, In-store reports, Bulk tools, Settings; nothing under WooCommerce), a shared tab row on every plugin page, redirects from the old addresses, one source for admin URLs (`AdminUrl`) and screen detection by stored hook suffix (`AdminMenu`), and the plugin **Dashboard**. No schema, capability or data change. See [Admin menu](#admin-menu) and [Dashboard](#dashboard).
 - **Phase 11 (hardening):** the read-only [Health check](#health-check) (Settings → Health check, and a count on the Dashboard for administrators); the Undo button hides itself when its 10 minutes end (no reload, no JavaScript); the bulk log's writes run under a lock; an administrators-only [performance signal](#performance-signal) on the Dashboard; CSV formula neutralisation also after leading spaces, for line feeds and for full-width characters; multisite refused; uninstall also removes the Phase 11 runtime state and the save-failure notices. No schema change (`DB_VERSION` 4), no new capability, the sale path unchanged. Tests for migrations from real v1–v3 tables, both uninstall branches on a cloned database, time and money edge cases and malformed input on every entry point.
 - **Phase 12 (theme compatibility, owner's decision B):** verified with six themes (block and classic) and with block and classic cart/checkout; see [Theme compatibility](#theme-compatibility). Compatibility fixes only: a logged-out visitor gets the login redirect for any method (a page cache stored a 405 page otherwise), scan responses set `DONOTCACHEPAGE`, `DONOTMINIFY` and `DONOTCDN`, and Plain or `index.php` permalinks are an error in the Health check, a Dashboard warning and an admin notice that shop managers see too. No theme-specific code, no schema or capability change, the sale path unchanged.
+- **Phase 13 (QA, documentation and packaging; version 1.0.0):** no feature, schema, capability or sale-path change. Version 1.0.0 (header, `PQBG_VERSION`, `readme.txt`, `CHANGELOG.md`); `License URI`; the plugin's `LICENSE` (GPL-2.0) and the GPL-3.0 text next to the LGPL-3.0 library (added by `build/build.php`); the translation template `languages/product-qrcode-barcode-generator.pot`; the owner and seller guides in `docs/`; the release zip built by `build/package.php`; the release-check suite `tests/phase13-release.php`. See [Release and packaging](#release-and-packaging).
 
 **Not implemented yet (later phases):**
 - CSV import of codes (left out of Phase 10 by decision D6; in the backlog), an undo of a cost import, bulk regeneration or retirement of codes
@@ -267,6 +270,7 @@ The libraries are bundled inside the plugin; no Composer is needed on the server
 - **Licenses:** BSD-2-Clause is compatible with the plugin's GPL-2.0-or-later.
   - LGPL-3.0-or-later is compatible only through the "or later" clause (it isn't compatible with GPL-2.0-only), so the plugin as distributed is effectively under GPLv3 terms.
   - Prefixing modifies the libraries. Each keeps its original license file next to its `src/`, and `NOTICE.md` records the modifications.
+  - **License files shipped** (Phase 13): the plugin's own `LICENSE` (GPL-2.0, the official text from gnu.org); `vendor-prefixed/bacon/bacon-qr-code/LICENSE` and `vendor-prefixed/dasprid/enum/LICENSE` (BSD-2-Clause; `dasprid/enum` is bacon's only dependency, apart from `ext-iconv`); `vendor-prefixed/picqer/php-barcode-generator/LICENSE.md` (LGPL-3.0) and `vendor-prefixed/picqer/php-barcode-generator/GPL-3.0.txt` (the official GPL-3.0 text, because the LGPL-3.0 adds permissions to the GPL-3.0 and asks for a copy of it, section 4(b)). `build/build.php` copies the GPL-3.0 text from `build/licenses/gpl-3.0.txt` after checking its SHA-256, so a rebuild keeps it. picqer has no dependencies.
 - **PHP minimum raised to 8.2** in Phase 4, because picqer's maintained 3.x line requires it. PHP 8.1 has been end-of-life since 31 Dec 2025.
 
 **Rebuilding** `vendor-prefixed/` from the pinned `build/composer.lock` is described in [`build/README.md`](build/README.md). The build is reproducible, and the build tools are pinned by SHA-256.
@@ -277,16 +281,42 @@ The CLI regression suites for Phases 2–11 are in [`tests/`](tests/README.md): 
 
 ## Production deployment
 
-**Exclude `tests/` and `build/` from any production deployment.** Deploy only the runtime files:
+**Exclude `tests/` and `build/` from any production deployment.** Deploy only the runtime files, which is exactly what the release zip contains (see [Release and packaging](#release-and-packaging)):
 
 - `product-qrcode-barcode-generator.php`, `uninstall.php`, `index.php`
 - `includes/`, `assets/`, `languages/`, `templates/`, `vendor-prefixed/`
-- `README.md` (optional)
+- `docs/` (the owner and seller guides), `README.md`, `readme.txt`, `CHANGELOG.md`, `LICENSE`
 
 `tests/` and `build/` are development tooling. They are kept in the repository so the vendor bundle can be rebuilt exactly and the regression suites can be rerun, but they must never reach a live server:
 - The test suites create and delete data, and one briefly deactivates the plugin.
 - The `.htaccess` denial only works on Apache.
 - `tests/decoder/node_modules/`, `tests/print-check/node_modules/`, `build/vendor/` and `build/tools/` are never committed and must not be deployed either.
+
+## Release and packaging
+
+Phase 13. The release zip is built by `build/package.php` (never shipped):
+
+```
+C:\xampp\php\php.exe -d extension=zip build\package.php --out=C:\xampp\backups\sharayu\release
+```
+
+- `-d extension=zip` loads PHP's zip extension for that one run (XAMPP's `php.ini`, which Apache shares, does not load it; nothing is changed).
+- It packs **the files committed at HEAD**, read from git (so the bytes are the committed ones), and refuses to build when the plugin folder differs from HEAD. `--allow-dirty` packs the working tree instead (a test build before a commit; the `.sha256` file says so). `--dry-run` only lists.
+- It leaves out `tests/`, `build/`, `node_modules`, package and composer files, `.git*` files, patches, logs, dumps and archives, and refuses to build when a required file is missing (the main file, `uninstall.php`, `LICENSE`, `readme.txt`, `README.md`, `CHANGELOG.md`, the .pot, the three guides, `NOTICE.md` and the four library licence files), when the version differs between the header, `PQBG_VERSION`, `readme.txt` and `CHANGELOG.md`, when a PHP file has no direct-access guard, or when a folder has no silence `index.php`.
+- The zip has one top folder `product-qrcode-barcode-generator/`, forward-slash paths, sorted entries, a fixed timestamp (2026-09-28 00:00 UTC) and fixed Unix permissions, so the same files always give a byte-identical zip. It is re-read and compared file by file after writing. The SHA-256 is printed and saved next to it (`.sha256`).
+- `--out` must be outside the repository.
+
+**Translations:** `languages/product-qrcode-barcode-generator.pot` is generated with WP-CLI (kept outside the repository):
+
+```
+C:\xampp\php\php.exe C:\xampp\tools\pqbg\wp-cli\wp-cli.phar i18n make-pot . languages/product-qrcode-barcode-generator.pot --slug=product-qrcode-barcode-generator --domain=product-qrcode-barcode-generator --exclude=tests,build,vendor-prefixed,node_modules,docs --headers="{\"Report-Msgid-Bugs-To\":\"\",\"Language-Team\":\"\"}"
+```
+
+Regenerate it after changing any user-facing string; the Phase 13 suite fails when it is out of date. 811 strings in 1.0.0. Translations themselves (`.po`/`.mo`) go in `languages/`; none are shipped yet.
+
+**The guides:** `docs/owner-guide.md` is written by hand. `docs/seller-guide.html` and `docs/seller-guide.pdf` are built by `tests/guide-screenshots.php` from `tests/guide/seller-guide.template.html` with screenshots of sample data (see `tests/README.md`).
+
+**Versions tested for 1.0.0:** WordPress 7.1.2, WooCommerce 11.1.2, PHP 8.5.6 (PHP 8.2.34: `php -l` only). The minimums (WordPress 6.7, WooCommerce 9.0, PHP 8.2) are enforced by `Requirements` but were not run.
 
 ## Naming and the rename
 
@@ -1548,6 +1578,8 @@ define( 'PQBG_UNINSTALL_DELETE_ALL_DATA', true );
 
 This drops `pqbg_codes` and `pqbg_sales`, deletes `pqbg_settings`, `pqbg_db_version` and the bulk tools' audit log (`pqbg_bulk_log`, Phase 10), every user's remembered print options (`pqbg_print_prefs` user meta) and every cost price (`_pqbg_cost_price` post meta, Phase 9A), removes every `pqbg_*` capability (including `pqbg_view_costs`), and deletes the Store Seller role. Affected users keep their accounts.
 **This cannot be undone. Back up the database first.**
+
+After the delete-all mode, WordPress may keep the inert role name `pqbg_seller` in former sellers' user data (their `{prefix}capabilities` user meta): WordPress's `remove_role()` deletes the role but does not edit the users who had it. The name no longer matches any role, so it grants nothing (checked in the Phase 13 fresh-install test: no user has any plugin capability afterwards). Nothing needs to be done; assigning another role to such a user replaces it.
 
 Both branches are executed for real by the Phase 11 suite on a cloned copy of the database tables (a temporary table prefix): exactly the items listed here are removed, and every other option, user meta, post meta, table, role and capability is unchanged.
 

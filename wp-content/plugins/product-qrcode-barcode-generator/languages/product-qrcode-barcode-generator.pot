@@ -1,0 +1,3987 @@
+# Copyright (C) 2026 Mosin Shaikh
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Product QR Code and Barcode Generator 1.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-09-28T09:56:50+02:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: product-qrcode-barcode-generator\n"
+
+#. Plugin Name of the plugin
+#: product-qrcode-barcode-generator.php
+#: includes/ToolsAdmin.php:918
+msgid "Product QR Code and Barcode Generator"
+msgstr ""
+
+#. Description of the plugin
+#: product-qrcode-barcode-generator.php
+msgid "QR code and barcode labels for a WooCommerce shop's own staff: secure product codes, label printing, in-store selling by scanning, sales history, reports and bulk tools."
+msgstr ""
+
+#. Author of the plugin
+#: product-qrcode-barcode-generator.php
+msgid "Mosin Shaikh"
+msgstr ""
+
+#. Author URI of the plugin
+#: product-qrcode-barcode-generator.php
+msgid "https://www.linkedin.com/in/mosin-shaikh01s/"
+msgstr ""
+
+#: includes/AdminActions.php:91
+msgid "Missing code reference."
+msgstr ""
+
+#: includes/AdminActions.php:111
+msgid "Invalid request."
+msgstr ""
+
+#: includes/AdminActions.php:116
+#: includes/BarcodeRenderer.php:63
+#: includes/PrintCache.php:110
+msgid "Barcodes are disabled."
+msgstr ""
+
+#: includes/AdminActions.php:122
+#: includes/AdminProductPanel.php:409
+msgid "This item has no active product code."
+msgstr ""
+
+#: includes/AdminActions.php:129
+msgid "The image could not be rendered."
+msgstr ""
+
+#: includes/AdminActions.php:158
+#: includes/PrintAdmin.php:263
+#: includes/PrintPage.php:97
+#: includes/ReportPrint.php:59
+msgid "Method not allowed."
+msgstr ""
+
+#: includes/AdminActions.php:168
+#: includes/BulkGenerator.php:187
+#: includes/BulkGenerator.php:235
+#: includes/ProductCodeService.php:133
+#: includes/ProductCodeService.php:198
+#: includes/ToolsAdmin.php:412
+msgid "You are not allowed to manage product codes."
+msgstr ""
+
+#: includes/AdminActions.php:172
+#: includes/AdminProductPanel.php:402
+#: includes/AdminProductPanel.php:423
+msgid "The link you followed has expired. Reload the product page and try again."
+msgstr ""
+
+#: includes/AdminActions.php:178
+#: includes/ProductCodeService.php:276
+msgid "Product not found."
+msgstr ""
+
+#: includes/AdminActions.php:207
+msgid "Product codes"
+msgstr ""
+
+#: includes/AdminMenu.php:61
+#: includes/DashboardAdmin.php:174
+msgid "Dashboard"
+msgstr ""
+
+#: includes/AdminMenu.php:68
+#: includes/SalesAdmin.php:177
+#: includes/SettingsPage.php:115
+msgid "In-store sales"
+msgstr ""
+
+#. translators: %s: link to In-store reports.
+#: includes/AdminMenu.php:75
+#: includes/DashboardAdmin.php:176
+#: includes/DashboardAdmin.php:262
+#: includes/ReportsAdmin.php:203
+msgid "In-store reports"
+msgstr ""
+
+#: includes/AdminMenu.php:82
+#: includes/DashboardAdmin.php:309
+#: includes/ToolsAdmin.php:133
+#: includes/ToolsAdmin.php:168
+msgid "Bulk tools"
+msgstr ""
+
+#: includes/AdminMenu.php:89
+#: includes/DashboardAdmin.php:357
+#: includes/SettingsPage.php:138
+#: includes/SettingsPage.php:142
+#: includes/SettingsPage.php:145
+msgid "Settings"
+msgstr ""
+
+#: includes/AdminMenu.php:103
+#: includes/AdminMenu.php:166
+msgid "QR & Barcodes"
+msgstr ""
+
+#: includes/AdminProductPanel.php:82
+msgid "QR & Barcode"
+msgstr ""
+
+#: includes/AdminProductPanel.php:100
+msgid "Save the product to assign its product code."
+msgstr ""
+
+#: includes/AdminProductPanel.php:109
+msgid "This product type has no product code: grouped and external products are not sold as a single item in the shop. Codes belong to simple products and to each variation of a variable product."
+msgstr ""
+
+#: includes/AdminProductPanel.php:127
+msgid "No code yet."
+msgstr ""
+
+#: includes/AdminProductPanel.php:134
+msgid "Code:"
+msgstr ""
+
+#: includes/AdminProductPanel.php:134
+#: includes/AdminProductPanel.php:192
+msgid "Active"
+msgstr ""
+
+#: includes/AdminProductPanel.php:159
+msgid "A variable product has no code of its own: each variation has its own code."
+msgstr ""
+
+#: includes/AdminProductPanel.php:162
+msgid "No variations yet. Variations get their codes when they are saved."
+msgstr ""
+
+#. translators: %d: variations with a code.
+#: includes/AdminProductPanel.php:170
+#, php-format
+msgid "Print all variation labels (%d)"
+msgstr ""
+
+#: includes/AdminProductPanel.php:174
+msgid "Variation"
+msgstr ""
+
+#: includes/AdminProductPanel.php:175
+#: includes/CodesExport.php:211
+#: includes/CostImport.php:539
+#: includes/CostImport.php:600
+#: includes/PrintAdmin.php:227
+#: includes/ReportData.php:197
+#: includes/ReportData.php:245
+#: includes/ReportData.php:623
+#: includes/ReportData.php:716
+#: includes/ReportData.php:738
+#: includes/SalesAdmin.php:357
+#: includes/SalesExport.php:130
+#: includes/SalesListTable.php:64
+#: includes/ToolsAdmin.php:599
+#: templates/pqbg-print.php:25
+#: templates/pqbg-scan.php:158
+#: templates/pqbg-scan.php:222
+#: templates/pqbg-scan.php:249
+msgid "SKU"
+msgstr ""
+
+#: includes/AdminProductPanel.php:176
+#: includes/AdminProductPanel.php:217
+#: includes/AdminProductPanel.php:333
+#: includes/AdminProductPanel.php:338
+#: includes/CodesExport.php:215
+#: includes/SalesAdmin.php:358
+#: includes/SalesExport.php:131
+#: templates/pqbg-scan.php:165
+#: templates/pqbg-scan.php:225
+#: templates/pqbg-scan.php:252
+msgid "Code"
+msgstr ""
+
+#: includes/AdminProductPanel.php:177
+#: includes/ReportData.php:584
+#: includes/ReportData.php:624
+#: includes/SalesAdmin.php:258
+#: includes/SalesExport.php:127
+#: includes/SalesListTable.php:70
+msgid "Status"
+msgstr ""
+
+#: includes/AdminProductPanel.php:178
+msgid "Actions"
+msgstr ""
+
+#: includes/AdminProductPanel.php:189
+msgid "No code"
+msgstr ""
+
+#. translators: %d: number of retired codes.
+#: includes/AdminProductPanel.php:216
+#, php-format
+msgid "Code history (%d retired)"
+msgstr ""
+
+#: includes/AdminProductPanel.php:220
+#: includes/ReportData.php:194
+#: includes/ReportData.php:244
+#: includes/ReportData.php:490
+#: includes/ReportData.php:579
+#: includes/ReportData.php:622
+#: includes/ReportData.php:715
+#: includes/ReportData.php:737
+#: includes/ReportsAdmin.php:899
+msgid "Item"
+msgstr ""
+
+#. translators: %s: site timezone, e.g. Asia/Kolkata or +05:30.
+#: includes/AdminProductPanel.php:224
+#: includes/CodesExport.php:221
+#, php-format
+msgid "Retired at (%s)"
+msgstr ""
+
+#: includes/AdminProductPanel.php:225
+msgid "Retired by"
+msgstr ""
+
+#: includes/AdminProductPanel.php:235
+msgid "This product"
+msgstr ""
+
+#. translators: %d: variation ID.
+#: includes/AdminProductPanel.php:238
+#, php-format
+msgid "Variation #%d"
+msgstr ""
+
+#. translators: %d: variation ID.
+#: includes/AdminProductPanel.php:241
+#, php-format
+msgid "Variation #%d (deleted)"
+msgstr ""
+
+#: includes/AdminProductPanel.php:276
+#: includes/SalePresenter.php:71
+msgid "System"
+msgstr ""
+
+#. translators: %d: user ID.
+#: includes/AdminProductPanel.php:282
+#: includes/SalePresenter.php:61
+#: includes/SalePresenter.php:77
+#, php-format
+msgid "User #%d (deleted)"
+msgstr ""
+
+#: includes/AdminProductPanel.php:300
+msgid "Product code:"
+msgstr ""
+
+#: includes/AdminProductPanel.php:303
+msgid "No code yet (it is assigned when the variation and its product are saved)."
+msgstr ""
+
+#: includes/AdminProductPanel.php:309
+msgid "Download QR"
+msgstr ""
+
+#: includes/AdminProductPanel.php:373
+#: includes/AdminProductPanel.php:374
+#: includes/AdminProductPanel.php:433
+msgid "Regenerate product code"
+msgstr ""
+
+#: includes/AdminProductPanel.php:434
+msgid "Product:"
+msgstr ""
+
+#: includes/AdminProductPanel.php:437
+msgid "Current code:"
+msgstr ""
+
+#: includes/AdminProductPanel.php:438
+msgid "Printed labels with the old code will stop working."
+msgstr ""
+
+#: includes/AdminProductPanel.php:439
+msgid "The current code is retired permanently and a new code is created. The old code stays in the history and is never used again."
+msgstr ""
+
+#: includes/AdminProductPanel.php:446
+msgid "Regenerate code"
+msgstr ""
+
+#: includes/AdminProductPanel.php:447
+#: includes/PrintAdmin.php:250
+#: includes/SalesAdmin.php:447
+msgid "Cancel"
+msgstr ""
+
+#: includes/AdminProductPanel.php:492
+msgid "Product code generated."
+msgstr ""
+
+#: includes/AdminProductPanel.php:493
+msgid "Product code regenerated. The old code is retired; labels printed with it no longer work."
+msgstr ""
+
+#: includes/AdminProductPanel.php:494
+msgid "The product code was changed by another request, so nothing was regenerated. Check the current code."
+msgstr ""
+
+#: includes/AdminProductPanel.php:495
+msgid "This item has no active code to regenerate."
+msgstr ""
+
+#: includes/AdminProductPanel.php:496
+#: includes/ProductCodeService.php:105
+msgid "This product type cannot have a product code."
+msgstr ""
+
+#: includes/AdminProductPanel.php:497
+#: includes/ProductCodeService.php:260
+msgid "Save the product first; unsaved products do not get a product code."
+msgstr ""
+
+#: includes/AdminProductPanel.php:498
+msgid "A product code could not be generated. Nothing was changed. Try again."
+msgstr ""
+
+#: includes/AdminProductPanel.php:501
+msgid "The product code could not be changed. Nothing was changed."
+msgstr ""
+
+#: includes/AdminProductPanel.php:534
+msgid "Download QR (SVG)"
+msgstr ""
+
+#: includes/AdminProductPanel.php:537
+msgid "Download barcode (SVG)"
+msgstr ""
+
+#: includes/AdminProductPanel.php:540
+msgid "Print label"
+msgstr ""
+
+#: includes/AdminProductPanel.php:541
+msgid "Regenerate…"
+msgstr ""
+
+#: includes/AdminProductPanel.php:552
+msgid "View QR"
+msgstr ""
+
+#: includes/AdminProductPanel.php:569
+msgid "Generate code"
+msgstr ""
+
+#: includes/AdminProductPanel.php:616
+#: includes/ToolsAdmin.php:346
+#: includes/ToolsAdmin.php:352
+msgid "Any"
+msgstr ""
+
+#: includes/BarcodeRenderer.php:110
+msgid "The barcode could not be rendered."
+msgstr ""
+
+#: includes/BulkGenerator.php:81
+msgid "Choose at least one product status."
+msgstr ""
+
+#: includes/BulkGenerator.php:193
+msgid "Another code generation run is in progress. Wait for it to finish, or continue it."
+msgstr ""
+
+#: includes/BulkGenerator.php:239
+#: includes/BulkGenerator.php:327
+msgid "Another batch is being processed. Try again in a moment."
+msgstr ""
+
+#: includes/BulkGenerator.php:246
+#: includes/BulkGenerator.php:334
+#: includes/BulkGenerator.php:360
+msgid "This code generation run no longer exists. Start a new one."
+msgstr ""
+
+#: includes/BulkGenerator.php:386
+msgid "Stop the run before dismissing it."
+msgstr ""
+
+#: includes/BulkLog.php:163
+#: includes/DashboardAdmin.php:273
+#: includes/DashboardAdmin.php:346
+#: includes/ToolsAdmin.php:192
+#: includes/ToolsAdmin.php:332
+msgid "Generate missing codes"
+msgstr ""
+
+#: includes/BulkLog.php:165
+msgid "Codes CSV export"
+msgstr ""
+
+#: includes/BulkLog.php:167
+msgid "Cost price template download"
+msgstr ""
+
+#: includes/BulkLog.php:169
+msgid "Cost price import"
+msgstr ""
+
+#: includes/CodeGenerator.php:137
+msgid "A product code could not be generated."
+msgstr ""
+
+#: includes/CodeGenerator.php:145
+#: includes/ProductCodeService.php:178
+#: includes/ProductCodeService.php:229
+msgid "A unique product code could not be generated."
+msgstr ""
+
+#: includes/CodeLifecycle.php:264
+msgid "The product was saved, but a product code could not be assigned. Open the product and use \"Generate code\" to try again."
+msgstr ""
+
+#: includes/CodeRepository.php:131
+#: includes/CodeRepository.php:279
+#: includes/ScanUrl.php:75
+msgid "Invalid product code format."
+msgstr ""
+
+#: includes/CodeRepository.php:135
+#: includes/CodeRepository.php:283
+msgid "Invalid product reference."
+msgstr ""
+
+#: includes/CodeRepository.php:147
+msgid "This item already has an active product code."
+msgstr ""
+
+#: includes/CodeRepository.php:170
+#: includes/CodeRepository.php:339
+msgid "The product code could not be saved because it conflicts with an existing code."
+msgstr ""
+
+#: includes/CodeRepository.php:296
+msgid "This item has no active product code to replace."
+msgstr ""
+
+#: includes/CodeRepository.php:301
+msgid "The product code was changed by another request. Reload the page and try again."
+msgstr ""
+
+#: includes/CodeRepository.php:338
+#: includes/CodeRepository.php:379
+msgid "The product code is not active."
+msgstr ""
+
+#: includes/CodeRepository.php:346
+msgid "The product code could not be saved."
+msgstr ""
+
+#: includes/CodeRepository.php:363
+msgid "Invalid product code reference."
+msgstr ""
+
+#: includes/CodesExport.php:67
+#: includes/ReportsExport.php:50
+#: includes/SalesExport.php:49
+msgid "This export can only be downloaded."
+msgstr ""
+
+#: includes/CodesExport.php:71
+msgid "Sorry, you are not allowed to export product codes."
+msgstr ""
+
+#: includes/CodesExport.php:77
+msgid "This export link has expired. Go back to Code tools and export again."
+msgstr ""
+
+#: includes/CodesExport.php:208
+#: includes/CostImport.php:538
+#: includes/CostImport.php:597
+#: includes/ToolsAdmin.php:599
+msgid "Item ID"
+msgstr ""
+
+#: includes/CodesExport.php:209
+#: includes/CostImport.php:598
+msgid "Parent ID"
+msgstr ""
+
+#: includes/CodesExport.php:210
+#: includes/CostImport.php:599
+#: includes/PrintAdmin.php:202
+#: includes/ToolsAdmin.php:352
+msgid "Type"
+msgstr ""
+
+#: includes/CodesExport.php:212
+#: includes/CostImport.php:540
+#: includes/CostImport.php:601
+#: includes/ReportData.php:194
+#: includes/SalesAdmin.php:356
+#: includes/SalesExport.php:128
+#: includes/SalesListTable.php:63
+#: includes/ToolsAdmin.php:599
+msgid "Product"
+msgstr ""
+
+#: includes/CodesExport.php:213
+#: includes/CostImport.php:602
+#: includes/SalesExport.php:129
+msgid "Attributes"
+msgstr ""
+
+#: includes/CodesExport.php:214
+#: includes/ToolsAdmin.php:315
+#: includes/ToolsAdmin.php:346
+msgid "Product status"
+msgstr ""
+
+#: includes/CodesExport.php:216
+msgid "Code status"
+msgstr ""
+
+#: includes/CodesExport.php:217
+msgid "Scan URL"
+msgstr ""
+
+#. translators: %s: site timezone, e.g. Asia/Kolkata.
+#: includes/CodesExport.php:219
+#, php-format
+msgid "Code created (%s)"
+msgstr ""
+
+#: includes/CodesExport.php:246
+msgid "(deleted)"
+msgstr ""
+
+#: includes/CodesExport.php:285
+#: includes/ToolsAdmin.php:828
+msgid "Deleted"
+msgstr ""
+
+#: includes/CodesExport.php:289
+#: includes/ToolsAdmin.php:822
+msgid "Published"
+msgstr ""
+
+#: includes/CodesExport.php:290
+#: includes/ToolsAdmin.php:823
+msgid "Private"
+msgstr ""
+
+#: includes/CodesExport.php:291
+#: includes/ToolsAdmin.php:824
+msgid "Draft"
+msgstr ""
+
+#: includes/CodesExport.php:292
+#: includes/ToolsAdmin.php:825
+msgid "Pending review"
+msgstr ""
+
+#: includes/CodesExport.php:293
+#: includes/ToolsAdmin.php:826
+msgid "Scheduled"
+msgstr ""
+
+#: includes/CodesExport.php:294
+#: includes/ToolsAdmin.php:827
+msgid "Trash"
+msgstr ""
+
+#: includes/CodesExport.php:303
+msgid "variation disabled"
+msgstr ""
+
+#: includes/CostImport.php:116
+msgid "An import is being applied. Continue it or cancel it before uploading another file."
+msgstr ""
+
+#: includes/CostImport.php:406
+#: includes/ToolsAdmin.php:549
+msgid "Nothing to apply: no row changes a cost price."
+msgstr ""
+
+#: includes/CostImport.php:410
+msgid "Tick the box to confirm that the rows with errors are skipped."
+msgstr ""
+
+#: includes/CostImport.php:537
+#: includes/ToolsAdmin.php:599
+msgid "Line"
+msgstr ""
+
+#. translators: %s: currency symbol.
+#: includes/CostImport.php:542
+#, php-format
+msgid "Cost before (%s)"
+msgstr ""
+
+#. translators: %s: currency symbol.
+#: includes/CostImport.php:544
+#, php-format
+msgid "New cost (%s)"
+msgstr ""
+
+#: includes/CostImport.php:545
+#: includes/ToolsAdmin.php:599
+msgid "Outcome"
+msgstr ""
+
+#: includes/CostImport.php:546
+#: includes/ReportData.php:494
+#: includes/ReportData.php:587
+#: includes/ReportsAdmin.php:899
+#: includes/ToolsAdmin.php:599
+msgid "Reason"
+msgstr ""
+
+#: includes/CostImport.php:547
+msgid "Result"
+msgstr ""
+
+#. translators: %s: currency symbol.
+#: includes/CostImport.php:604
+#: includes/CostPrice.php:317
+#: includes/CostPrice.php:371
+#, php-format
+msgid "Cost price (%s)"
+msgstr ""
+
+#: includes/CostImport.php:638
+msgid "(default for variations without their own cost)"
+msgstr ""
+
+#: includes/CostImport.php:685
+msgid "Give an ID or a SKU."
+msgstr ""
+
+#: includes/CostImport.php:687
+msgid "The ID must be a whole number."
+msgstr ""
+
+#: includes/CostImport.php:689
+msgid "No product or variation has this ID."
+msgstr ""
+
+#: includes/CostImport.php:691
+msgid "No product or variation has this SKU."
+msgstr ""
+
+#: includes/CostImport.php:692
+msgid "If the SKU starts with 0, Excel may have removed the zeros: see the README."
+msgstr ""
+
+#: includes/CostImport.php:694
+msgid "More than one product or variation has this SKU. Use the ID instead."
+msgstr ""
+
+#: includes/CostImport.php:696
+msgid "The ID and the SKU belong to different products."
+msgstr ""
+
+#: includes/CostImport.php:698
+msgid "The product is in the trash or not saved yet."
+msgstr ""
+
+#: includes/CostImport.php:700
+msgid "This product type has no cost price (only simple products, variable products and variations have one)."
+msgstr ""
+
+#: includes/CostImport.php:702
+msgid "The variation's parent product is missing, in the trash or not a variable product."
+msgstr ""
+
+#. translators: %s: line numbers.
+#: includes/CostImport.php:705
+#, php-format
+msgid "This product appears on more than one row (lines %s). Keep one row per product."
+msgstr ""
+
+#: includes/CostImport.php:707
+msgid "The cost price cannot be negative."
+msgstr ""
+
+#. translators: %s: number of decimals.
+#: includes/CostImport.php:710
+#, php-format
+msgid "More than %s decimals. The value is not rounded; correct it in the file."
+msgstr ""
+
+#. translators: %d: number of digits.
+#: includes/CostImport.php:713
+#, php-format
+msgid "The cost price is too large (at most %d digits before the decimal point)."
+msgstr ""
+
+#: includes/CostImport.php:715
+msgid "Not a number. Use e.g. 1200.50, 1,200.50, 1,20,000 or ₹1200. Leave the cell empty for no change, or write \"clear\" to remove the cost price."
+msgstr ""
+
+#: includes/CostImport.php:728
+msgid "Update"
+msgstr ""
+
+#: includes/CostImport.php:729
+msgid "Clear (becomes unknown)"
+msgstr ""
+
+#: includes/CostImport.php:730
+msgid "No change (same value)"
+msgstr ""
+
+#: includes/CostImport.php:731
+msgid "No change (empty cell)"
+msgstr ""
+
+#: includes/CostImport.php:732
+#: includes/HealthCheckAdmin.php:58
+msgid "Error"
+msgstr ""
+
+#: includes/CostImport.php:745
+#: includes/ToolsAdmin.php:572
+msgid "Applied"
+msgstr ""
+
+#: includes/CostImport.php:746
+msgid "Already had this value"
+msgstr ""
+
+#: includes/CostImport.php:747
+msgid "Skipped: the cost was changed after the preview"
+msgstr ""
+
+#: includes/CostImport.php:748
+#: includes/ReportData.php:151
+#: includes/ReportData.php:337
+#: includes/ReportsAdmin.php:930
+#: includes/SalePresenter.php:36
+msgid "Failed"
+msgstr ""
+
+#. translators: %s: column name.
+#: includes/CostImport.php:788
+#, php-format
+msgid "The file has more than one \"%s\" column."
+msgstr ""
+
+#: includes/CostImport.php:795
+msgid "The file needs a \"Cost price\" column. Download the template to see the format."
+msgstr ""
+
+#: includes/CostImport.php:799
+msgid "The file needs an \"ID\" or a \"SKU\" column. Download the template to see the format."
+msgstr ""
+
+#: includes/CostImport.php:978
+#: includes/ToolsAdmin.php:757
+msgid "This import has expired or was replaced. Upload the file again."
+msgstr ""
+
+#: includes/CostImport.php:996
+msgid "The file is too large to preview. Split it into smaller files."
+msgstr ""
+
+#: includes/CostImport.php:1054
+#: includes/ToolsAdmin.php:670
+#: includes/ToolsAdmin.php:697
+#: includes/ToolsAdmin.php:748
+#: includes/ToolsAdmin.php:778
+msgid "Sorry, you are not allowed to see or change cost prices."
+msgstr ""
+
+#: includes/CostPrice.php:322
+msgid "Optional. Only administrators see this. Used for profit in In-store sales. Leave empty if unknown."
+msgstr ""
+
+#. translators: %s: currency symbol.
+#: includes/CostPrice.php:342
+#, php-format
+msgid "Default cost price (%s)"
+msgstr ""
+
+#: includes/CostPrice.php:346
+msgid "Optional. Used for variations without their own cost price. Only administrators see this."
+msgstr ""
+
+#. translators: %s: default cost price with currency symbol.
+#: includes/CostPrice.php:375
+#, php-format
+msgid "Default: %s"
+msgstr ""
+
+#: includes/CostPrice.php:378
+msgid "Optional. Empty uses the product's default cost price. Only administrators see this."
+msgstr ""
+
+#. translators: %d: variation ID.
+#: includes/CostPrice.php:424
+#, php-format
+msgid "Variation #%d: "
+msgstr ""
+
+#. translators: %d: number of decimals.
+#: includes/CostPrice.php:474
+#, php-format
+msgid "The cost price must be empty or a number of 0 or more with at most %d decimals, without thousands separators (e.g. 1499.00). The previous value was kept."
+msgstr ""
+
+#: includes/CsvUpload.php:48
+#: includes/CsvUpload.php:56
+msgid "Choose a CSV file to upload."
+msgstr ""
+
+#: includes/CsvUpload.php:60
+msgid "The file could not be uploaded. Try again."
+msgstr ""
+
+#: includes/CsvUpload.php:66
+msgid "Only .csv files can be imported. In Excel use File → Save As → \"CSV UTF-8 (Comma delimited)\"."
+msgstr ""
+
+#: includes/CsvUpload.php:73
+#: includes/CsvUpload.php:116
+msgid "This file is not a CSV text file."
+msgstr ""
+
+#: includes/CsvUpload.php:79
+msgid "The file could not be read. Try again."
+msgstr ""
+
+#: includes/CsvUpload.php:128
+msgid "Save the file as \"CSV UTF-8 (Comma delimited)\" and upload it again."
+msgstr ""
+
+#. translators: 1: line number, 2: maximum columns.
+#: includes/CsvUpload.php:158
+#, php-format
+msgid "Line %1$d has more than %2$d columns."
+msgstr ""
+
+#. translators: 1: line number, 2: maximum bytes.
+#: includes/CsvUpload.php:164
+#, php-format
+msgid "Line %1$d has a cell longer than %2$d characters."
+msgstr ""
+
+#. translators: %d: maximum rows.
+#: includes/CsvUpload.php:175
+#, php-format
+msgid "The file has more than %d rows. Split it into smaller files."
+msgstr ""
+
+#: includes/CsvUpload.php:188
+msgid "The file is empty."
+msgstr ""
+
+#: includes/CsvUpload.php:192
+msgid "The file has a header row but no data rows."
+msgstr ""
+
+#. translators: %s: size limit, e.g. "1 MB".
+#: includes/CsvUpload.php:240
+#, php-format
+msgid "The file is larger than %s. Split it into smaller files."
+msgstr ""
+
+#: includes/DashboardAdmin.php:49
+#: includes/DashboardAdmin.php:162
+#: includes/ReportsAdmin.php:178
+#: includes/ReportsAdmin.php:196
+#: includes/SalesAdmin.php:55
+#: includes/SalesAdmin.php:80
+#: includes/SettingsPage.php:62
+#: includes/SettingsPage.php:131
+#: includes/ToolsAdmin.php:116
+#: includes/ToolsAdmin.php:163
+msgid "Sorry, you are not allowed to access this page."
+msgstr ""
+
+#: includes/DashboardAdmin.php:98
+#: includes/SettingsPage.php:247
+msgid "Scan base URL settings"
+msgstr ""
+
+#. translators: %s: scan base URL.
+#: includes/DashboardAdmin.php:102
+#, php-format
+msgid "QR codes currently point to a local address (%s). Do not print labels until the production URL is set."
+msgstr ""
+
+#: includes/DashboardAdmin.php:104
+#: includes/PrintAdmin.php:132
+#: includes/SettingsPage.php:240
+#: templates/pqbg-print.php:22
+msgid "Labels should use an https:// scan URL in production."
+msgstr ""
+
+#: includes/DashboardAdmin.php:110
+msgid "Scan links do not work with the current permalink setting, so every printed label opens an error page. Choose another structure under Settings → Permalinks (the labels need no reprint)."
+msgstr ""
+
+#: includes/DashboardAdmin.php:110
+msgid "Permalink settings"
+msgstr ""
+
+#. translators: 1: number of items, 2: scan page address.
+#: includes/DashboardAdmin.php:117
+#, php-format
+msgid "%1$s item uses an address at or below %2$s, which the scan page takes over."
+msgid_plural "%1$s items use an address at or below %2$s, which the scan page takes over."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/DashboardAdmin.php:123
+msgid "Code generation is running."
+msgstr ""
+
+#: includes/DashboardAdmin.php:123
+msgid "Code generation was interrupted (no batch for several minutes)."
+msgstr ""
+
+#: includes/DashboardAdmin.php:123
+#: includes/DashboardAdmin.php:125
+msgid "Continue in Bulk tools"
+msgstr ""
+
+#: includes/DashboardAdmin.php:125
+msgid "Code generation was stopped before it finished."
+msgstr ""
+
+#. translators: %s: number of problems.
+#: includes/DashboardAdmin.php:145
+#, php-format
+msgid "The health check found %s problem in the plugin's data."
+msgid_plural "The health check found %s problems in the plugin's data."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: number of problems.
+#: includes/DashboardAdmin.php:145
+msgid "Open Health check"
+msgstr ""
+
+#. translators: %s: link to In-store reports.
+#: includes/DashboardAdmin.php:176
+#, php-format
+msgid "Today at a glance. For trends and analysis, open %s."
+msgstr ""
+
+#: includes/DashboardAdmin.php:203
+msgid "Needs attention"
+msgstr ""
+
+#: includes/DashboardAdmin.php:221
+#: includes/DashboardAdmin.php:257
+#: includes/ReportData.php:99
+#: includes/ReportData.php:249
+#: includes/ReportData.php:393
+#: includes/ReportData.php:486
+#: includes/ReportsAdmin.php:368
+#: includes/ReportsAdmin.php:703
+#: includes/ReportsAdmin.php:835
+msgid "Revenue"
+msgstr ""
+
+#: includes/DashboardAdmin.php:222
+#: includes/DashboardAdmin.php:257
+#: includes/ReportData.php:97
+#: includes/ReportData.php:248
+#: includes/ReportData.php:392
+#: includes/ReportData.php:484
+#: includes/ReportsAdmin.php:369
+#: includes/ReportsAdmin.php:835
+#: templates/pqbg-scan.php:104
+msgid "Sales"
+msgstr ""
+
+#: includes/DashboardAdmin.php:223
+#: includes/ReportData.php:247
+#: includes/ReportsAdmin.php:370
+msgid "Items sold"
+msgstr ""
+
+#: includes/DashboardAdmin.php:227
+#: includes/ReportData.php:109
+#: includes/ReportsAdmin.php:375
+msgid "Gross profit"
+msgstr ""
+
+#: includes/DashboardAdmin.php:228
+#: includes/ReportData.php:110
+#: includes/ReportsAdmin.php:376
+msgid "Margin"
+msgstr ""
+
+#: includes/DashboardAdmin.php:231
+msgid "Today in the shop"
+msgstr ""
+
+#. translators: 1: date, 2: timezone.
+#: includes/DashboardAdmin.php:233
+#, php-format
+msgid "%1$s · in-store sales, completed only · %2$s"
+msgstr ""
+
+#: includes/DashboardAdmin.php:255
+msgid "No completed in-store sales yet today."
+msgstr ""
+
+#: includes/DashboardAdmin.php:257
+msgid "Today by payment method"
+msgstr ""
+
+#: includes/DashboardAdmin.php:257
+#: includes/ReportData.php:483
+#: includes/ReportData.php:582
+#: includes/ReportsAdmin.php:423
+#: includes/ReportsAdmin.php:425
+#: includes/ReportsAdmin.php:835
+#: includes/ReportsAdmin.php:899
+#: includes/SalesAdmin.php:251
+#: includes/SalesAdmin.php:362
+#: includes/SalesExport.php:136
+#: includes/SalesListTable.php:68
+#: templates/pqbg-scan.php:194
+#: templates/pqbg-scan.php:213
+msgid "Paid by"
+msgstr ""
+
+#. translators: %s: number of sales.
+#: includes/DashboardAdmin.php:261
+#, php-format
+msgid "Voided today: %s sale."
+msgid_plural "Voided today: %s sales."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: number of sales.
+#: includes/DashboardAdmin.php:261
+msgid "See voids"
+msgstr ""
+
+#: includes/DashboardAdmin.php:262
+#: includes/DashboardAdmin.php:349
+#: includes/ReportPrint.php:79
+#: includes/ReportPrint.php:97
+#: includes/ReportsAdmin.php:73
+msgid "End of day"
+msgstr ""
+
+#: includes/DashboardAdmin.php:262
+#: includes/DashboardAdmin.php:350
+msgid "Today's sales"
+msgstr ""
+
+#: includes/DashboardAdmin.php:273
+msgid "Published products without a code"
+msgstr ""
+
+#: includes/DashboardAdmin.php:274
+msgid "Low on stock"
+msgstr ""
+
+#: includes/DashboardAdmin.php:274
+#: includes/DashboardAdmin.php:275
+msgid "See the items"
+msgstr ""
+
+#: includes/DashboardAdmin.php:275
+#: includes/ReportData.php:945
+#: includes/ReportsAdmin.php:629
+#: includes/ScanScreen.php:549
+msgid "Out of stock"
+msgstr ""
+
+#: includes/DashboardAdmin.php:278
+msgid "Products and codes"
+msgstr ""
+
+#: includes/DashboardAdmin.php:284
+msgid "Published products and variations only. Bulk tools → Code tools also counts drafts, private, pending and scheduled items, so its number can be higher. Stock uses the WooCommerce low and out-of-stock thresholds (published and private items)."
+msgstr ""
+
+#: includes/DashboardAdmin.php:293
+#: includes/ToolsAdmin.php:365
+msgid "Recent bulk runs"
+msgstr ""
+
+#: includes/DashboardAdmin.php:296
+#: includes/ToolsAdmin.php:368
+msgid "None yet."
+msgstr ""
+
+#. translators: 1: date and time, 2: tool, 3: user.
+#: includes/DashboardAdmin.php:303
+#, php-format
+msgid "%1$s — %2$s (%3$s)"
+msgstr ""
+
+#: includes/DashboardAdmin.php:320
+msgid "Setup"
+msgstr ""
+
+#: includes/DashboardAdmin.php:321
+msgid "Scan links point to"
+msgstr ""
+
+#: includes/DashboardAdmin.php:322
+msgid "Example scan link"
+msgstr ""
+
+#: includes/DashboardAdmin.php:323
+msgid "Barcodes"
+msgstr ""
+
+#: includes/DashboardAdmin.php:323
+msgid "On (Code 128, for hardware scanners)"
+msgstr ""
+
+#: includes/DashboardAdmin.php:323
+msgid "Off (QR codes only)"
+msgstr ""
+
+#: includes/DashboardAdmin.php:324
+#: includes/SettingsPage.php:119
+#: includes/SettingsPage.php:195
+msgid "Payment methods offered"
+msgstr ""
+
+#: includes/DashboardAdmin.php:328
+msgid "Change in Settings"
+msgstr ""
+
+#: includes/DashboardAdmin.php:342
+msgid "Open the scan page (sell on a phone)"
+msgstr ""
+
+#: includes/DashboardAdmin.php:345
+msgid "Print labels (Products → select → \"Print QR labels\")"
+msgstr ""
+
+#: includes/DashboardAdmin.php:353
+#: includes/ToolsAdmin.php:130
+#: includes/ToolsAdmin.php:483
+msgid "Import cost prices"
+msgstr ""
+
+#: includes/DashboardAdmin.php:360
+msgid "Quick links"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:32
+msgid "Read-only checks of the plugin's data. Nothing on this page changes anything."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:35
+msgid "No problems found."
+msgstr ""
+
+#. translators: %s: number of problems.
+#: includes/HealthCheckAdmin.php:38
+#, php-format
+msgid "%s problem found."
+msgid_plural "%s problems found."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: milliseconds.
+#: includes/HealthCheckAdmin.php:46
+#, php-format
+msgid "Checked in %s ms."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:59
+msgid "Warning"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:60
+msgid "Information"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:68
+msgid "none found."
+msgstr ""
+
+#. translators: %s: count.
+#: includes/HealthCheckAdmin.php:70
+#, php-format
+msgid "%s found."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:74
+msgid "Item or sale"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:74
+#: includes/ToolsAdmin.php:372
+msgid "Details"
+msgstr ""
+
+#. translators: 1: rows shown, 2: total.
+#: includes/HealthCheckAdmin.php:84
+#, php-format
+msgid "Showing %1$s of %2$s."
+msgstr ""
+
+#. translators: %s: sale number.
+#: includes/HealthCheckAdmin.php:99
+#, php-format
+msgid "Sale #%s"
+msgstr ""
+
+#. translators: %s: item ID.
+#: includes/HealthCheckAdmin.php:106
+#, php-format
+msgid "Item #%s"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:127
+msgid "A plugin table is missing. Deactivate and reactivate the plugin to recreate it."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:128
+msgid "Permalinks are set to \"Plain\"."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:129
+msgid "The permalink structure contains index.php."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:130
+msgid "The item no longer exists."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:131
+msgid "Not a product or variation."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:132
+msgid "The product is no longer a simple product (e.g. now variable, grouped or external)."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:133
+msgid "The variation's parent is missing or no longer a variable product."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:134
+msgid "The item is an auto-draft."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:135
+msgid "The code row breaks the one-active-code rule."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:136
+msgid "More than one entry."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:137
+msgid "The stored cost price is not a valid amount."
+msgstr ""
+
+#. translators: 1: stored version, 2: expected version.
+#: includes/HealthCheckAdmin.php:143
+#, php-format
+msgid "Stored schema version %1$d, expected %2$d."
+msgstr ""
+
+#. translators: %d: number of active codes.
+#: includes/HealthCheckAdmin.php:146
+#, php-format
+msgid "%d active codes for one item."
+msgstr ""
+
+#. translators: %s: product code.
+#: includes/HealthCheckAdmin.php:153
+#, php-format
+msgid "Code %s."
+msgstr ""
+
+#. translators: %s: stock quantity.
+#: includes/HealthCheckAdmin.php:158
+#, php-format
+msgid "Stock %s."
+msgstr ""
+
+#. translators: 1: date and time, 2: product name.
+#: includes/HealthCheckAdmin.php:164
+#, php-format
+msgid "%1$s, %2$s."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:177
+msgid "Database tables"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:177
+msgid "The plugin's tables exist and their version matches the plugin."
+msgstr ""
+
+#. translators: %s: example scan page address.
+#: includes/HealthCheckAdmin.php:179
+msgid "Scan links (permalinks)"
+msgstr ""
+
+#. translators: %s: example scan page address.
+#: includes/HealthCheckAdmin.php:179
+#, php-format
+msgid "Printed labels open addresses such as %s. They work only with a permalink structure other than \"Plain\" and without index.php; otherwise every label opens an error page. Choose another structure under Settings → Permalinks (the labels need no reprint)."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:180
+msgid "Negative stock"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:180
+msgid "Items with a product code (or the parent product that holds their stock) with stock below zero. Count the item and correct its stock on the product screen."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:181
+msgid "Sales without a stock snapshot"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:181
+msgid "Completed sales whose \"stock after\" was not recorded because the request stopped right after changing the stock. The stock and the sale agree; only the snapshot is missing. Nothing to repair."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:182
+msgid "Interrupted sales"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:182
+msgid "Sales still \"in progress\" after 15 minutes: the request stopped before changing the stock, so no stock changed. The next sale of the same item marks them failed automatically."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:183
+msgid "Codes on missing or unsuitable items"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:183
+msgid "Active product codes whose item was deleted or can no longer have a code. Check the product; printed labels with these codes will not sell."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:184
+msgid "One active code per item"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:184
+msgid "Every item has at most one active code, and every code row is consistent. This should never find anything; if it does, keep a database backup and investigate before changing anything."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:185
+msgid "Cost prices"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:185
+msgid "Stored cost prices that are not valid amounts, stored twice, or stored on something that is not a product. Re-enter the cost on the product screen or with Import cost prices."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:186
+msgid "Codes on trashed items"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:186
+msgid "Codes stay active while an item is in the trash (so restoring it keeps its labels); they are retired when it is deleted permanently. For information."
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:187
+msgid "Sales of deleted items"
+msgstr ""
+
+#: includes/HealthCheckAdmin.php:187
+msgid "Sales keep the product name, SKU and prices from the moment of sale, so deleting a product later is allowed; reports show these as deleted. For information."
+msgstr ""
+
+#: includes/Install.php:61
+#: includes/Install.php:71
+msgid "Plugin activation failed"
+msgstr ""
+
+#: includes/Install.php:114
+msgid "Another Product QR Code and Barcode Generator installation or upgrade is in progress. Try again in a few minutes."
+msgstr ""
+
+#: includes/Install.php:162
+msgid "Product QR Code and Barcode Generator could not create its database tables."
+msgstr ""
+
+#: includes/Install.php:188
+#: includes/Install.php:214
+#: includes/Install.php:237
+msgid "Product QR Code and Barcode Generator could not update its database tables."
+msgstr ""
+
+#: includes/PaymentMethods.php:43
+msgid "Cash"
+msgstr ""
+
+#: includes/PaymentMethods.php:44
+msgid "UPI"
+msgstr ""
+
+#: includes/PaymentMethods.php:45
+msgid "Card"
+msgstr ""
+
+#: includes/PaymentMethods.php:46
+msgid "Other"
+msgstr ""
+
+#: includes/PaymentMethods.php:90
+#: includes/ReportData.php:817
+msgid "Not recorded"
+msgstr ""
+
+#. translators: 1: slow renders, 2: renders counted, 3: seconds.
+#: includes/PerfSignal.php:133
+#, php-format
+msgid "%1$d of the last %2$d Dashboard loads took more than %3$s s to compute their figures."
+msgstr ""
+
+#. translators: 1: average sales per day, 2: days, 3: threshold.
+#: includes/PerfSignal.php:138
+#, php-format
+msgid "In-store sales averaged %1$s a day over the last %2$d days (more than %3$d)."
+msgstr ""
+
+#: includes/PerfSignal.php:145
+msgid "In-store reports may be getting slow: the plugin README (In-store reports → Performance) describes the planned daily summary table or result cache."
+msgstr ""
+
+#: includes/PrintAdmin.php:64
+#: includes/PrintAdmin.php:65
+#: includes/PrintAdmin.php:127
+#: includes/PrintAdmin.php:301
+#: includes/PrintPage.php:151
+#: includes/PrintPage.php:310
+msgid "Print QR labels"
+msgstr ""
+
+#: includes/PrintAdmin.php:93
+#: includes/PrintAdmin.php:267
+#: includes/PrintPage.php:101
+msgid "You are not allowed to print product labels."
+msgstr ""
+
+#: includes/PrintAdmin.php:101
+#: includes/PrintAdmin.php:112
+#: includes/PrintAdmin.php:277
+#: includes/PrintPage.php:112
+msgid "The link you followed has expired. Go back to the products and try again."
+msgstr ""
+
+#: includes/PrintAdmin.php:130
+#: includes/SettingsPage.php:238
+#: templates/pqbg-print.php:21
+msgid "QR codes currently point to a local address. Do not print labels until the production URL is set."
+msgstr ""
+
+#: includes/PrintAdmin.php:130
+msgid "You can still print test labels; they are marked \"TEST – NOT FOR USE\"."
+msgstr ""
+
+#. translators: 1: items with a code, 2: selected products.
+#: includes/PrintAdmin.php:144
+#, php-format
+msgid "%1$d item ready to print"
+msgid_plural "%1$d items ready to print"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: labels.
+#: includes/PrintAdmin.php:148
+#, php-format
+msgid "%d label with these options"
+msgid_plural "%d labels with these options"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: items.
+#: includes/PrintAdmin.php:155
+#, php-format
+msgid "%d item is not published: its label scans to \"Not published – cannot be sold yet\" until you publish it."
+msgid_plural "%d items are not published: their labels scan to \"Not published – cannot be sold yet\" until you publish them."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/PrintAdmin.php:165
+#: templates/pqbg-print.php:130
+msgid "Open product"
+msgstr ""
+
+#: includes/PrintAdmin.php:182
+msgid "Layout"
+msgstr ""
+
+#: includes/PrintAdmin.php:187
+msgid "too small for your scan URL"
+msgstr ""
+
+#. translators: %s: QR size in mm.
+#: includes/PrintAdmin.php:189
+#, php-format
+msgid "QR code %s mm"
+msgstr ""
+
+#: includes/PrintAdmin.php:194
+msgid "edge-to-edge sheet"
+msgstr ""
+
+#: includes/PrintAdmin.php:200
+msgid "Custom layout (mm):"
+msgstr ""
+
+#: includes/PrintAdmin.php:203
+msgid "Label sheet"
+msgstr ""
+
+#: includes/PrintAdmin.php:204
+msgid "Thermal printer (one label per page)"
+msgstr ""
+
+#: includes/PrintAdmin.php:205
+msgid "Thermal printer resolution"
+msgstr ""
+
+#: includes/PrintAdmin.php:212
+msgid "For a thermal printer only the label width and height are used."
+msgstr ""
+
+#: includes/PrintAdmin.php:214
+msgid "Options"
+msgstr ""
+
+#: includes/PrintAdmin.php:215
+msgid "Start at position"
+msgstr ""
+
+#: includes/PrintAdmin.php:215
+msgid "Label sheets only: skip the labels already used on a partly used sheet (counted row by row from the top left)."
+msgstr ""
+
+#: includes/PrintAdmin.php:217
+msgid "Copies"
+msgstr ""
+
+#: includes/PrintAdmin.php:218
+msgid "per item"
+msgstr ""
+
+#: includes/PrintAdmin.php:219
+msgid "One label per unit in stock (items that track their own stock; others get 1 label)"
+msgstr ""
+
+#. translators: %d: maximum labels.
+#: includes/PrintAdmin.php:221
+#, php-format
+msgid "At most %d labels per print job."
+msgstr ""
+
+#: includes/PrintAdmin.php:223
+msgid "Show on the label"
+msgstr ""
+
+#: includes/PrintAdmin.php:225
+msgid "Product name"
+msgstr ""
+
+#: includes/PrintAdmin.php:226
+msgid "Variation attributes"
+msgstr ""
+
+#: includes/PrintAdmin.php:228
+#: includes/ReportData.php:628
+msgid "Price"
+msgstr ""
+
+#: includes/PrintAdmin.php:229
+msgid "Store name"
+msgstr ""
+
+#: includes/PrintAdmin.php:236
+msgid "Code (always printed)"
+msgstr ""
+
+#: includes/PrintAdmin.php:237
+msgid "Printed prices go out of date when you change them; the QR always shows the live price."
+msgstr ""
+
+#. translators: %s: width in mm.
+#: includes/PrintAdmin.php:241
+#, php-format
+msgid "Barcodes are on: a barcode is printed on labels that are at least %s mm wide inside their margins."
+msgstr ""
+
+#. translators: %s: maximum offset in mm.
+#: includes/PrintAdmin.php:247
+msgid "Printer offset (label sheets only): right"
+msgstr ""
+
+#. translators: %s: maximum offset in mm.
+#: includes/PrintAdmin.php:247
+msgid "down"
+msgstr ""
+
+#. translators: %s: maximum offset in mm.
+#: includes/PrintAdmin.php:247
+#, php-format
+msgid "Moves everything by up to ±%s mm if your printer prints slightly off; negative values move left or up."
+msgstr ""
+
+#: includes/PrintAdmin.php:249
+msgid "Preview and print"
+msgstr ""
+
+#: includes/PrintAdmin.php:251
+msgid "Your choices are remembered for next time (for your user only)."
+msgstr ""
+
+#: includes/PrintJob.php:55
+msgid "The product selection is not valid. Go back to the products and try again."
+msgstr ""
+
+#: includes/PrintJob.php:62
+msgid "No products were selected."
+msgstr ""
+
+#. translators: 1: selected count, 2: maximum.
+#: includes/PrintJob.php:67
+#, php-format
+msgid "%1$d products are selected; the maximum is %2$d. Select fewer products."
+msgstr ""
+
+#: includes/PrintJob.php:141
+msgid "Choose a label layout."
+msgstr ""
+
+#. translators: %d: labels per sheet.
+#: includes/PrintJob.php:151
+#, php-format
+msgid "The start position must be a whole number from 1 to %d."
+msgstr ""
+
+#: includes/PrintJob.php:157
+msgid "Choose how many copies to print."
+msgstr ""
+
+#. translators: %d: maximum copies.
+#: includes/PrintJob.php:164
+#, php-format
+msgid "Copies per item must be a whole number from 1 to %d."
+msgstr ""
+
+#: includes/PrintJob.php:170
+msgid "Unknown label field."
+msgstr ""
+
+#. translators: %s: maximum offset in mm.
+#: includes/PrintJob.php:184
+#, php-format
+msgid "The printer offset must be between -%1$s and %1$s mm, with at most 2 decimals."
+msgstr ""
+
+#: includes/PrintJob.php:400
+msgid "Stock is shared with the other variations: 1 label."
+msgstr ""
+
+#: includes/PrintJob.php:401
+msgid "Stock is not tracked: 1 label."
+msgstr ""
+
+#. translators: 1: labels in the job, 2: maximum.
+#: includes/PrintJob.php:411
+#, php-format
+msgid "This job has %1$d labels; the maximum is %2$d. Select fewer products or print fewer copies."
+msgstr ""
+
+#: includes/PrintJob.php:417
+msgid "Nothing to print: none of the selected items has an active product code (or stock, when printing one label per unit)."
+msgstr ""
+
+#: includes/PrintJob.php:441
+msgid "Skipped – no code yet"
+msgstr ""
+
+#: includes/PrintJob.php:442
+msgid "Skipped – in the trash"
+msgstr ""
+
+#: includes/PrintJob.php:443
+msgid "Skipped – not found"
+msgstr ""
+
+#: includes/PrintJob.php:444
+msgid "Skipped – this product type has no code (grouped or external product)"
+msgstr ""
+
+#: includes/PrintJob.php:445
+msgid "Skipped – this variable product has no variations"
+msgstr ""
+
+#: includes/PrintJob.php:446
+msgid "Skipped – no stock (one label per unit in stock)"
+msgstr ""
+
+#: includes/PrintJob.php:449
+msgid "Skipped"
+msgstr ""
+
+#: includes/PrintLayout.php:135
+msgid "Edge-to-edge sheet: your printer must print within about 3 mm of the paper edge. Test on plain paper first."
+msgstr ""
+
+#: includes/PrintLayout.php:150
+msgid "Custom"
+msgstr ""
+
+#. translators: 1: label width, 2: label height (mm).
+#: includes/PrintLayout.php:154
+#, php-format
+msgid "Thermal · %1$s × %2$s mm (one label per page)"
+msgstr ""
+
+#. translators: 1: paper, 2: columns, 3: rows, 4: label width, 5: label height, 6: labels per sheet.
+#: includes/PrintLayout.php:160
+#, php-format
+msgid "%1$s · %2$d × %3$d · %4$s × %5$s mm (%6$d per sheet)"
+msgstr ""
+
+#: includes/PrintLayout.php:170
+msgid "Page width"
+msgstr ""
+
+#: includes/PrintLayout.php:171
+msgid "Page height"
+msgstr ""
+
+#: includes/PrintLayout.php:172
+msgid "Label width"
+msgstr ""
+
+#: includes/PrintLayout.php:173
+msgid "Label height"
+msgstr ""
+
+#: includes/PrintLayout.php:174
+msgid "Columns"
+msgstr ""
+
+#: includes/PrintLayout.php:175
+msgid "Rows"
+msgstr ""
+
+#: includes/PrintLayout.php:176
+msgid "Left margin"
+msgstr ""
+
+#: includes/PrintLayout.php:177
+msgid "Top margin"
+msgstr ""
+
+#: includes/PrintLayout.php:178
+msgid "Gap between columns"
+msgstr ""
+
+#: includes/PrintLayout.php:179
+msgid "Gap between rows"
+msgstr ""
+
+#: includes/PrintLayout.php:197
+msgid "Choose a label sheet or a thermal printer."
+msgstr ""
+
+#: includes/PrintLayout.php:206
+msgid "Choose the thermal printer resolution: 203 or 300 dpi."
+msgstr ""
+
+#. translators: 1: field name, 2: minimum, 3: maximum.
+#: includes/PrintLayout.php:224
+#, php-format
+msgid "%1$s must be a whole number from %2$s to %3$s."
+msgstr ""
+
+#. translators: 1: field name, 2: minimum, 3: maximum.
+#: includes/PrintLayout.php:226
+#, php-format
+msgid "%1$s must be a number from %2$s to %3$s mm, with at most 2 decimals."
+msgstr ""
+
+#. translators: %d: maximum labels per sheet.
+#: includes/PrintLayout.php:250
+#, php-format
+msgid "A sheet can have at most %d labels."
+msgstr ""
+
+#. translators: 1: needed width, 2: page width (mm).
+#: includes/PrintLayout.php:258
+#, php-format
+msgid "The labels do not fit across the page: they need %1$s mm, the page is %2$s mm wide."
+msgstr ""
+
+#. translators: 1: needed height, 2: page height (mm).
+#: includes/PrintLayout.php:263
+#, php-format
+msgid "The labels do not fit down the page: they need %1$s mm, the page is %2$s mm high."
+msgstr ""
+
+#. translators: 1: scan URL length, 2: minimum QR size (mm), 3: modules per side, 4: minimum module size (mm), 5: available QR size (mm).
+#: includes/PrintLayout.php:410
+#, php-format
+msgid "Your scan URL (%1$d characters) needs a QR code of at least %2$s mm (%3$d × %3$d modules including the quiet zone, at %4$s mm per module) next to the code text. This label has room for %5$s mm. Use a larger label or a shorter scan base URL."
+msgstr ""
+
+#: includes/ProductCodeService.php:162
+#: includes/ProductCodeService.php:220
+msgid "The product code could not be loaded."
+msgstr ""
+
+#: includes/QrRenderer.php:50
+msgid "QR codes need the PHP iconv extension, which is not available on this server."
+msgstr ""
+
+#: includes/QrRenderer.php:94
+msgid "The QR code could not be rendered."
+msgstr ""
+
+#: includes/ReportChart.php:187
+msgid "None"
+msgstr ""
+
+#: includes/ReportChart.php:194
+msgid "Most"
+msgstr ""
+
+#: includes/ReportData.php:55
+msgid "Unknown report."
+msgstr ""
+
+#: includes/ReportData.php:59
+#: includes/ReportsAdmin.php:185
+#: includes/ReportsExport.php:67
+msgid "Sorry, you are not allowed to see costs and profit."
+msgstr ""
+
+#: includes/ReportData.php:98
+#: includes/ReportData.php:485
+#: includes/ReportsAdmin.php:835
+#: includes/ReportsAdmin.php:950
+msgid "Items"
+msgstr ""
+
+#: includes/ReportData.php:103
+msgid "Share of revenue"
+msgstr ""
+
+#: includes/ReportData.php:106
+#: includes/ReportsAdmin.php:371
+msgid "Average sale"
+msgstr ""
+
+#: includes/ReportData.php:111
+msgid "Sales with unknown cost"
+msgstr ""
+
+#: includes/ReportData.php:112
+msgid "Revenue with unknown cost"
+msgstr ""
+
+#: includes/ReportData.php:148
+#: includes/ReportsAdmin.php:420
+msgid "Period"
+msgstr ""
+
+#. translators: 1: date and time, 2: user, 3: reason.
+#: includes/ReportData.php:150
+#: includes/ReportData.php:334
+#: includes/ReportsAdmin.php:899
+#: includes/ReportsAdmin.php:930
+#: includes/SalePresenter.php:35
+#: includes/SalesAdmin.php:387
+msgid "Voided"
+msgstr ""
+
+#: includes/ReportData.php:173
+#: includes/ReportData.php:219
+msgid "Total (completed)"
+msgstr ""
+
+#. translators: %s: product name.
+#: includes/ReportData.php:207
+#, php-format
+msgid "%s (deleted)"
+msgstr ""
+
+#: includes/ReportData.php:220
+msgid "Names are the snapshot taken at the latest sale. \"(deleted)\": the product no longer exists."
+msgstr ""
+
+#: includes/ReportData.php:246
+#: includes/ReportData.php:947
+#: includes/ReportsAdmin.php:630
+#: includes/ScanScreen.php:548
+msgid "In stock"
+msgstr ""
+
+#: includes/ReportData.php:274
+msgid "Slow sellers: every item in stock now (stock above 0), with the fewest items sold in this period first. Items that share their product's stock are listed once, as the product."
+msgstr ""
+
+#: includes/ReportData.php:290
+#: includes/ReportsAdmin.php:613
+msgid "Category"
+msgstr ""
+
+#: includes/ReportData.php:291
+msgid "Products sold"
+msgstr ""
+
+#: includes/ReportData.php:307
+msgid "Current categories of each product (a variation counts under its product). A category includes its sub-categories, each product counted once there. A product in several categories counts in each, so category totals can add up to more than the total."
+msgstr ""
+
+#. translators: %s: number of products.
+#: includes/ReportData.php:311
+#, php-format
+msgid "%s product sold in this period is in more than one category."
+msgid_plural "%s products sold in this period are in more than one category."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/ReportData.php:317
+msgid "Total (each sale once)"
+msgstr ""
+
+#: includes/ReportData.php:332
+#: includes/ReportsAdmin.php:851
+#: includes/ReportsAdmin.php:930
+#: includes/SalesAdmin.php:244
+#: includes/SalesExport.php:137
+#: includes/SalesListTable.php:69
+msgid "Seller"
+msgstr ""
+
+#: includes/ReportData.php:335
+#: includes/ReportsAdmin.php:930
+msgid "of which undone by the seller"
+msgstr ""
+
+#: includes/ReportData.php:336
+msgid "Void rate"
+msgstr ""
+
+#. translators: %s: regular price.
+#: includes/ReportData.php:351
+#: includes/ReportData.php:499
+#: includes/ReportData.php:581
+#: includes/ReportData.php:678
+#: includes/ReportData.php:787
+#: includes/ReportsAdmin.php:843
+#: includes/ReportsAdmin.php:855
+#: includes/ReportsAdmin.php:899
+#: includes/SalesAdmin.php:361
+#: includes/SalesExport.php:134
+#: includes/SalesListTable.php:67
+#: includes/ScanScreen.php:429
+#: includes/ToolsAdmin.php:323
+#: templates/pqbg-scan.php:211
+msgid "Total"
+msgstr ""
+
+#: includes/ReportData.php:360
+msgid "Void rate = voided ÷ (completed + voided) of the sales each seller made in this period. Failed attempts (e.g. the item sold online at the same moment) changed no stock and are not the seller's voids."
+msgstr ""
+
+#: includes/ReportData.php:390
+msgid "Day"
+msgstr ""
+
+#: includes/ReportData.php:391
+#: includes/ReportsAdmin.php:725
+msgid "Hour"
+msgstr ""
+
+#: includes/ReportData.php:418
+msgid "Payment method"
+msgstr ""
+
+#: includes/ReportData.php:436
+msgid "Seller (who sold)"
+msgstr ""
+
+#: includes/ReportData.php:450
+msgid "Voided in this period by"
+msgstr ""
+
+#: includes/ReportData.php:459
+msgid "Voided sale (sold in this period)"
+msgstr ""
+
+#: includes/ReportData.php:459
+msgid "Voided in this period, sold earlier"
+msgstr ""
+
+#: includes/ReportData.php:481
+msgid "Section"
+msgstr ""
+
+#: includes/ReportData.php:482
+msgid "Seller / user"
+msgstr ""
+
+#: includes/ReportData.php:487
+#: includes/ReportsAdmin.php:835
+#: includes/ReportsAdmin.php:876
+msgid "Refunds of earlier sales"
+msgstr ""
+
+#: includes/ReportData.php:488
+#: includes/ReportsAdmin.php:835
+msgid "Net collected"
+msgstr ""
+
+#: includes/ReportData.php:489
+#: includes/ReportData.php:577
+#: includes/ReportsAdmin.php:899
+#: includes/SalesExport.php:126
+#: includes/SalesListTable.php:62
+msgid "Sale #"
+msgstr ""
+
+#: includes/ReportData.php:491
+#: includes/ReportData.php:578
+msgid "Sold at"
+msgstr ""
+
+#: includes/ReportData.php:492
+#: includes/ReportData.php:585
+#: includes/SalesExport.php:138
+msgid "Voided at"
+msgstr ""
+
+#: includes/ReportData.php:493
+#: includes/ReportData.php:586
+#: includes/ReportsAdmin.php:899
+#: includes/SalesExport.php:139
+msgid "Voided by"
+msgstr ""
+
+#: includes/ReportData.php:495
+#: includes/ReportData.php:588
+#: includes/ReportsAdmin.php:899
+msgid "Returned to stock"
+msgstr ""
+
+#: includes/ReportData.php:526
+msgid "Revenue with known cost"
+msgstr ""
+
+#: includes/ReportData.php:527
+#: includes/ReportData.php:633
+#: includes/SalesExport.php:146
+msgid "Cost"
+msgstr ""
+
+#: includes/ReportData.php:580
+#: includes/SalesListTable.php:65
+msgid "Qty"
+msgstr ""
+
+#: includes/ReportData.php:583
+#: includes/ReportsAdmin.php:899
+msgid "Sold by"
+msgstr ""
+
+#: includes/ReportData.php:589
+#: includes/ReportsAdmin.php:935
+#: includes/SalesAdmin.php:391
+#: includes/SalesExport.php:141
+msgid "Failure"
+msgstr ""
+
+#: includes/ReportData.php:593
+msgid "Voided and failed sales made in this period (by sale date, like the sales history). Voided sales are not in any revenue."
+msgstr ""
+
+#: includes/ReportData.php:625
+#: includes/ReportData.php:739
+#: includes/ReportsAdmin.php:76
+#: includes/SalesAdmin.php:370
+msgid "Stock"
+msgstr ""
+
+#: includes/ReportData.php:626
+msgid "State"
+msgstr ""
+
+#: includes/ReportData.php:627
+msgid "Low at"
+msgstr ""
+
+#: includes/ReportData.php:629
+#: includes/ReportData.php:743
+#: includes/ReportsAdmin.php:952
+msgid "Value at price"
+msgstr ""
+
+#: includes/ReportData.php:634
+#: includes/ReportData.php:747
+#: includes/ReportsAdmin.php:956
+msgid "Value at cost"
+msgstr ""
+
+#: includes/ReportData.php:641
+msgid "(stock shared by its variations)"
+msgstr ""
+
+#: includes/ReportData.php:645
+msgid "(below zero)"
+msgstr ""
+
+#: includes/ReportData.php:664
+msgid "Items that manage their own stock (published, private, draft or pending). A variable product with product-level stock is one line, shared by its variations. Low and out of stock use the WooCommerce thresholds. Stock below zero (backorders) is valued at 0."
+msgstr ""
+
+#. translators: 1: number of items, 2: units.
+#: includes/ReportData.php:669
+#, php-format
+msgid "%1$s items (%2$s units) are not in the value at price: no price, or variations sharing the stock have different prices."
+msgstr ""
+
+#. translators: 1: number of items, 2: units, 3: their value at price.
+#: includes/ReportData.php:674
+#, php-format
+msgid "Value at cost leaves out %1$s items without a known cost (%2$s units, %3$s at price)."
+msgstr ""
+
+#: includes/ReportData.php:720
+msgid "Published simple products and published variations of published variable products that have no active QR code. Open the product and save it, or use \"Generate code\" in its QR & Barcode panel."
+msgstr ""
+
+#: includes/ReportData.php:740
+msgid "Age (days)"
+msgstr ""
+
+#: includes/ReportData.php:741
+msgid "Last in-store sale"
+msgstr ""
+
+#: includes/ReportData.php:742
+msgid "Last online order"
+msgstr ""
+
+#. translators: %d: days.
+#: includes/ReportData.php:775
+#, php-format
+msgid "Dead stock: in stock now and not sold in the last %d days. Items added less than that long ago are not counted as dead yet."
+msgstr ""
+
+#. translators: 1: number of items, 2: days.
+#: includes/ReportData.php:780
+#, php-format
+msgid "%1$s unsold items were added in the last %2$d days and are not listed."
+msgstr ""
+
+#: includes/ReportData.php:804
+#: includes/SalesAdmin.php:385
+msgid "Undone by the seller"
+msgstr ""
+
+#: includes/ReportData.php:814
+msgid "Yes"
+msgstr ""
+
+#: includes/ReportData.php:814
+msgid "No"
+msgstr ""
+
+#: includes/ReportData.php:817
+msgid "Yes (undo)"
+msgstr ""
+
+#: includes/ReportData.php:824
+msgid "Profit = total − quantity × unit cost, for sales whose cost was known at the moment of sale. Sales with an unknown cost are left out of cost, profit and margin (never counted as zero) and are shown separately. Margin = profit ÷ revenue of the sales with a known cost."
+msgstr ""
+
+#: includes/ReportData.php:831
+msgid "Net collected = revenue of this period's completed sales − the amounts of EARLIER sales voided in this period, per payment method. Assumption: refunds are paid back in the original payment method. A sale made and voided in the same period is already not in revenue, so it is not subtracted again."
+msgstr ""
+
+#: includes/ReportData.php:838
+msgid "Counts in-store sales and online orders (processing, completed, on hold): an item sold online is not dead stock."
+msgstr ""
+
+#: includes/ReportData.php:946
+#: includes/ReportsAdmin.php:628
+msgid "Low stock"
+msgstr ""
+
+#: includes/ReportPeriod.php:56
+#: includes/SalesAdmin.php:209
+#: includes/ScanScreen.php:380
+msgid "Today"
+msgstr ""
+
+#: includes/ReportPeriod.php:57
+#: includes/SalesAdmin.php:210
+#: includes/ScanScreen.php:381
+msgid "Yesterday"
+msgstr ""
+
+#: includes/ReportPeriod.php:58
+msgid "This week"
+msgstr ""
+
+#: includes/ReportPeriod.php:59
+msgid "Last week"
+msgstr ""
+
+#: includes/ReportPeriod.php:60
+#: includes/SalesAdmin.php:212
+msgid "This month"
+msgstr ""
+
+#: includes/ReportPeriod.php:61
+#: includes/SalesAdmin.php:213
+msgid "Last month"
+msgstr ""
+
+#: includes/ReportPeriod.php:62
+#: includes/SalesAdmin.php:211
+#: includes/ScanScreen.php:382
+msgid "Last 7 days"
+msgstr ""
+
+#: includes/ReportPeriod.php:63
+msgid "Last 30 days"
+msgstr ""
+
+#: includes/ReportPeriod.php:64
+msgid "Last 90 days"
+msgstr ""
+
+#: includes/ReportPeriod.php:65
+msgid "Last 12 months"
+msgstr ""
+
+#: includes/ReportPrint.php:63
+msgid "Sorry, you are not allowed to see in-store reports."
+msgstr ""
+
+#: includes/ReportPrint.php:69
+msgid "This link has expired. Go back to In-store reports and print again."
+msgstr ""
+
+#: includes/ReportsAdmin.php:67
+msgid "Summary"
+msgstr ""
+
+#: includes/ReportsAdmin.php:68
+#: includes/ReportsAdmin.php:418
+msgid "Sales over time"
+msgstr ""
+
+#: includes/ReportsAdmin.php:69
+msgid "Products"
+msgstr ""
+
+#: includes/ReportsAdmin.php:70
+#: templates/pqbg-scan.php:162
+msgid "Categories"
+msgstr ""
+
+#: includes/ReportsAdmin.php:71
+msgid "Sellers"
+msgstr ""
+
+#: includes/ReportsAdmin.php:72
+msgid "Peak times"
+msgstr ""
+
+#: includes/ReportsAdmin.php:74
+msgid "Profit & margin"
+msgstr ""
+
+#: includes/ReportsAdmin.php:75
+msgid "Voids & failed"
+msgstr ""
+
+#: includes/ReportsAdmin.php:77
+msgid "Dead stock"
+msgstr ""
+
+#: includes/ReportsAdmin.php:206
+#: includes/SalesAdmin.php:178
+msgid "Export CSV"
+msgstr ""
+
+#: includes/ReportsAdmin.php:210
+#: templates/pqbg-print.php:87
+#: templates/pqbg-report-print.php:33
+msgid "Print"
+msgstr ""
+
+#: includes/ReportsAdmin.php:244
+msgid "Reports"
+msgstr ""
+
+#: includes/ReportsAdmin.php:267
+msgid "In-store (scan) sales only — online orders are in WooCommerce → Analytics."
+msgstr ""
+
+#: includes/ReportsAdmin.php:268
+msgid "Revenue, items and sales count completed sales only; voided and failed sales are not in revenue."
+msgstr ""
+
+#: includes/ReportsAdmin.php:269
+msgid "Amounts are as recorded at the moment of sale. A \"sale\" is one scanned item with its quantity."
+msgstr ""
+
+#. translators: %s: site timezone, e.g. Asia/Kolkata.
+#: includes/ReportsAdmin.php:271
+#, php-format
+msgid "Days are in the site timezone (%s)."
+msgstr ""
+
+#: includes/ReportsAdmin.php:275
+msgid "Stock is the current stock; prices and costs are the current ones."
+msgstr ""
+
+#: includes/ReportsAdmin.php:312
+#: includes/SalesAdmin.php:241
+msgid "From"
+msgstr ""
+
+#: includes/ReportsAdmin.php:313
+#: includes/SalesAdmin.php:242
+msgid "To"
+msgstr ""
+
+#: includes/ReportsAdmin.php:314
+msgid "Apply"
+msgstr ""
+
+#: includes/ReportsAdmin.php:325
+#: includes/SalesAdmin.php:182
+msgid "The start date was after the end date, so they were swapped."
+msgstr ""
+
+#. translators: %d: days.
+#: includes/ReportsAdmin.php:330
+#, php-format
+msgid "A range can be at most %d days; the start date was moved forward."
+msgstr ""
+
+#. translators: %s: date range.
+#: includes/ReportsAdmin.php:345
+#, php-format
+msgid "Compared with %s"
+msgstr ""
+
+#. translators: %s: time of day.
+#: includes/ReportsAdmin.php:351
+#, php-format
+msgid "(up to %s, the same point in time)"
+msgstr ""
+
+#. translators: 1: an amount or a stock status, 2: the number of sales or the quantity in stock.
+#: includes/ReportsAdmin.php:400
+#: templates/pqbg-scan.php:152
+#, php-format
+msgid "%1$s (%2$s)"
+msgstr ""
+
+#. translators: 1: amount, 2: number of sales.
+#: includes/ReportsAdmin.php:414
+#, php-format
+msgid "%1$s (%2$s sales)"
+msgstr ""
+
+#: includes/ReportsAdmin.php:419
+#: includes/ReportsAdmin.php:664
+msgid "Revenue over time"
+msgstr ""
+
+#: includes/ReportsAdmin.php:419
+msgid "Revenue of completed sales per period."
+msgstr ""
+
+#: includes/ReportsAdmin.php:420
+#: includes/ReportsAdmin.php:425
+msgid "Revenue (sales)"
+msgstr ""
+
+#: includes/ReportsAdmin.php:424
+msgid "Revenue by payment method"
+msgstr ""
+
+#: includes/ReportsAdmin.php:424
+msgid "Completed sales in this period, by how the customer paid."
+msgstr ""
+
+#: includes/ReportsAdmin.php:429
+msgid "Top 5 products"
+msgstr ""
+
+#: includes/ReportsAdmin.php:429
+msgid "Top sellers"
+msgstr ""
+
+#: includes/ReportsAdmin.php:433
+#: includes/ReportsAdmin.php:761
+msgid "No completed sales in this period."
+msgstr ""
+
+#. translators: 1: name, 2: amount, 3: number of items.
+#: includes/ReportsAdmin.php:438
+#, php-format
+msgid "%1$s — %2$s (%3$s items)"
+msgstr ""
+
+#. translators: %s: number of items.
+#: includes/ReportsAdmin.php:449
+#, php-format
+msgid "%s item low on stock"
+msgid_plural "%s items low on stock"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: number of items.
+#: includes/ReportsAdmin.php:451
+#, php-format
+msgid "%s item out of stock"
+msgid_plural "%s items out of stock"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: number of sales.
+#: includes/ReportsAdmin.php:453
+#, php-format
+msgid "%s voided sale in this period"
+msgid_plural "%s voided sales in this period"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: number of items.
+#: includes/ReportsAdmin.php:455
+#, php-format
+msgid "%s active item without a QR code"
+msgid_plural "%s active items without a QR code"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/ReportsAdmin.php:458
+msgid "Alerts"
+msgstr ""
+
+#: includes/ReportsAdmin.php:465
+msgid "Products list"
+msgstr ""
+
+#: includes/ReportsAdmin.php:465
+msgid "Stock alerts use the WooCommerce low and out-of-stock thresholds (published and private items)."
+msgstr ""
+
+#: includes/ReportsAdmin.php:552
+msgid "By hour"
+msgstr ""
+
+#: includes/ReportsAdmin.php:553
+msgid "By day"
+msgstr ""
+
+#: includes/ReportsAdmin.php:554
+msgid "By week"
+msgstr ""
+
+#: includes/ReportsAdmin.php:555
+msgid "By month"
+msgstr ""
+
+#: includes/ReportsAdmin.php:564
+msgid "That grouping does not suit this period, so the nearest one is shown."
+msgstr ""
+
+#: includes/ReportsAdmin.php:571
+msgid "Best sellers"
+msgstr ""
+
+#: includes/ReportsAdmin.php:572
+msgid "Slow sellers"
+msgstr ""
+
+#: includes/ReportsAdmin.php:579
+msgid "By item (variation)"
+msgstr ""
+
+#: includes/ReportsAdmin.php:580
+msgid "By product"
+msgstr ""
+
+#: includes/ReportsAdmin.php:589
+msgid "By period"
+msgstr ""
+
+#: includes/ReportsAdmin.php:590
+msgid "By item"
+msgstr ""
+
+#: includes/ReportsAdmin.php:591
+msgid "By category"
+msgstr ""
+
+#: includes/ReportsAdmin.php:603
+msgid "No sale in 30 days"
+msgstr ""
+
+#: includes/ReportsAdmin.php:604
+msgid "60 days"
+msgstr ""
+
+#: includes/ReportsAdmin.php:605
+msgid "90 days"
+msgstr ""
+
+#: includes/ReportsAdmin.php:606
+msgid "Never sold"
+msgstr ""
+
+#: includes/ReportsAdmin.php:619
+#: includes/ReportsAdmin.php:627
+#: includes/SalesAdmin.php:244
+#: includes/SalesAdmin.php:251
+#: includes/SalesAdmin.php:258
+msgid "All"
+msgstr ""
+
+#: includes/ReportsAdmin.php:625
+msgid "Show"
+msgstr ""
+
+#: includes/ReportsAdmin.php:631
+msgid "Below zero"
+msgstr ""
+
+#: includes/ReportsAdmin.php:632
+msgid "Active items without a QR code"
+msgstr ""
+
+#: includes/ReportsAdmin.php:637
+#: includes/SalesAdmin.php:266
+msgid "Filter"
+msgstr ""
+
+#: includes/ReportsAdmin.php:664
+msgid "Gross profit over time"
+msgstr ""
+
+#: includes/ReportsAdmin.php:665
+msgid "Gross profit of completed sales with a known cost, per period (losses below the line)."
+msgstr ""
+
+#: includes/ReportsAdmin.php:665
+msgid "Revenue of completed sales per period. The numbers are in the table below."
+msgstr ""
+
+#: includes/ReportsAdmin.php:681
+msgid "Top 10 by revenue"
+msgstr ""
+
+#: includes/ReportsAdmin.php:681
+msgid "The ten with the most revenue in this period. Every row is in the table below."
+msgstr ""
+
+#: includes/ReportsAdmin.php:703
+msgid "Number of sales"
+msgstr ""
+
+#. translators: 1: weekday, 2: hour range, 3: number of sales, 4: revenue.
+#: includes/ReportsAdmin.php:714
+#, php-format
+msgid "%1$s %2$s: %3$s sales, %4$s"
+msgstr ""
+
+#: includes/ReportsAdmin.php:719
+msgid "Revenue by hour and weekday"
+msgstr ""
+
+#: includes/ReportsAdmin.php:719
+msgid "Sales by hour and weekday"
+msgstr ""
+
+#: includes/ReportsAdmin.php:719
+msgid "Completed sales in this period by local hour of day (columns) and day of week (rows); darker is busier."
+msgstr ""
+
+#: includes/ReportsAdmin.php:723
+msgid "Busiest"
+msgstr ""
+
+#. translators: %s: number of sales.
+#: includes/ReportsAdmin.php:749
+#: includes/ScanScreen.php:451
+#, php-format
+msgid "%s sale"
+msgid_plural "%s sales"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: list of the busiest hours, 2: weekday, 3: hour.
+#: includes/ReportsAdmin.php:784
+#, php-format
+msgid "Busiest hours: %1$s. Busiest day: %2$s. Busiest hour of the day: %3$s."
+msgstr ""
+
+#: includes/ReportsAdmin.php:814
+msgid "Cash expected in drawer"
+msgstr ""
+
+#. translators: %s: payment method.
+#: includes/ReportsAdmin.php:814
+#, php-format
+msgid "%s net collected"
+msgstr ""
+
+#. translators: %s: date or date range.
+#: includes/ReportsAdmin.php:817
+#, php-format
+msgid "End of day — %s"
+msgstr ""
+
+#. translators: 1: revenue, 2: refunds.
+#: includes/ReportsAdmin.php:825
+#, php-format
+msgid "%1$s sales − %2$s refunds of earlier sales"
+msgstr ""
+
+#: includes/ReportsAdmin.php:834
+msgid "By payment method"
+msgstr ""
+
+#: includes/ReportsAdmin.php:846
+msgid "By seller (who sold) — net collected"
+msgstr ""
+
+#: includes/ReportsAdmin.php:849
+#: templates/pqbg-scan.php:106
+msgid "No sales in this period."
+msgstr ""
+
+#. translators: 1: sales, 2: refunds.
+#: includes/ReportsAdmin.php:863
+#, php-format
+msgid "(%1$s − %2$s)"
+msgstr ""
+
+#: includes/ReportsAdmin.php:871
+msgid "Each sale belongs to the seller who sold it; a refund of an earlier sale is taken from that seller's figure. Who paid the refund out is listed below."
+msgstr ""
+
+#. translators: 1: user, 2: amounts per method, 3: number of sales.
+#: includes/ReportsAdmin.php:885
+#, php-format
+msgid "Voided in this period by %1$s: %2$s (%3$s sale)"
+msgid_plural "Voided in this period by %1$s: %2$s (%3$s sales)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/ReportsAdmin.php:890
+msgid "Voided sales made in this period (not in revenue)"
+msgstr ""
+
+#: includes/ReportsAdmin.php:890
+msgid "Voided in this period, sold earlier (the refunds above)"
+msgstr ""
+
+#: includes/ReportsAdmin.php:894
+msgid "None."
+msgstr ""
+
+#. translators: 1: date and time, 2: seller.
+#: includes/ReportsAdmin.php:899
+#: includes/SalesAdmin.php:382
+msgid "Sold"
+msgstr ""
+
+#: includes/ReportsAdmin.php:929
+msgid "Per seller"
+msgstr ""
+
+#: includes/ReportsAdmin.php:934
+msgid "Failed attempts by reason"
+msgstr ""
+
+#: includes/ReportsAdmin.php:935
+msgid "Count"
+msgstr ""
+
+#: includes/ReportsAdmin.php:936
+msgid "sold_online: the item sold online at the same moment; error or interrupted: the sale could not be completed. Failed attempts changed no stock."
+msgstr ""
+
+#: includes/ReportsAdmin.php:951
+msgid "Units in stock"
+msgstr ""
+
+#: includes/ReportsAdmin.php:959
+msgid "Low / out of stock"
+msgstr ""
+
+#: includes/ReportsAdmin.php:1034
+msgid "mixed prices"
+msgstr ""
+
+#: includes/ReportsAdmin.php:1035
+#: includes/SalesAdmin.php:366
+#: includes/SalesAdmin.php:367
+#: includes/SalesListTable.php:164
+#: includes/SalesListTable.php:172
+#: includes/ToolsAdmin.php:625
+msgid "unknown"
+msgstr ""
+
+#: includes/ReportsAdmin.php:1036
+msgid "no variations"
+msgstr ""
+
+#: includes/ReportsAdmin.php:1066
+msgid "Show the numbers"
+msgstr ""
+
+#: includes/ReportsAdmin.php:1101
+msgid "— nothing to compare with"
+msgstr ""
+
+#. translators: 1: arrow, 2: number.
+#: includes/ReportsAdmin.php:1108
+#, php-format
+msgid "%1$s %2$s pt"
+msgstr ""
+
+#. translators: 1: arrow, 2: number.
+#: includes/ReportsAdmin.php:1108
+#, php-format
+msgid "%1$s %2$s%%"
+msgstr ""
+
+#. translators: 1: number of sales, 2: their revenue.
+#: includes/ReportsAdmin.php:1118
+#, php-format
+msgid "Profit and margin leave out %1$s sale (%2$s) with an unknown cost."
+msgid_plural "Profit and margin leave out %1$s sales (%2$s) with an unknown cost."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/ReportsExport.php:54
+msgid "Sorry, you are not allowed to export reports."
+msgstr ""
+
+#: includes/ReportsExport.php:60
+msgid "This export link has expired. Go back to In-store reports and export again."
+msgstr ""
+
+#: includes/ReportsExport.php:71
+msgid "The Summary has no export. Open a report and export it."
+msgstr ""
+
+#: includes/ReportsQuery.php:404
+msgid "Deleted products (category unknown)"
+msgstr ""
+
+#: includes/ReportTable.php:162
+msgid "Nothing to show for this period."
+msgstr ""
+
+#. translators: 1: required PHP version, 2: current PHP version.
+#: includes/Requirements.php:53
+#, php-format
+msgid "Product QR Code and Barcode Generator requires PHP %1$s or newer. This site runs PHP %2$s."
+msgstr ""
+
+#. translators: 1: required WordPress version, 2: current WordPress version.
+#: includes/Requirements.php:58
+#, php-format
+msgid "Product QR Code and Barcode Generator requires WordPress %1$s or newer. This site runs WordPress %2$s."
+msgstr ""
+
+#: includes/Requirements.php:62
+msgid "Product QR Code and Barcode Generator requires WooCommerce to be installed and active."
+msgstr ""
+
+#. translators: 1: required WooCommerce version, 2: current WooCommerce version.
+#: includes/Requirements.php:65
+#, php-format
+msgid "Product QR Code and Barcode Generator requires WooCommerce %1$s or newer. This site runs WooCommerce %2$s."
+msgstr ""
+
+#: includes/Requirements.php:69
+msgid "Product QR Code and Barcode Generator works on single sites only; WordPress multisite is not supported."
+msgstr ""
+
+#: includes/Requirements.php:114
+msgid "Product QR Code and Barcode Generator is inactive."
+msgstr ""
+
+#: includes/SalePresenter.php:34
+msgid "Completed"
+msgstr ""
+
+#: includes/SalePresenter.php:37
+msgid "In progress"
+msgstr ""
+
+#. translators: %s: seller name at the time of sale.
+#: includes/SalePresenter.php:59
+#, php-format
+msgid "%s (deleted user)"
+msgstr ""
+
+#: includes/SaleRepository.php:68
+msgid "This sale was already submitted."
+msgstr ""
+
+#: includes/SaleRepository.php:69
+msgid "The sale could not be recorded."
+msgstr ""
+
+#: includes/SaleRequest.php:87
+#: includes/SaleRequest.php:96
+#: includes/SaleService.php:190
+#: includes/SaleService.php:759
+msgid "This form is not valid. Check the item and confirm again."
+msgstr ""
+
+#: includes/SaleRequest.php:120
+#: includes/SaleRequest.php:260
+#: includes/ScanRoute.php:273
+msgid "This request could not be understood."
+msgstr ""
+
+#: includes/SaleRequest.php:124
+#: includes/SaleService.php:186
+#: includes/SaleService.php:412
+msgid "You do not have permission to sell."
+msgstr ""
+
+#: includes/SaleRequest.php:182
+msgid "This form is no longer valid. Check the item and confirm again."
+msgstr ""
+
+#: includes/SaleRequest.php:195
+msgid "This sale form has expired. Check the item and confirm again."
+msgstr ""
+
+#. translators: %s: stock quantity shown on the form.
+#: includes/SaleRequest.php:206
+#, php-format
+msgid "Choose a quantity between 1 and %s."
+msgstr ""
+
+#: includes/SaleRequest.php:241
+#: includes/ScanScreen.php:218
+msgid "This item just sold online. Stock was not changed."
+msgstr ""
+
+#: includes/SaleRequest.php:242
+#: includes/SaleService.php:198
+#: includes/ScanScreen.php:219
+msgid "The sale could not be completed. Stock was not changed."
+msgstr ""
+
+#: includes/SaleRequest.php:264
+msgid "This form is no longer valid. Reload the page and try again."
+msgstr ""
+
+#: includes/SalesAdmin.php:67
+#: includes/SalesAdmin.php:125
+#: includes/SaleService.php:498
+msgid "Sale not found."
+msgstr ""
+
+#: includes/SalesAdmin.php:67
+msgid "Sale not found"
+msgstr ""
+
+#: includes/SalesAdmin.php:71
+#: includes/SalesAdmin.php:109
+msgid "Sorry, you are not allowed to void sales."
+msgstr ""
+
+#: includes/SalesAdmin.php:105
+msgid "This action must be submitted from the void screen."
+msgstr ""
+
+#: includes/SalesAdmin.php:117
+msgid "This form is no longer valid. Go back, reload the page and try again."
+msgstr ""
+
+#: includes/SalesAdmin.php:265
+msgid "Search"
+msgstr ""
+
+#: includes/SalesAdmin.php:265
+msgid "Name, SKU or code"
+msgstr ""
+
+#: includes/SalesAdmin.php:267
+msgid "The date presets above keep these filters. Dates are days in the site timezone."
+msgstr ""
+
+#. translators: 1: number of sales, 2: number of items, 3: revenue.
+#: includes/SalesAdmin.php:289
+#, php-format
+msgid "Completed in this view: %1$s sales · %2$s items · %3$s"
+msgstr ""
+
+#. translators: 1: cost, 2: profit.
+#: includes/SalesAdmin.php:305
+#, php-format
+msgid "Cost %1$s · Profit %2$s"
+msgstr ""
+
+#. translators: 1: number of lines, 2: their revenue.
+#: includes/SalesAdmin.php:315
+#, php-format
+msgid "excludes %1$s line with unknown cost (%2$s)"
+msgid_plural "excludes %1$s lines with unknown cost (%2$s)"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: voided count, 2: failed count.
+#: includes/SalesAdmin.php:326
+#, php-format
+msgid "Also in this view: %1$s voided · %2$s failed"
+msgstr ""
+
+#. translators: 1: sale number, 2: status.
+#: includes/SalesAdmin.php:346
+#, php-format
+msgid "Sale #%1$s — %2$s"
+msgstr ""
+
+#: includes/SalesAdmin.php:349
+#: includes/SalesAdmin.php:446
+msgid "Void sale"
+msgstr ""
+
+#: includes/SalesAdmin.php:352
+msgid "Back to In-store sales"
+msgstr ""
+
+#: includes/SalesAdmin.php:359
+#: includes/SalesExport.php:132
+#: templates/pqbg-scan.php:177
+#: templates/pqbg-scan.php:209
+msgid "Quantity"
+msgstr ""
+
+#: includes/SalesAdmin.php:360
+#: includes/SalesExport.php:133
+#: includes/SalesListTable.php:66
+msgid "Unit price"
+msgstr ""
+
+#. translators: %s: regular price.
+#: includes/SalesAdmin.php:360
+#, php-format
+msgid "regular %s"
+msgstr ""
+
+#: includes/SalesAdmin.php:366
+#: includes/SalesExport.php:145
+#: includes/SalesListTable.php:74
+msgid "Unit cost"
+msgstr ""
+
+#: includes/SalesAdmin.php:367
+#: includes/SalesExport.php:147
+#: includes/SalesListTable.php:75
+msgid "Profit"
+msgstr ""
+
+#: includes/SalesAdmin.php:367
+msgid "(not counted: the sale is not completed)"
+msgstr ""
+
+#: includes/SalesAdmin.php:380
+msgid "Timeline"
+msgstr ""
+
+#. translators: 1: date and time, 2: seller.
+#: includes/SalesAdmin.php:382
+#, php-format
+msgid "%1$s by %2$s"
+msgstr ""
+
+#. translators: 1: date and time, 2: user, 3: reason.
+#: includes/SalesAdmin.php:387
+#, php-format
+msgid "%1$s by %2$s — “%3$s”"
+msgstr ""
+
+#. translators: 1: request ID, 2: source.
+#: includes/SalesAdmin.php:398
+#, php-format
+msgid "Request %1$s · source %2$s. Prices, names and cost are snapshots taken at the moment of sale."
+msgstr ""
+
+#. translators: %s: sale number.
+#: includes/SalesAdmin.php:415
+#, php-format
+msgid "Void sale #%s?"
+msgstr ""
+
+#: includes/SalesAdmin.php:419
+#: includes/SaleService.php:441
+#: includes/SaleService.php:455
+msgid "Only a completed sale can be voided."
+msgstr ""
+
+#: includes/SalesAdmin.php:420
+msgid "Back to the sale"
+msgstr ""
+
+#. translators: 1: item, 2: quantity, 3: unit price, 4: total, 5: payment method, 6: seller.
+#: includes/SalesAdmin.php:425
+#, php-format
+msgid "%1$s · %2$s × %3$s = %4$s · %5$s · %6$s"
+msgstr ""
+
+#: includes/SalesAdmin.php:434
+msgid "Reason (required)"
+msgstr ""
+
+#. translators: %s: quantity.
+#: includes/SalesAdmin.php:440
+#, php-format
+msgid "Return %s to stock"
+msgstr ""
+
+#. translators: 1: quantity, 2: stock now.
+#: includes/SalesAdmin.php:442
+#, php-format
+msgid "Return %1$s to stock (stock now %2$s)"
+msgstr ""
+
+#: includes/SalesAdmin.php:445
+msgid "The sale stays in the history, marked as voided, with your name, the time and the reason. It no longer counts in totals."
+msgstr ""
+
+#: includes/SalesAdmin.php:457
+msgid "Sale voided. The quantity was returned to stock."
+msgstr ""
+
+#: includes/SalesAdmin.php:458
+msgid "Sale voided. Stock was not changed."
+msgstr ""
+
+#: includes/SalesAdmin.php:459
+msgid "This sale was already voided or cannot be voided. Nothing was changed."
+msgstr ""
+
+#: includes/SalesAdmin.php:460
+msgid "Enter a reason for voiding this sale."
+msgstr ""
+
+#. translators: %d: maximum length.
+#: includes/SalesAdmin.php:462
+#, php-format
+msgid "The reason can be at most %d characters."
+msgstr ""
+
+#: includes/SalesAdmin.php:463
+msgid "Someone is selling this item right now. Try again in a moment. Nothing was changed."
+msgstr ""
+
+#: includes/SalesAdmin.php:464
+msgid "The quantity cannot be returned to stock because stock tracking changed for this product. Untick \"Return to stock\" to void the sale without changing stock. Nothing was changed."
+msgstr ""
+
+#: includes/SalesAdmin.php:465
+msgid "You are not allowed to void sales."
+msgstr ""
+
+#: includes/SalesAdmin.php:466
+msgid "The sale could not be voided. Nothing was changed."
+msgstr ""
+
+#. translators: %d: product ID holding the stock.
+#: includes/SalesAdmin.php:484
+#, php-format
+msgid "(stock held by #%d)"
+msgstr ""
+
+#: includes/SalesAdmin.php:499
+msgid "(product no longer exists)"
+msgstr ""
+
+#. translators: %d: product ID.
+#: includes/SalesAdmin.php:503
+#, php-format
+msgid "Edit product #%d"
+msgstr ""
+
+#: includes/SaleService.php:80
+#: includes/ScanScreen.php:79
+msgid "Code not found."
+msgstr ""
+
+#: includes/SaleService.php:84
+#: includes/ScanScreen.php:508
+#: includes/ScanScreen.php:531
+msgid "This label is out of date."
+msgstr ""
+
+#: includes/SaleService.php:96
+#: includes/SaleService.php:139
+#: includes/ScanScreen.php:534
+msgid "This label is no longer valid."
+msgstr ""
+
+#: includes/SaleService.php:100
+msgid "This product is in the trash – cannot be sold."
+msgstr ""
+
+#: includes/SaleService.php:106
+#: includes/ScanScreen.php:123
+msgid "Not published – cannot be sold yet."
+msgstr ""
+
+#: includes/SaleService.php:110
+#: includes/ScanScreen.php:128
+msgid "This variation is disabled – cannot be sold."
+msgstr ""
+
+#: includes/SaleService.php:119
+msgid "Stock tracking is off for this variation. Tick 'Manage stock?' on the variation, or 'Track stock quantity for this product' on the product's Inventory tab, to sell from a scan."
+msgstr ""
+
+#: includes/SaleService.php:120
+msgid "Stock tracking is off for this product. On the Inventory tab, tick 'Track stock quantity for this product' to sell from a scan."
+msgstr ""
+
+#: includes/SaleService.php:127
+msgid "This item has no price. Set a price before selling."
+msgstr ""
+
+#. translators: %s: zero in the store currency, e.g. ₹0.
+#: includes/SaleService.php:132
+#, php-format
+msgid "This item has no price (%s). Set a price before selling."
+msgstr ""
+
+#: includes/SaleService.php:194
+msgid "Choose a valid quantity."
+msgstr ""
+
+#: includes/SaleService.php:210
+#: includes/SaleService.php:239
+#: includes/SaleService.php:543
+msgid "Someone else is selling this item right now. Try again."
+msgstr ""
+
+#: includes/SaleService.php:290
+msgid "Stock settings changed since you opened this page. Check the item and confirm again."
+msgstr ""
+
+#: includes/SaleService.php:304
+#: includes/ScanScreen.php:152
+msgid "Out of stock – cannot be sold."
+msgstr ""
+
+#. translators: %s: current stock quantity.
+#: includes/SaleService.php:310
+#, php-format
+msgid "Stock changed since you opened this page. Now %s in stock."
+msgstr ""
+
+#. translators: %s: current stock quantity.
+#: includes/SaleService.php:312
+#, php-format
+msgid "Only %1$s in stock. Choose a quantity between 1 and %1$s."
+msgstr ""
+
+#: includes/SaleService.php:318
+msgid "The price changed since you opened this page. Check the new price and confirm again."
+msgstr ""
+
+#: includes/SaleService.php:393
+msgid "Choose how the customer paid."
+msgstr ""
+
+#: includes/SaleService.php:397
+msgid "That payment method is not available. Choose another."
+msgstr ""
+
+#: includes/SaleService.php:436
+msgid "You do not have permission to void sales."
+msgstr ""
+
+#: includes/SaleService.php:502
+msgid "You can only undo your own sale."
+msgstr ""
+
+#: includes/SaleService.php:506
+msgid "This sale was already undone."
+msgstr ""
+
+#: includes/SaleService.php:510
+msgid "This sale cannot be undone."
+msgstr ""
+
+#: includes/SaleService.php:514
+msgid "Undo is no longer available (10-minute limit)."
+msgstr ""
+
+#: includes/SaleService.php:532
+msgid "The sale could not be changed."
+msgstr ""
+
+#: includes/SaleService.php:539
+msgid "This sale cannot be undone here."
+msgstr ""
+
+#: includes/SaleService.php:558
+msgid "Stock tracking changed for this product, so the sale cannot be undone here."
+msgstr ""
+
+#: includes/SaleService.php:575
+msgid "The sale could not be undone. Stock was not changed."
+msgstr ""
+
+#: includes/SaleService.php:621
+msgid "The sale was recorded, but it could not be reversed. Tell a manager."
+msgstr ""
+
+#: includes/SalesExport.php:53
+msgid "Sorry, you are not allowed to export sales."
+msgstr ""
+
+#: includes/SalesExport.php:59
+msgid "This export link has expired. Go back to In-store sales and export again."
+msgstr ""
+
+#. translators: %s: site timezone, e.g. Asia/Kolkata.
+#: includes/SalesExport.php:125
+#, php-format
+msgid "Date (%s)"
+msgstr ""
+
+#: includes/SalesExport.php:135
+msgid "Currency"
+msgstr ""
+
+#: includes/SalesExport.php:140
+msgid "Void reason"
+msgstr ""
+
+#: includes/SalesListTable.php:61
+msgid "Date"
+msgstr ""
+
+#: includes/SalesListTable.php:120
+msgid "No in-store sales match these filters."
+msgstr ""
+
+#. translators: %s: scan page address.
+#: includes/ScanRoute.php:461
+#, php-format
+msgid "Scan links such as %s need pretty permalinks. They do not work with the \"Plain\" permalink setting or with permalinks that contain index.php, so every printed label opens an error page. Choose another structure under Settings → Permalinks."
+msgstr ""
+
+#. translators: 1: content title and type, 2: scan page address.
+#: includes/ScanRoute.php:469
+#, php-format
+msgid "%1$s uses an address at or below %2$s. The scan page takes precedence, so visitors cannot reach that content. Change its slug."
+msgstr ""
+
+#: includes/ScanRoute.php:476
+#: includes/SettingsPage.php:245
+msgid "Product QR Code and Barcode Generator:"
+msgstr ""
+
+#: includes/ScanScreen.php:108
+msgid "This product is in the trash."
+msgstr ""
+
+#: includes/ScanScreen.php:135
+msgid "Edit product"
+msgstr ""
+
+#: includes/ScanScreen.php:203
+msgid "Sold."
+msgstr ""
+
+#. translators: %s: time.
+#: includes/ScanScreen.php:210
+#, php-format
+msgid "This sale was undone at %s. Stock was restored."
+msgstr ""
+
+#. translators: %s: time.
+#: includes/ScanScreen.php:212
+#, php-format
+msgid "This sale was voided at %s."
+msgstr ""
+
+#: includes/ScanScreen.php:255
+msgid "Scan next item"
+msgstr ""
+
+#. translators: 1: quantity, 2: unit price, 3: total.
+#: includes/ScanScreen.php:278
+#: includes/ScanScreen.php:395
+#, php-format
+msgid "%1$s × %2$s = %3$s"
+msgstr ""
+
+#: includes/ScanScreen.php:334
+msgid "Not a valid product code."
+msgstr ""
+
+#: includes/ScanScreen.php:346
+msgid "You do not have permission to view products."
+msgstr ""
+
+#: includes/ScanScreen.php:355
+msgid "You do not have permission to view sales."
+msgstr ""
+
+#. translators: %s: number of items.
+#: includes/ScanScreen.php:453
+#, php-format
+msgid "%s item"
+msgid_plural "%s items"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/ScanScreen.php:464
+msgid "This page can only be opened, not submitted to."
+msgstr ""
+
+#: includes/ScanScreen.php:503
+msgid "Open the product to reprint its label"
+msgstr ""
+
+#: includes/ScanScreen.php:550
+msgid "On backorder"
+msgstr ""
+
+#: includes/Settings.php:236
+msgid "At least one payment method must stay enabled. The previous choice was kept."
+msgstr ""
+
+#. translators: %d: maximum number of characters.
+#: includes/Settings.php:270
+#, php-format
+msgid "The scan base URL must be an absolute http:// or https:// address of at most %d characters, without spaces or login details. The previous value was kept."
+msgstr ""
+
+#: includes/SettingsPage.php:66
+#: includes/ToolsAdmin.php:112
+msgid "This page does not exist."
+msgstr ""
+
+#: includes/SettingsPage.php:95
+msgid "QR codes and barcodes"
+msgstr ""
+
+#: includes/SettingsPage.php:99
+msgid "Enable barcodes (for hardware scanners)"
+msgstr ""
+
+#: includes/SettingsPage.php:108
+msgid "Scan base URL"
+msgstr ""
+
+#: includes/SettingsPage.php:143
+msgid "Health check"
+msgstr ""
+
+#: includes/SettingsPage.php:173
+msgid "QR codes are always generated and are the main way to scan a product with a phone camera. A QR code contains only the scan URL for the product code, never product details."
+msgstr ""
+
+#: includes/SettingsPage.php:184
+msgid "Also produce Code 128 barcodes"
+msgstr ""
+
+#: includes/SettingsPage.php:185
+msgid "Off by default. Turn this on only if staff use hardware barcode scanners. The barcode holds the same product code as the QR code, so no codes need to be regenerated."
+msgstr ""
+
+#: includes/SettingsPage.php:202
+msgid "The sale form asks the seller to choose one of these. At least one must stay enabled. Split or mixed payments are not supported: record the sale under the main method."
+msgstr ""
+
+#: includes/SettingsPage.php:216
+msgid "Leave empty to use the site URL. Otherwise enter an absolute http:// or https:// address; any trailing slash, query string or fragment is removed. Codes are stored, URLs are not, so changing this never changes any product code."
+msgstr ""
+
+#: includes/SettingsPage.php:218
+msgid "Effective scan base URL:"
+msgstr ""
+
+#: includes/SettingsPage.php:219
+msgid "(site URL)"
+msgstr ""
+
+#: includes/SettingsPage.php:220
+msgid "QR codes will contain:"
+msgstr ""
+
+#: includes/ToolsAdmin.php:129
+msgid "Code tools"
+msgstr ""
+
+#: includes/ToolsAdmin.php:193
+msgid "Gives a product code to every simple product and every variation that does not have one yet, using the same rules as saving a product: variable products themselves never get a code (their variations do), and items in the trash never do. Existing codes are never changed. Codes are permanent: they are never deleted, so check the count first."
+msgstr ""
+
+#: includes/ToolsAdmin.php:224
+msgid "Finished"
+msgstr ""
+
+#: includes/ToolsAdmin.php:226
+msgid "Stopped"
+msgstr ""
+
+#: includes/ToolsAdmin.php:228
+msgid "Interrupted"
+msgstr ""
+
+#: includes/ToolsAdmin.php:228
+msgid "No batch has run for several minutes (the page was probably closed). Continue it, or start a new run below; codes already created stay."
+msgstr ""
+
+#: includes/ToolsAdmin.php:230
+msgid "Generating codes…"
+msgstr ""
+
+#: includes/ToolsAdmin.php:230
+msgid "Keep this page open. It continues by itself; without JavaScript, press Continue."
+msgstr ""
+
+#. translators: 1: items processed, 2: items in the run.
+#: includes/ToolsAdmin.php:235
+#, php-format
+msgid "%1$s of about %2$s items"
+msgstr ""
+
+#. translators: %s: number.
+#: includes/ToolsAdmin.php:239
+#, php-format
+msgid "Codes created: %s"
+msgstr ""
+
+#. translators: %s: number.
+#: includes/ToolsAdmin.php:241
+#, php-format
+msgid "Already had a code by then: %s"
+msgstr ""
+
+#. translators: %s: number.
+#: includes/ToolsAdmin.php:243
+#, php-format
+msgid "Skipped (changed or trashed during the run): %s"
+msgstr ""
+
+#. translators: %s: number.
+#: includes/ToolsAdmin.php:245
+#, php-format
+msgid "Failed: %s"
+msgstr ""
+
+#: includes/ToolsAdmin.php:250
+msgid "Failed items (run again to retry them):"
+msgstr ""
+
+#. translators: 1: user name, 2: date and time, 3: statuses.
+#: includes/ToolsAdmin.php:254
+#, php-format
+msgid "Started by %1$s on %2$s; product statuses: %3$s."
+msgstr ""
+
+#: includes/ToolsAdmin.php:261
+#: includes/ToolsAdmin.php:264
+#: includes/ToolsAdmin.php:565
+msgid "Continue"
+msgstr ""
+
+#: includes/ToolsAdmin.php:262
+msgid "Stop"
+msgstr ""
+
+#: includes/ToolsAdmin.php:265
+msgid "Dismiss"
+msgstr ""
+
+#: includes/ToolsAdmin.php:267
+msgid "Clear this summary"
+msgstr ""
+
+#: includes/ToolsAdmin.php:275
+msgid "Print labels for the codes just created"
+msgstr ""
+
+#. translators: %d: items per print job.
+#: includes/ToolsAdmin.php:277
+#, php-format
+msgid "Opens the label print setup (at most %d items per print job)."
+msgstr ""
+
+#. translators: 1: first item number, 2: last item number.
+#: includes/ToolsAdmin.php:283
+#, php-format
+msgid "Print labels: items %1$s–%2$s"
+msgstr ""
+
+#. translators: %s: number of items.
+#: includes/ToolsAdmin.php:291
+#, php-format
+msgid "Links cover the first %s items; print the rest from the Products list."
+msgstr ""
+
+#: includes/ToolsAdmin.php:308
+msgid "Every qualifying product and variation has a code."
+msgstr ""
+
+#: includes/ToolsAdmin.php:315
+#: includes/ToolsAdmin.php:352
+msgid "Simple products"
+msgstr ""
+
+#: includes/ToolsAdmin.php:315
+#: includes/ToolsAdmin.php:352
+msgid "Variations"
+msgstr ""
+
+#: includes/ToolsAdmin.php:315
+msgid "Without a code"
+msgstr ""
+
+#: includes/ToolsAdmin.php:324
+msgid "A variation counts under its product's status; enabled and disabled variations are both included. Stock tracking does not matter. The Dashboard and In-store reports → Summary count published products only (\"Published products without a code\")."
+msgstr ""
+
+#: includes/ToolsAdmin.php:327
+msgid "Starting a new run replaces the interrupted one above."
+msgstr ""
+
+#. translators: %s: number of items.
+#: includes/ToolsAdmin.php:331
+#, php-format
+msgid "I understand that up to %s new codes will be created for the ticked statuses, and that codes are permanent."
+msgstr ""
+
+#: includes/ToolsAdmin.php:340
+msgid "Export codes (CSV)"
+msgstr ""
+
+#: includes/ToolsAdmin.php:344
+msgid "Codes"
+msgstr ""
+
+#: includes/ToolsAdmin.php:345
+msgid "Active codes"
+msgstr ""
+
+#: includes/ToolsAdmin.php:345
+msgid "Retired codes"
+msgstr ""
+
+#: includes/ToolsAdmin.php:345
+msgid "Active and retired"
+msgstr ""
+
+#: includes/ToolsAdmin.php:353
+msgid "Also list products and variations without a code (at the end, with an empty code)"
+msgstr ""
+
+#: includes/ToolsAdmin.php:354
+msgid "Download CSV"
+msgstr ""
+
+#: includes/ToolsAdmin.php:355
+msgid "Columns: item ID, parent ID, type, SKU, product, attributes, product status, code, code status, scan URL (active codes only), created and retired dates. It never contains cost data. SKUs are exact in the file; Excel removes leading zeros (\"00123\") when a CSV is opened by double-click: use Data → From Text/CSV and set the SKU column to Text."
+msgstr ""
+
+#: includes/ToolsAdmin.php:372
+msgid "When"
+msgstr ""
+
+#: includes/ToolsAdmin.php:372
+msgid "User"
+msgstr ""
+
+#: includes/ToolsAdmin.php:372
+msgid "Tool"
+msgstr ""
+
+#: includes/ToolsAdmin.php:425
+msgid "Tick the box to confirm that the codes will be created."
+msgstr ""
+
+#: includes/ToolsAdmin.php:446
+#: includes/ToolsAdmin.php:721
+msgid "Unknown request."
+msgstr ""
+
+#: includes/ToolsAdmin.php:484
+msgid "Only administrators see this. Upload a CSV file with an ID or SKU column and a \"Cost price\" column. You see a preview first; nothing changes until you apply it."
+msgstr ""
+
+#: includes/ToolsAdmin.php:485
+msgid "Download the template (all products with their current cost prices)"
+msgstr ""
+
+#: includes/ToolsAdmin.php:487
+msgid "Rows are matched by ID; the SKU is used when the ID is empty. A variable product's row sets the default cost price for its variations."
+msgstr ""
+
+#: includes/ToolsAdmin.php:488
+msgid "An empty cost cell changes nothing. Write \"clear\" to remove a cost price (it becomes unknown). 0 is a known cost of zero."
+msgstr ""
+
+#. translators: %d: number of decimals.
+#: includes/ToolsAdmin.php:490
+#, php-format
+msgid "Numbers like 1200.50, 1,200.50, 1,20,000, ₹1200, Rs. 1200 or 1200/- are accepted, with at most %d decimals (never rounded)."
+msgstr ""
+
+#. translators: 1: size limit, 2: row limit.
+#: includes/ToolsAdmin.php:492
+#, php-format
+msgid "At most %1$s and %2$s rows per file. Save from Excel as \"CSV UTF-8 (Comma delimited)\"."
+msgstr ""
+
+#: includes/ToolsAdmin.php:499
+msgid "CSV file"
+msgstr ""
+
+#: includes/ToolsAdmin.php:500
+msgid "Upload and preview"
+msgstr ""
+
+#. translators: 1: file name, 2: number of rows.
+#: includes/ToolsAdmin.php:519
+#, php-format
+msgid "%1$s: %2$s rows"
+msgstr ""
+
+#: includes/ToolsAdmin.php:522
+msgid "The file was not saved as UTF-8; it was read as Windows-1252. Check the names and SKUs in the preview."
+msgstr ""
+
+#: includes/ToolsAdmin.php:531
+msgid "Download the full report (CSV)"
+msgstr ""
+
+#. translators: 1: rows to apply, 2: rows with errors.
+#: includes/ToolsAdmin.php:542
+#, php-format
+msgid "Apply the %1$s valid changes and skip the %2$s rows with errors."
+msgstr ""
+
+#. translators: %s: number of rows.
+#: includes/ToolsAdmin.php:546
+#, php-format
+msgid "Apply %s changes"
+msgstr ""
+
+#: includes/ToolsAdmin.php:552
+msgid "Cancel and upload another file"
+msgstr ""
+
+#: includes/ToolsAdmin.php:558
+msgid "Applying…"
+msgstr ""
+
+#. translators: 1: rows done, 2: rows.
+#: includes/ToolsAdmin.php:561
+#, php-format
+msgid "%1$s of %2$s rows"
+msgstr ""
+
+#: includes/ToolsAdmin.php:567
+msgid "Stop (rows already applied stay)"
+msgstr ""
+
+#: includes/ToolsAdmin.php:576
+msgid "The report stays available for an hour. Keep it if you need a record of the old and new values."
+msgstr ""
+
+#: includes/ToolsAdmin.php:577
+msgid "Start another import"
+msgstr ""
+
+#: includes/ToolsAdmin.php:599
+msgid "Cost now"
+msgstr ""
+
+#: includes/ToolsAdmin.php:599
+msgid "New cost"
+msgstr ""
+
+#. translators: 1: rows shown, 2: rows.
+#: includes/ToolsAdmin.php:615
+#, php-format
+msgid "Showing %1$s of %2$s rows (errors first). The report has them all."
+msgstr ""
+
+#: includes/ToolsAdmin.php:678
+#: includes/ToolsAdmin.php:882
+msgid "The link you followed has expired. Go back and try again."
+msgstr ""
+
+#: includes/ToolsAdmin.php:803
+msgid "Code generation finished."
+msgstr ""
+
+#: includes/ToolsAdmin.php:804
+msgid "Code generation stopped. You can continue it later."
+msgstr ""
+
+#: includes/ToolsAdmin.php:805
+msgid "The run summary was cleared. It stays in Recent bulk runs."
+msgstr ""
+
+#: includes/ToolsAdmin.php:806
+msgid "The cost prices were imported."
+msgstr ""
+
+#: includes/ToolsAdmin.php:807
+msgid "The import was closed."
+msgstr ""
+
+#: includes/ToolsAdmin.php:857
+msgid "This action needs a form submission."
+msgstr ""
+
+#: includes/ToolsAdmin.php:867
+msgid "This file can only be downloaded."
+msgstr ""
+
+#: includes/ToolsAdmin.php:895
+msgid "This download link has expired. Go back and try again."
+msgstr ""
+
+#: includes/ToolsAdmin.php:922
+#: templates/pqbg-print.php:51
+#: templates/pqbg-print.php:61
+msgid "Back"
+msgstr ""
+
+#: templates/pqbg-print.php:23
+msgid "product name"
+msgstr ""
+
+#: templates/pqbg-print.php:24
+msgid "variation attributes"
+msgstr ""
+
+#: templates/pqbg-print.php:26
+msgid "price"
+msgstr ""
+
+#: templates/pqbg-print.php:27
+msgid "store name"
+msgstr ""
+
+#: templates/pqbg-print.php:55
+msgid "QR codes point to a LOCAL address:"
+msgstr ""
+
+#: templates/pqbg-print.php:56
+msgid "Phones cannot open this address from outside this computer. Set the production scan URL before printing real labels."
+msgstr ""
+
+#: templates/pqbg-print.php:57
+msgid "You can still print test labels: every label will say \"TEST – NOT FOR USE\"."
+msgstr ""
+
+#: templates/pqbg-print.php:60
+msgid "Print TEST labels anyway"
+msgstr ""
+
+#. translators: 1: labels, 2: layout name, 3: pages.
+#: templates/pqbg-print.php:75
+#, php-format
+msgid "%1$d label · %2$s · %3$d page"
+msgid_plural "%1$d labels · %2$s · %3$d pages"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: QR size (mm), 2: module size (mm).
+#: templates/pqbg-print.php:83
+#, php-format
+msgid "QR code %1$s mm (%2$s mm per module)"
+msgstr ""
+
+#: templates/pqbg-print.php:88
+msgid "Change options"
+msgstr ""
+
+#: templates/pqbg-print.php:89
+msgid "Back to products"
+msgstr ""
+
+#: templates/pqbg-print.php:92
+msgid "In the print dialog:"
+msgstr ""
+
+#: templates/pqbg-print.php:94
+msgid "Scale: 100% (\"Default\" in Chrome and Edge; \"Actual size\" in other dialogs). Never \"Fit to page\"."
+msgstr ""
+
+#: templates/pqbg-print.php:95
+msgid "Margins: None."
+msgstr ""
+
+#: templates/pqbg-print.php:96
+msgid "Headers and footers: off."
+msgstr ""
+
+#. translators: 1: label width, 2: label height (mm).
+#: templates/pqbg-print.php:99
+#, php-format
+msgid "Paper size: %1$s × %2$s mm (set this label size in the thermal printer's own settings too). One label per page."
+msgstr ""
+
+#. translators: 1: page width, 2: page height (mm).
+#: templates/pqbg-print.php:102
+#, php-format
+msgid "Paper: %1$s × %2$s mm, portrait. Print one page on plain paper first and hold it against a label sheet to check the alignment."
+msgstr ""
+
+#: templates/pqbg-print.php:104
+msgid "Background graphics are not needed: labels are printed in black on white."
+msgstr ""
+
+#: templates/pqbg-print.php:108
+msgid "TEST labels."
+msgstr ""
+
+#: templates/pqbg-print.php:108
+msgid "Every label is marked \"TEST – NOT FOR USE\"."
+msgstr ""
+
+#. translators: %s: list of fields.
+#: templates/pqbg-print.php:117
+#, php-format
+msgid "Not printed on this label size (not enough room): %s."
+msgstr ""
+
+#. translators: %s: barcode width in mm.
+#: templates/pqbg-print.php:121
+#, php-format
+msgid "Barcode not printed on this label size: it needs a label at least %s mm wide inside its margins, with room left for the QR code."
+msgstr ""
+
+#. translators: 1: page number, 2: pages.
+#: templates/pqbg-print.php:151
+#, php-format
+msgid "Page %1$d of %2$d"
+msgstr ""
+
+#: templates/pqbg-report-print.php:31
+msgid "Back to In-store reports"
+msgstr ""
+
+#: templates/pqbg-report-print.php:43
+msgid "In-store (scan) sales only"
+msgstr ""
+
+#. translators: %s: date and time.
+#: templates/pqbg-report-print.php:48
+#, php-format
+msgid "Printed %s"
+msgstr ""
+
+#: templates/pqbg-scan.php:47
+#: templates/pqbg-scan.php:57
+msgid "Scan"
+msgstr ""
+
+#: templates/pqbg-scan.php:59
+msgid "My sales"
+msgstr ""
+
+#: templates/pqbg-scan.php:61
+msgid "Log out"
+msgstr ""
+
+#: templates/pqbg-scan.php:66
+msgid "Scan or type a code"
+msgstr ""
+
+#: templates/pqbg-scan.php:69
+msgid "Look up"
+msgstr ""
+
+#: templates/pqbg-scan.php:86
+msgid "Summary (completed sales)"
+msgstr ""
+
+#. translators: %s: number of voided sales.
+#: templates/pqbg-scan.php:99
+#, php-format
+msgid "Voided: %s"
+msgstr ""
+
+#. translators: %s: number of older sales not listed.
+#: templates/pqbg-scan.php:125
+#, php-format
+msgid "%s older sales in this period are not listed. The summary includes them."
+msgstr ""
+
+#: templates/pqbg-scan.php:143
+msgid "Price not set"
+msgstr ""
+
+#: templates/pqbg-scan.php:171
+msgid "Sell"
+msgstr ""
+
+#. translators: %s: unit price.
+#: templates/pqbg-scan.php:189
+#, php-format
+msgid "Total = quantity × %s"
+msgstr ""
+
+#: templates/pqbg-scan.php:199
+msgid "Confirm sale"
+msgstr ""
+
+#: templates/pqbg-scan.php:216
+msgid "Stock now"
+msgstr ""
+
+#: templates/pqbg-scan.php:219
+msgid "Time"
+msgstr ""
+
+#: templates/pqbg-scan.php:234
+msgid "Undo this sale"
+msgstr ""
+
+#. translators: %s: time.
+#: templates/pqbg-scan.php:238
+#, php-format
+msgid "Undo available until %s"
+msgstr ""
+
+#: templates/pqbg-scan.php:242
+msgid "Undo is no longer available. Ask a manager to void the sale if needed."
+msgstr ""

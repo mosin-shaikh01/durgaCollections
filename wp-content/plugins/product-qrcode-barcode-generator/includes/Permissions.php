@@ -1,10 +1,11 @@
 <?php
 /**
- * Central capability model. Every privileged operation in later phases must
- * check one of these capabilities server-side (REST permission_callback,
- * admin handlers, etc.). Never use __return_true for privileged endpoints.
+ * Central capability model. Every privileged operation must check one of
+ * these capabilities server-side (admin pages, admin-post handlers, the scan
+ * route; a REST permission_callback if one is ever added). Never use
+ * __return_true for privileged endpoints.
  *
- * Nonce convention for later phases:
+ * Nonce convention:
  *   action: self::nonce_action( 'void_sale' )  =>  "pqbg_void_sale"
  *   field:  self::NONCE_FIELD                 =>  "_pqbg_nonce"
  *   verify with check_admin_referer()/wp_verify_nonce() AND a capability check.

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seller guide</title>
+<!-- Built by tests/guide-screenshots.php from tests/guide/seller-guide.template.html. Do not edit the built file; edit the template and rebuild. -->
+<style>
+	:root { --ink: #1d2327; --muted: #50575e; --line: #dcdcde; --accent: #2271b1; --warn: #996800; --bg: #ffffff; --soft: #f6f7f7; }
+	* { box-sizing: border-box; }
+	html { -webkit-text-size-adjust: 100%; }
+	body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.5 "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif; }
+	main { max-width: 34rem; margin: 0 auto; padding: 16px; }
+	h1 { font-size: 1.6rem; line-height: 1.2; margin: 0.2rem 0 0.2rem; }
+	.lead { color: var(--muted); margin: 0 0 1rem; }
+	.rule { border: 2px solid var(--accent); border-radius: 8px; padding: 0.6rem 0.8rem; margin: 0 0 1.2rem; background: var(--soft); }
+	ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: step; }
+	ol.steps > li { counter-increment: step; border-top: 1px solid var(--line); padding: 0.9rem 0 0.9rem 3rem; position: relative; }
+	ol.steps > li::before { content: counter(step); position: absolute; left: 0; top: 0.9rem; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; text-align: center; line-height: 2.2rem; }
+	h2 { font-size: 1.15rem; margin: 0 0 0.3rem; }
+	p { margin: 0 0 0.5rem; }
+	.shot { margin: 0.6rem 0 0.2rem; }
+	.shot img { display: block; width: 100%; max-width: 18rem; height: auto; border: 1px solid var(--line); border-radius: 12px; }
+	.shot figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.3rem; }
+	.note { color: var(--warn); }
+	.help { border-top: 2px solid var(--ink); margin-top: 0.6rem; padding-top: 0.8rem; }
+	.help ul { padding-left: 1.2rem; margin: 0; }
+	footer { color: var(--muted); font-size: 0.8rem; margin-top: 1rem; }
+	b { font-weight: 700; }
+
+	/* One A4 page: steps in two columns, the four screens in one row. */
+	@page { size: A4; margin: 8mm 9mm; }
+	@media print {
+		body { font-size: 9.5pt; line-height: 1.33; }
+		main { max-width: none; padding: 0; }
+		h1 { font-size: 17pt; }
+		.lead { margin-bottom: 3mm; }
+		.rule { padding: 2mm 3mm; margin-bottom: 3mm; }
+		ol.steps { columns: 2; column-gap: 8mm; }
+		ol.steps > li { break-inside: avoid; padding: 2mm 0 2mm 9mm; }
+		ol.steps > li::before { top: 2mm; width: 6.5mm; height: 6.5mm; line-height: 6.5mm; font-size: 9pt; }
+		h2 { font-size: 11pt; margin-bottom: 1mm; }
+		p { margin-bottom: 1mm; }
+		ol.steps .shot { display: none; }
+		.shots { display: flex !important; gap: 4mm; margin: 3mm 0 2mm; }
+		.shots figure { flex: 1; margin: 0; }
+		.shots img { width: 100%; height: auto; border: 0.3mm solid var(--line); border-radius: 2mm; }
+		.shots figcaption { font-size: 8pt; color: var(--muted); text-align: center; }
+		.help { margin-top: 2mm; padding-top: 2mm; }
+		.help ul { columns: 2; column-gap: 8mm; }
+		footer { margin-top: 2mm; font-size: 7.5pt; }
+	}
+	.shots { display: none; }
+</style>
+</head>
+<body>
+<main>
+	<h1>Selling in the shop: seller guide</h1>
+	<p class="lead">How to sell an item by scanning its label with your phone.</p>
+
+	<p class="rule"><b>Use only your own login.</b> Every sale is recorded with your name. Never give your password to anyone and never use someone else's.</p>
+
+	<ol class="steps">
+		<li>
+			<h2>Log in</h2>
+			<p>Scan any label with the phone camera and open the link. The first time, the login page opens: enter <b>your own</b> username and password and tap <b>Log In</b>. Tick "Remember Me" on your own phone only.</p>
+		</li>
+		<li>
+			<h2>Scan the label</h2>
+			<p>Point the camera at the QR label and open the link. Check the <b>name</b>, <b>size or colour</b>, <b>price</b> and <b>stock</b> against the item in your hand.</p>
+			<p>No camera? Type the code printed under the QR (for example DC-7K4M-9P2X-Q8RT) in the <b>Scan or type a code</b> box.</p>
+			<p class="note">A yellow or red message (out of stock, no price, out of date label…) means: do not sell, call the manager.</p>
+			<figure class="shot"><img src="{{scan}}" alt="The product screen after scanning: photo, name, price, stock and code."><figcaption>After scanning: check the product.</figcaption></figure>
+		</li>
+		<li>
+			<h2>Choose the quantity</h2>
+			<p>Choose how many the customer is buying. The list shows the total, for example "2 × ₹1,499.00 = ₹2,998.00".</p>
+		</li>
+		<li>
+			<h2>Choose how the customer paid</h2>
+			<p>Take the payment first, then tap <b>Cash</b>, <b>UPI</b>, <b>Card</b> or <b>Other</b>. You must always choose one.</p>
+			<figure class="shot"><img src="{{sell}}" alt="The sale form: quantity 2 and Paid by UPI chosen, and the Confirm sale button."><figcaption>Quantity and payment chosen.</figcaption></figure>
+		</li>
+		<li>
+			<h2>Tap Confirm sale</h2>
+			<p>Tap <b>Confirm sale</b> once and wait for <b>Sold.</b> The stock goes down at once. Then scan the next item.</p>
+			<p>"Someone else is selling this item right now"? Wait two seconds and tap again.</p>
+		</li>
+		<li>
+			<h2>Mistake? Undo within 10 minutes</h2>
+			<p>On the "Sold." page, tap <b>Undo this sale</b>. You can only undo your own sale, once, within 10 minutes. After that the button disappears: ask the manager to void the sale.</p>
+			<figure class="shot"><img src="{{undo}}" alt="The Sold page with the sale details and the Undo this sale button."><figcaption>Sold, with the Undo button.</figcaption></figure>
+		</li>
+		<li>
+			<h2>My sales</h2>
+			<p>Tap <b>My sales</b> at the top to see your own sales for Today, Yesterday or the Last 7 days, with the totals for each payment method. At the end of the day, check your cash against it.</p>
+			<figure class="shot"><img src="{{mysales}}" alt="My sales for today: the sales list and the totals per payment method."><figcaption>My sales: your own sales only.</figcaption></figure>
+		</li>
+		<li>
+			<h2>Log out</h2>
+			<p>At the end of your shift, tap <b>Log out</b> (top right), always on a shared shop phone.</p>
+		</li>
+	</ol>
+
+	<div class="shots" aria-hidden="true">
+		<figure><img src="{{scan}}" alt=""><figcaption>2. Check the product</figcaption></figure>
+		<figure><img src="{{sell}}" alt=""><figcaption>3–4. Quantity and payment</figcaption></figure>
+		<figure><img src="{{undo}}" alt=""><figcaption>6. Sold, with Undo</figcaption></figure>
+		<figure><img src="{{mysales}}" alt=""><figcaption>7. My sales</figcaption></figure>
+	</div>
+
+	<div class="help">
+		<h2>When to call the manager</h2>
+		<ul>
+			<li>The label does not scan, or opens an error page.</li>
+			<li>The price or product on the screen is not the item in your hand.</li>
+			<li>You sold the wrong item or quantity and 10 minutes have passed.</li>
+			<li>You forgot your password (the manager resets it; never borrow a login).</li>
+		</ul>
+	</div>
+
+	<footer>Product QR Code and Barcode Generator {{version}}. Screens show sample data only.</footer>
+</main>
+</body>
+</html>

@@ -41,6 +41,7 @@ $suites = array(
 	'phase10b-menu.php',
 	'phase11-hardening.php',
 	'phase12-themes.php',
+	'phase13-release.php',
 );
 
 $filters = array_slice( $argv, 1 );

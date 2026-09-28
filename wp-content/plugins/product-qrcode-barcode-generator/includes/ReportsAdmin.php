@@ -396,7 +396,7 @@ final class ReportsAdmin {
 			$split[] = array(
 				'label' => PaymentMethods::label( '' === $key ? null : (string) $key ),
 				'value' => (float) $m['revenue'],
-				/* translators: 1: amount, 2: number of sales. */
+				/* translators: 1: an amount or a stock status, 2: the number of sales or the quantity in stock. */
 				'text'  => sprintf( __( '%1$s (%2$s)', 'product-qrcode-barcode-generator' ), SalePresenter::money( $m['revenue'] ), number_format_i18n( $m['count'] ) ),
 			);
 		}

@@ -685,17 +685,34 @@ try {
 	$build( $three, array() );
 	$un = (string) file_get_contents( PQBG_PLUGIN_DIR . 'uninstall.php' );
 	pqbg_t( 'uninstall.php clears the cache before the data-preservation check (the cache is not data)', false !== strpos( $un, 'PrintCache::clear_all();' ) && strpos( $un, 'PrintCache::clear_all();' ) < strpos( $un, "if ( ! defined( 'PQBG_UNINSTALL_DELETE_ALL_DATA' )" ) && strpos( $un, "delete_metadata( 'user', 0, 'pqbg_print_prefs'" ) > strpos( $un, "if ( ! defined( 'PQBG_UNINSTALL_DELETE_ALL_DATA' )" ) );
-	$flag = $raw_option( 'pqbg_rewrite_version' );
-	$codes_n = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" );
+	// The real uninstall removes runtime state; keep the site's (Phase 13: before, only the rewrite
+	// flag was put back, so the Dashboard timing samples, a run state and cost-import previews were lost).
+	$runtime_opts = array( 'pqbg_rewrite_version', 'pqbg_perf_samples', 'pqbg_bulk_run' );
+	$runtime_now  = static fn(): array => array(
+		'options' => array_map( $raw_option, $runtime_opts ),
+		'meta'    => $wpdb->get_results( $wpdb->prepare( "SELECT user_id, meta_key, meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s ORDER BY user_id, umeta_id", 'pqbg_cost_import' ), ARRAY_A ),
+	);
+	$runtime_before = $runtime_now();
+	$codes_n        = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" );
 	if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 		define( 'WP_UNINSTALL_PLUGIN', pqbg_test_plugin_basename() );
 	}
 	include PQBG_PLUGIN_DIR . 'uninstall.php';
-	if ( is_array( $flag ) ) {
-		$wpdb->insert( $wpdb->options, array( 'option_name' => 'pqbg_rewrite_version', 'option_value' => $flag['option_value'], 'autoload' => $flag['autoload'] ) );
-		wp_cache_delete( 'pqbg_rewrite_version', 'options' );
-		wp_cache_delete( 'alloptions', 'options' );
+	foreach ( $runtime_opts as $i => $name ) {
+		$row = $runtime_before['options'][ $i ];
+		if ( is_array( $row ) ) {
+			$wpdb->delete( $wpdb->options, array( 'option_name' => $name ) );
+			$wpdb->insert( $wpdb->options, array( 'option_name' => $name, 'option_value' => $row['option_value'], 'autoload' => $row['autoload'] ) );
+			wp_cache_delete( $name, 'options' );
+		}
 	}
+	$wpdb->delete( $wpdb->usermeta, array( 'meta_key' => 'pqbg_cost_import' ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+	foreach ( $runtime_before['meta'] as $row ) {
+		$wpdb->insert( $wpdb->usermeta, $row );
+	}
+	wp_cache_delete( 'alloptions', 'options' );
+	wp_cache_delete( 'notoptions', 'options' );
+	pqbg_t( 'after the real uninstall, the site\'s runtime state (rewrite flag, timing samples, run state, cost-import previews) is restored byte for byte', $runtime_before === $runtime_now() );
 	pqbg_t( 'running the default uninstall path: cache gone; codes, settings and print preferences kept', 0 === (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( '_transient_' . PrintCache::PREFIX ) . '%' ) ) && false === get_option( PrintCache::INDEX_OPTION ) && $codes_n === (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" ) && is_array( get_option( Plugin::SETTINGS_OPTION ) ) );
 
 	pqbg_section( 'round trip at print resolution (QR and barcode rasterised at their printed size, decoded)' );

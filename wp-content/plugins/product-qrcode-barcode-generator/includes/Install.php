@@ -2,7 +2,7 @@
 /**
  * Activation, deactivation, versioned migrations and the install lock.
  *
- * Adding a migration in a later phase:
+ * Adding a migration:
  *   1. Update Schema::statements() to the new current schema (if tables change).
  *   2. Add `N => array( __CLASS__, 'migrate_N' )` to migrations() and bump DB_VERSION to N.
  *   3. migrate_N() must be idempotent: call Schema::create_or_update() for

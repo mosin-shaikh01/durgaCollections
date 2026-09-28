@@ -13,6 +13,8 @@ This directory is build tooling only, and must be **excluded from any production
 | `scoper.inc.php` | PHP-Scoper config: prefix `ProductQrBarcode\Vendor`, each package's `src/` only |
 | `patcher.php` | Inserts `defined( 'ABSPATH' ) \|\| exit;` after the namespace line of every file, and fails the build if a file doesn't have exactly one namespace declaration |
 | `build.php` | Runs the steps below and verifies the result |
+| `licenses/gpl-3.0.txt` | The official GPL-3.0 text (https://www.gnu.org/licenses/gpl-3.0.txt, unchanged; SHA-256 `3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986`, pinned in `build.php`), copied next to the LGPL-3.0 library (Phase 13) |
+| `package.php` | Builds the release zip (Phase 13); see "Release and packaging" in the plugin README |
 
 Not committed, and listed in the root `.gitignore`: `tools/`, `vendor/`, `scoped/`.
 
@@ -28,7 +30,7 @@ Not committed, and listed in the root `.gitignore`: `tools/`, `vendor/`, `scoped
 2. From the plugin directory, run `php build/build.php`. It performs these steps:
    1. `composer install` from `composer.lock` into `build/vendor/`, with no dev packages, plugins or scripts.
    2. `php-scoper add-prefix` into `build/scoped/`, applying the namespace prefix and the ABSPATH guard patcher.
-   3. Replaces `vendor-prefixed/` with each package's scoped `src/` and its original LICENSE file.
+   3. Replaces `vendor-prefixed/` with each package's scoped `src/` and its original LICENSE file, plus the GPL-3.0 text next to the LGPL-3.0 library (`picqer/php-barcode-generator/GPL-3.0.txt`, from `licenses/`).
    4. Writes `vendor-prefixed/NOTICE.md` (versions, licenses, modifications) and an `index.php` stub in every directory.
    5. Checks that every file is prefixed and has exactly one guard, then deletes `build/scoped/`.
 

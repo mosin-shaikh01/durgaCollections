@@ -72,7 +72,7 @@ final class Plugin {
 	}
 
 	/**
-	 * Default settings. Later phases add keys here; stored values for unknown keys are ignored.
+	 * Default settings. New settings add their keys here; stored values for unknown keys are ignored.
 	 * New keys need no migration because stored settings are always merged over these defaults.
 	 *
 	 * - barcodes_enabled: render Code 128 barcodes for hardware scanners (QR codes are always on).

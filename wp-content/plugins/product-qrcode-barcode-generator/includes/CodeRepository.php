@@ -10,8 +10,8 @@
  *   - There is deliberately no "reactivate": a retired code can never become
  *     active again. Replacing a code means retire + create a new one.
  *
- * This class performs NO capability checks; callers (admin screens, REST
- * routes in later phases) must check Permissions::can_manage_codes() first.
+ * This class performs NO capability checks; callers (admin screens and
+ * handlers) must check Permissions::can_manage_codes() first.
  * It does not generate codes or validate WooCommerce product types either:
  * CodeGenerator produces codes and ProductCodeService decides eligibility.
  *
