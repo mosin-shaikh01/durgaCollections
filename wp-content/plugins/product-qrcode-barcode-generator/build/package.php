@@ -115,10 +115,12 @@ function pqbg_pkg_committed( string $prefix, array $paths ): array {
 	if ( ! is_resource( $proc ) ) {
 		pqbg_pkg_fail( 'cannot run git cat-file' );
 	}
-	fwrite( $pipes[0], implode( "\n", array_map( static fn( $p ) => 'HEAD:' . $prefix . $p, $paths ) ) . "\n" );
-	fclose( $pipes[0] );
+	// One request, then its answer: writing every request first deadlocks once git's output pipe
+	// is full (git stops reading while nobody reads its output).
 	$out = array();
 	foreach ( $paths as $path ) {
+		fwrite( $pipes[0], 'HEAD:' . $prefix . $path . "\n" );
+		fflush( $pipes[0] );
 		$header = (string) fgets( $pipes[1] );
 		if ( ! preg_match( '/^[0-9a-f]{40} blob (\d+)$/', trim( $header ), $m ) ) {
 			pqbg_pkg_fail( "not a committed file: {$path} ({$header})" );
@@ -131,6 +133,7 @@ function pqbg_pkg_committed( string $prefix, array $paths ): array {
 		fgets( $pipes[1] ); // The newline after the contents.
 		$out[ $path ] = $data;
 	}
+	fclose( $pipes[0] );
 	fclose( $pipes[1] );
 	fclose( $pipes[2] );
 	proc_close( $proc );
