@@ -1,0 +1,13 @@
+{
+  "name": "pqbg-theme-check",
+  "private": true,
+  "description": "Test tooling only: drives the installed Chrome/Edge headless to check the scan pages and the theme's store pages under each theme (Phase 12: console, CSP, overflow, touch targets, scanner focus, isolation, screenshots).",
+  "type": "module",
+  "license": "GPL-2.0-or-later",
+  "engines": {
+    "node": ">=22.13 <23 || >=24"
+  },
+  "dependencies": {
+    "puppeteer-core": "25.12.0"
+  }
+}

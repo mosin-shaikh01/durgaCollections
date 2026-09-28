@@ -7,6 +7,8 @@
  *
  * Checks (severity):
  *   schema            error    stored schema version differs from the code, or a table is missing
+ *   permalinks        error    the permalink setting cannot serve scan URLs (Plain, or index.php), so no
+ *                              printed label opens (Phase 12)
  *   negative_stock    error    negative stock on an item with an active code, or on its stock holder
  *   stock_after_null  warning  completed sales without the stock_after snapshot (a Phase 7 crash window)
  *   stale_pending     warning  pending sales older than STALE_PENDING seconds (a process that died;
@@ -61,6 +63,7 @@ final class HealthCheck {
 
 		$out = array(
 			'schema'           => self::schema(),
+			'permalinks'       => self::permalinks(),
 			'negative_stock'   => self::negative_stock(),
 			'stock_after_null' => self::stock_after_null(),
 			'stale_pending'    => self::stale_pending( $now ),
@@ -146,6 +149,19 @@ final class HealthCheck {
 				'stored' => Install::stored_version(),
 				'code'   => Install::DB_VERSION,
 			);
+		}
+
+		return self::result( self::ERROR, count( $rows ), $rows );
+	}
+
+	/**
+	 * Whether scan URLs can reach the plugin (ScanRoute::is_available()). No query.
+	 */
+	private static function permalinks(): array {
+		$rows = array();
+
+		if ( ! ScanRoute::is_available() ) {
+			$rows[] = array( 'reason' => '' === (string) get_option( 'permalink_structure' ) ? 'plain' : 'index_php' );
 		}
 
 		return self::result( self::ERROR, count( $rows ), $rows );

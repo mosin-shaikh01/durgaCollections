@@ -41,6 +41,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 9B was committed as two commits, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist), and pushed to `origin/main` (normal fast-forward, no force): first the Phase 7 race fix as `072f4d6` ("Fix Phase 7 idempotency race: duplicate request mid-sale reported failed"), then Phase 9B as `716600d` ("Phase 9B: in-store reports and owner dashboard (end of day, profit, stock, dead stock; schema v4)"). Recorded at the start of Phase 10 (2026-09-26).
 - Phase 10 was committed as `5b746a7` ("Phase 10: bulk code generation, codes CSV export, admin-only cost-price import") and pushed to `origin/main`, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist; normal fast-forward, no force). Recorded at the start of Phase 10B (2026-09-27); this record is committed together with Phase 10B.
 - Phase 10B was committed as `0145aff` ("Phase 10B: own QR & Barcodes menu, plugin Dashboard, shared navigation") and pushed to `origin/main`, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist; normal fast-forward, no force). Recorded at the start of Phase 11 (2026-09-27), after checking that `HEAD` = `origin/main` = `0145aff` and the working tree was clean; this record is committed together with Phase 11.
+- Phase 11 was committed as `32a8b90` ("Phase 11: hardening (health check, security fixes, undo expiry, perf signal, multisite refused)") and pushed to `origin/main`, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist; normal fast-forward, no force). Recorded at the start of Phase 12 (2026-09-28), after checking that `HEAD` = `origin/main` = `32a8b90` and the working tree was clean; this record is committed together with Phase 12.
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -54,6 +55,7 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `32a8b90` | Phase 11: hardening (health check, security fixes, undo expiry, perf signal, multisite refused) |
 | `0145aff` | Phase 10B: own QR & Barcodes menu, plugin Dashboard, shared navigation |
 | `5b746a7` | Phase 10: bulk code generation, codes CSV export, admin-only cost-price import |
 | `716600d` | Phase 9B: in-store reports and owner dashboard (end of day, profit, stock, dead stock; schema v4) |
@@ -112,7 +114,7 @@ every other plugin stays ignored. For a future custom theme the pattern is:
 - [ ] The user's label stock → possibly a new default print preset (A4 3 × 7 until then).
 - [x] **Phase 11 (hardening):** the reconciliation check and the concurrency-test items from Phase 7. **Done in Phase 11:** the read-only Health check (Settings → Health check; a count on the Dashboard for administrators) and the minimum-stock / parent-level snapshot checks in the Phase 7 suite. See the Phase 11 section.
 - [x] **Phase 10B = MENU RESTRUCTURE** (added 2026-09-27 in Phase 10; owner's decision Option 1): the plugin's own top-level "QR & Barcodes" menu with Dashboard, In-store sales, In-store reports, Bulk tools, Settings; nothing under WooCommerce; old addresses redirect. **Implemented 2026-09-27; see the Phase 10B section.**
-- [ ] **Phase 12 (theme compatibility, owner's decision B, 2026-09-27):** plan it after Phase 11. The plugin must work with any WooCommerce theme: every front-end / staff-facing screen it outputs (the scan page, My sales, the login round trip, anything on product pages or My Account) works and looks usable with classic themes (e.g. Storefront) and block themes (e.g. Twenty Twenty-Five), with block and classic cart/checkout present; no theme-specific code; only WordPress/WooCommerce APIs and the plugin's own scoped CSS.
+- [x] **Phase 12 (theme compatibility, owner's decision B, 2026-09-27):** implemented and tested 2026-09-28 (see the Phase 12 section); not committed, waiting for the user's review. Original item: plan it after Phase 11. The plugin must work with any WooCommerce theme: every front-end / staff-facing screen it outputs (the scan page, My sales, the login round trip, anything on product pages or My Account) works and looks usable with classic themes (e.g. Storefront) and block themes (e.g. Twenty Twenty-Five), with block and classic cart/checkout present; no theme-specific code; only WordPress/WooCommerce APIs and the plugin's own scoped CSS.
 - [ ] **Performance (was the Phase 11 open item; still open by design):** If the dashboard exceeds 2 s on real data, or in-store sales exceed ~300/day, implement a daily roll-up table (option B) or a permission-keyed result cache (option C). Do not change the sale path for this before then. **Since Phase 11 the Dashboard tells administrators when this condition repeats** (3 of the last 10 Dashboard loads over 2 s, or more than 300 completed in-store sales a day over 30 days; `PerfSignal`); build nothing before it does. (Phase 9B measured the dashboard at about 1.4–1.55 s for 90 days with 50,000 sales in 90 days; every report meets the 1 s / 2 s targets at 5,000 sales in 90 days. See the Phase 9B section.)
 
 ### Pre-launch acceptance checklist
@@ -128,6 +130,8 @@ All pending. Each item must pass before production launch; the detailed steps ar
 
 - [ ] **Phase 10B manual checks:** click through QR & Barcodes as an administrator and as a shop manager, on a desktop and on a phone: the menu below Products with Dashboard, In-store sales, In-store reports, Bulk tools, Settings (no Settings for the shop manager) and nothing under WooCommerce; the tab row and highlighting on every page; the Dashboard figures against In-store reports → Summary → Today; an old bookmark `admin.php?page=pqbg-settings&tab=tools` lands on Bulk tools; on the phone the menu folds, tabs wrap and the Dashboard is one column. Steps: the "Phase 10B checklist" in the plugin README.
 - [ ] **50,000-sale stress checks (owner's decision C, 2026-09-27):** run in Phase 11 (hardening; done, see the Phase 11 section) and **once more before launch**: `PQBG_STRESS=1` with the Phase 9B, 10B and 11 suites (the reports and the Dashboard under 2 s, the Health check under 1 s at 50,000 sales). Default runs use the 5,000-sale checks.
+- [ ] **Phase 12 manual checks (theme compatibility):** on the **live** site, with the production theme, host and cache/CDN settings in place: scan a label on a phone logged out (login page, then the styled product screen with the code box focused), sell, undo, My sales, Log out and Back (the product page does not reappear); a second seller on another phone never sees the first seller's sale page or My sales; `/scan/*` excluded from the page cache, CDN HTML cache and CSS/JS optimisation, and a scan page's headers show `Cache-Control: no-store …` with no cache HIT; permalinks not Plain and no "Scan links (permalinks)" error in the Health check. Steps: the "Phase 12 checklist" in the plugin README.
+- [ ] **WooCommerce cart/checkout 404 (found in Phase 12):** WooCommerce cart/checkout scripts request a missing add-to-cart asset (404) on this site, with or without the plugin. Investigate before launch (check with Coming Soon off and on the live host). Observed exactly: the block and classic cart/checkout pages request `{page URL}/undefinedwc/store/v1/cart` (the Store API cart endpoint with an undefined base), HTTP 404, under all six tested themes (Phase 12 suite INFO lines).
 - [ ] **Phase 11 manual checks:** open Settings → Health check on the real data after a backup (no errors, or each finding understood; a shop manager gets 403); on the phone, leave a sale page open and watch the Undo button disappear by itself about 10 minutes after the sale, then void the test sale. Steps: the "Phase 11 checklist" in the plugin README.
 
 ### Backlog
@@ -155,8 +159,8 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **9B** | **Reports & owner dashboard** | **Done 2026-09-26. Approved on the automated tests; committed as `072f4d6` (Phase 7 race fix) and `716600d` (Phase 9B), pushed. Manual checks pending (pre-launch acceptance checklist).** |
 | **10** | **Bulk / CSV tools** | **Done 2026-09-27. Approved on the automated tests; committed `5b746a7`, pushed. Manual checks pending (pre-launch acceptance checklist).** |
 | **10B** | **Menu restructure (own "QR & Barcodes" menu) and plugin Dashboard** | **Done 2026-09-27. Approved on the automated tests; committed `0145aff`, pushed. Manual checks pending (pre-launch acceptance checklist).** |
-| **11** | **Hardening and performance (incl. the 50,000-sale stress checks)** | **Implemented and tested 2026-09-27; waiting for the user's review. Not committed.** Manual checks in the pre-launch acceptance checklist. |
-| 12 | Theme compatibility (owner's decision B: any WooCommerce theme, classic and block, block and classic cart/checkout; no theme-specific code) | Not started; plan after Phase 11 |
+| **11** | **Hardening and performance (incl. the 50,000-sale stress checks)** | **Done 2026-09-27. Approved on the automated tests; committed `32a8b90`, pushed.** Manual checks in the pre-launch acceptance checklist. |
+| **12** | **Theme compatibility (owner's decision B: any WooCommerce theme, classic and block, block and classic cart/checkout; no theme-specific code)** | **Implemented and tested 2026-09-28; waiting for the user's review. Not committed** (D12, the author/shop-name change, to be committed first). Manual checks in the pre-launch acceptance checklist. |
 | 13 | Plugin QA, documentation and packaging | Not started. Note from Phase 11 (owner's decision): **Revisit coding-standards cleanup if the plugin is ever published on WordPress.org.** (PHPCS findings recorded in the Phase 11 section; only the 3 missing translator comments were fixed.) |
 | later | Theme work (optional, later; owner's decision A: plugin first) | Not started |
 
@@ -1725,7 +1729,7 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 **Final report:** `C:\xampp\backups\sharayu\phase10b-report.txt`.
 ### Phase 11: Hardening (2026-09-27)
 
-**Status:** implemented and tested; **NOT committed, waiting for the user's review.** No schema change (`DB_VERSION` 4), no new capability, the sale path unchanged (`SaleService`, `SaleRepository`, `SaleRequest`, `StockLock` and `Schema` byte-identical to `0145aff`; a scope check in the new suite). One new non-autoloaded runtime option, `pqbg_perf_samples` (the owner's change 2).
+**Status:** implemented and tested; approved on the automated tests, **committed as `32a8b90` and pushed** (recorded 2026-09-28). No schema change (`DB_VERSION` 4), no new capability, the sale path unchanged (`SaleService`, `SaleRepository`, `SaleRequest`, `StockLock` and `Schema` byte-identical to `0145aff`; a scope check in the new suite). One new non-autoloaded runtime option, `pqbg_perf_samples` (the owner's change 2).
 
 **Start state:** `HEAD` = `origin/main` = `0145aff`, clean. Housekeeping: `0145aff` recorded here. Plan (D1–D22): `C:\xampp\backups\sharayu\phase11-plan.txt`.
 
@@ -1785,6 +1789,68 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 **Manual checks:** added to the Pre-launch acceptance checklist ("Phase 11 manual checks") with the steps in the plugin README ("Phase 11 checklist").
 
 **Final report:** `C:\xampp\backups\sharayu\phase11-report.txt`.
+
+### Phase 12: Theme compatibility (2026-09-28)
+
+**Status:** implemented and tested; **NOT committed, waiting for the user's review.** Two commits are intended: D12 (author and shop name) first, then Phase 12 (the D12 change alone is saved as `C:\xampp\backups\sharayu\phase12-d12-author.patch`). No schema change (`DB_VERSION` 4), no new capability or option, the sale path unchanged (`SaleService`, `SaleRepository`, `SaleRequest`, `StockLock`, `Schema` untouched).
+
+**Start state:** `HEAD` = `origin/main` = `32a8b90`, clean. Recorded `32a8b90`. Theme state saved before anything else: `C:\xampp\backups\sharayu\phase12-theme-snapshot-before.json`. Plan (D1–D11): `C:\xampp\backups\sharayu\phase12-plan.txt`.
+
+**Approved plan:** D1–D11 as recommended, Twenty Twenty-Four included; plus the owner's F (screenshots for the owner), G (fixes with reasons; what to leave out), H (the suite always restores the theme and settings, verified by a guard; README, tests/README, progress.md, a pre-launch item); plus: Plain permalinks break every printed label, so also a Health check error and a Dashboard warning, documented. And **D12** (the owner's request, a separate earlier commit): author Mosin Shaikh, the shop name removed from the plugin.
+
+**D12 (author and shop name), every change:**
+- `product-qrcode-barcode-generator.php`: `Author: Mosin Shaikh`, new `Author URI: https://www.linkedin.com/in/mosin-shaikh01s/`; the Description no longer names the shop ("for a WooCommerce shop's own staff"). There was no `Plugin URI`, so none was removed or added.
+- `README.md` (plugin): the first line no longer names the shop, plus an author/licence line; the rename section describes the former name as "an earlier working name (identifier prefix `dpc_` / `DPC_`)" instead of naming it, the display-name/folder/text-domain/namespace rows merged into one row without the old names, "DC is the store brand, Durga Collections" became "the `DC-` prefix is part of the permanent code format", and the "`Author: Durga Collections` … not renamed" line was removed.
+- `tests/phase4-rendering.php`: one test base URL `https://durgacollections.example/store` → `https://store.example.net/shop` (a fixture value, not functional).
+- Not changed (functional or not the shop name): the `DC-` code prefix and the code format; option, meta, table, capability and role names; the text domain; the `dpc_`/`DPC_` identifiers named in the README's rename section (they are the old identifiers, not the shop name). There is no migration code for old `dpc_` data. The third-party licence files in `vendor-prefixed/` keep their own copyright holders. `progress.md` history and git history untouched.
+- A case-insensitive search for "durga" in the plugin folder (every file, including ignored `node_modules`/build folders) finds **nothing**. Verified on its own: phase2-main 83/83, phase4 165/165, crash count 139.
+
+**Implemented (Phase 12):**
+- **Standalone scan page kept** (D9): the scan pages already use no theme, `wp_head()` or script; nothing on the store pages or emails.
+- **F1, a logged-out page-cache poisoning (found and confirmed, then fixed):** WP Fastest Cache stores any logged-out, non-POST HTML response and ignores `no-store`; one logged-out `PUT` to `/scan/` or `/scan/{CODE}/` stored the 405 page, which was then served (200) to every logged-out visitor instead of the login redirect. `ScanRoute::decide()` now answers every logged-out request (any method) with the 302 to the login page, before the method check. Logged-in users still get 405.
+- **F2:** `ScanRoute::no_page_cache()` defines `DONOTCACHEPAGE`, `DONOTMINIFY` and `DONOTCDN` on every scan response (`NO_CACHE_CONSTANTS`), besides the unchanged no-store headers.
+- **Permalinks (F3 and the owner's addition):** the "pretty permalinks needed" notice also goes to users with `pqbg_manage_codes` (shop managers print labels; the slug-conflict notice stays administrators-only) and says every printed label opens an error page; a new Health check **error** `permalinks` (reason `plain` or `index_php`, counted on the Dashboard for administrators); the Dashboard warning says what breaks and links to Settings → Permalinks for users with `manage_options` (`AdminUrl::permalinks()`). No fallback URL (the label format is permanent); documented.
+- **Recommended leaving out:** a theme-wrapped scan page (would bring theme JS/CSS under the CSP, admin bars and caches); a `?pqbg_code=` fallback for Plain permalinks (printed labels are permanent); cache-plugin-specific hooks (e.g. LiteSpeed's) beyond the common constants; WP Super Cache / LiteSpeed tests (WPSC writes `wp-config.php`; LiteSpeed needs a LiteSpeed server).
+- **Tests:** `tests/phase12-themes.php` (new, in `run.php`), `tests/theme-check/` (puppeteer-core tool; installed in `C:\xampp\tools\pqbg\theme-check\`), `tests/phase12-repair.php` (repairs a killed run from the saved start state; dry run by default). False by design (listed in `tests/README.md`): Phase 6 (the permalink notice for shop managers), Phase 11 (ten Health checks).
+- **Tools** (outside the web root, never committed): theme zips in `C:\xampp\tools\pqbg\themes\` (Storefront 4.6.2, Astra 4.14.0, Kadence 1.5.2, OceanWP 4.2.6; SHA-256 in `SHA256SUMS.txt`), `C:\xampp\tools\pqbg\cache-plugin\wp-fastest-cache.1.5.2.zip`. The themes and the cache plugin exist in the site only while the suite runs.
+
+**Backups** (`C:\xampp\backups\sharayu\`, outside the web root, never committed; all 53 tables, "Dump completed"): `sharayu-20260928-001017-before-phase12.sql` (973,223 bytes, before the baseline), `…-005958-before-phase12-d12-tests.sql` (978,770), `…-012101-before-phase12-tests.sql` (988,177), `…-101505-before-phase12-dev2.sql` (1,003,563), `…-103342-before-phase12-final.sql` (993,613), `…-112522-before-phase12-p11-rerun.sql` (1,013,236). Also `phase12-htaccess-before.txt` (`.htaccess` before the cache experiment; identical to the current file).
+
+**Baseline:** 1,965 passed, 0 failed, 0 skipped (suite by suite; the watchdog never tripped, lowest 932 MB; 0 plugin notices; crash count 139 throughout).
+
+**Final tests** (2026-09-28, `PQBG_TESTS_ALLOW_PRODUCTION=1`, every tool from `C:\xampp\tools\pqbg\`, the 500 MB watchdog (never tripped; lowest 2,277 MB), the error capture, on mains power; one suite at a time, free memory 2.9–3.3 GB):
+
+| Suite | Result | Crashes |
+|---|---|---|
+| phase12-themes | 274/274 (945 s) | 139 → 139 |
+| phase2-main | 83/83 | 139 → 139 |
+| phase2-lifecycle | 22/22 | 139 → 139 |
+| phase2-no-woocommerce | 12/12 | 139 → 139 |
+| phase3-codes | 110/110 | 139 → 139 |
+| phase4-rendering | 165/165 | 139 → 139 |
+| phase5-admin | 158/158 | 139 → 139 |
+| phase6-scan | 214/214 | 139 → 139 |
+| phase7-sales | 216/216 | 139 → 139 |
+| phase8-printing | 167/167 | 139 → 139 |
+| phase9a-sales-history | 253/253 | 139 → 139 |
+| phase9b-reports | 146/146 | 139 → 139 |
+| phase10-bulk | 197/197 | 139 → 139 |
+| phase10b-menu | 92/92 | 139 → 139 |
+| phase11-hardening | 129/130 (a false-by-design section count I had missed: 9 → 10 Health check sections; fixed and listed) → re-run 130/130 | 139 → 139 |
+| **Total** | **2,239 passed, 0 failed, 0 skipped; AS guard PASS for every suite; 0 notices from plugin code** (6 known WooCommerce `process_login` warnings in phase11, as in Phase 11) | |
+
+**After the final run:** PHPCS on the five changed plugin files found one new sniff (a `define()` with a variable name in `ScanRoute::no_page_cache()`, deliberately the unprefixed constants cache plugins check); annotated with `phpcs:ignore` and a reason (a comment only), after which the files have the same 48 findings as at `32a8b90` (all style or reviewed database sniffs; none from the security, i18n or PHP-compatibility sniffs). Backup `…-113025-before-phase12-comment-rerun.sql` (1,013,237 bytes); phase5-admin 158/158 and phase6-scan 214/214 again (they read `ScanRoute.php`'s source); crash count 139.
+
+**Phase 12 results in brief:** under all six themes, every scan screen passed every HTTP and browser check in Edge and Chrome; computed styles identical to Twenty Twenty-Five's; screenshots identical (10 of them within the 0.01% anti-aliasing tolerance, 17–33 pixels); the store pages load no plugin asset or markup and the plugin adds no browser error; admin pages and the menu position hold; no plugin PHP notice. Permalinks: four pretty structures work, Plain and `index.php` give the notice (administrator and shop manager), the Dashboard warning and the Health check error. WP Fastest Cache: no leak between users or to logged-out visitors, no cache file for `/scan/`, logged-out PUT/DELETE/OPTIONS no longer poison it. Restore guard: every option, post, file, folder, `.htaccess` identical to the start; `wp-config.php` never changed. 156 screenshots in `C:\xampp\backups\sharayu\phase12-screens\` (6.9 MB). Seen but not the plugin's: WooCommerce's block and classic cart/checkout request `…/undefinedwc/store/v1/cart` (404) in the browser on this site, with or without the plugin.
+
+**Incidents:**
+- **The machine slept from 01:24:40 to 09:54:07** (Kernel-Power 42, "Button or Lid") during the first development run of the Phase 12 suite; that run was not counted. It left three options (`pqbg_perf_samples`, `bsf_usage_migrated`, `wc_blocks_use_blockified_product_grid_block_as_template`), none present before; listed, then removed. The suite's cleanup now removes them (reasons in the code).
+- WooCommerce logged three fatal errors in `wc-logs/fatal-errors-2026-09-27-….log` from a scratch environment probe of mine (an undefined `get_filesystem_method()` in a CLI script outside the site), not from the site or the plugin.
+- The F1 experiment and the theme-switch prototype were restored exactly (verified by fingerprint: only cron, transients and Action Scheduler locks differ).
+
+**Manual checks:** added to the Pre-launch acceptance checklist ("Phase 12 manual checks") with the steps in the plugin README ("Phase 12 checklist").
+
+**Final report:** `C:\xampp\backups\sharayu\phase12-report.txt`.
 ### Instructions for the next Claude session
 
 - Read this file and `wp-content/plugins/product-qrcode-barcode-generator/README.md` first. Re-verify the environment; don't trust these notes blindly.
@@ -1822,6 +1888,13 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
   - Every suite honours `PQBG_STOP_FILE` (`pqbg_test_stop_point()`; `pqbg_section()` is a safe point; nothing stops during "cleanup"). New suites must keep their body in `try`/`finally` with every section inside it, and call `pqbg_test_stop_point()` in long loops.
   - For test runs only, the error logger `C:\xampp\tools\pqbg\errors\pqbg-error-capture.php` may be copied to `wp-content/mu-plugins/` with `PQBG_ERROR_CAPTURE=C:\xampp\tools\pqbg\errors`; remove it (and the `mu-plugins` folder, which did not exist before) afterwards. Target: zero events from plugin code.
   - PHPCS: `C:\xampp\tools\pqbg\phpcs\` (see `tests/README.md`).
+- **Theme compatibility rules** (Phase 12):
+  - No theme-specific code: never name a theme or branch on the active theme (`get_template()`, `wp_is_block_theme()` …); the Phase 12 suite has a scope check.
+  - The scan pages stay standalone (no theme, `wp_head()`, script); the plugin outputs nothing on store pages or emails (the suite checks the front-end hook list).
+  - Every scan response defines `DONOTCACHEPAGE`, `DONOTMINIFY`, `DONOTCDN`; a logged-out visitor only ever gets the 302 to the login page (any method), so no page cache can store a scan page.
+  - Plain / `index.php` permalinks: the Health check error, the Dashboard warning and the admin notice (settings or code managers); no fallback URL.
+  - `tests/phase12-themes.php` needs `PQBG_THEMECHECK`, `PQBG_THEME_PACKS`, `PQBG_CACHE_PLUGIN`, `PQBG_ERROR_CAPTURE` (run it through `run.php`) and `PQBG_SCREENS`; it takes about 16 minutes. If a run is killed, run `php tests/phase12-repair.php` (dry run), then with `--apply`, before anything else.
+  - **Keep the laptop on mains power with the lid open during runs** (a closed lid slept the machine during a Phase 12 development run).
 - On this live dev site, create new class files **before** referencing them from boot code (see the Phase 4 incident).
 - **Phase 7 (Mark as Sold) is done, approved, committed as `2413698` and pushed** (2026-09-25).
 - **Phase 8 (Printing) is done, approved, committed as `753613c` and pushed** (2026-09-25). **The physical printer test is NOT done** (no printer was available): it must be done before printing real labels / before production launch (see the Status open items).
@@ -2053,3 +2126,19 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
   - Final: 1,965 passed, 0 failed, 0 skipped; 0 notices from plugin code; crash count 139 throughout. Stress (50,000 sales): 9B, 10B, 11 all passed.
   - Incidents: a minute-long parse error in `DashboardAdmin.php` during development; the machine slept 19:58–22:44 (a run re-done); the first stress run killed for low memory, its leftovers removed with the user's approval by a guarded script.
   - Not committed; waiting for the user's review. Report: `C:\xampp\backups\sharayu\phase11-report.txt`.
+  - Approved on the automated tests; committed as `32a8b90` and pushed to `origin/main` (normal push).
+
+### 2026-09-28
+- **Phase 12 (theme compatibility), planning:**
+  - `HEAD` = `origin/main` = `32a8b90`, clean. Recorded `32a8b90`. Theme state recorded for exact restoration: twentytwentyfive (block) active, `theme_mods_twentytwentyfive` = `{"custom_css_post_id":-1}`, global styles #2922 and navigation #4 in the database; values and hashes in `C:\xampp\backups\sharayu\phase12-theme-snapshot-before.json` (12,330 bytes).
+  - Backup `sharayu-20260928-001017-before-phase12.sql` (973,223 bytes, 53 tables, complete). Baseline suite by suite: 1,965 passed, 0 failed, 0 skipped; AS guard PASS; 0 plugin notices; crash count 139 throughout. Clean state confirmed afterwards.
+  - Inspected every front-end output: the scan pages, My sales and the error pages are a standalone document (no theme, no `wp_head()`); the plugin prints nothing on shop, product, cart, checkout, My Account or emails. Findings: logged-out non-GET requests get a cacheable-looking 405 page (a WP Fastest Cache hypothesis to test), no `DONOTCACHEPAGE` on scan responses, the permalink notice hidden from shop managers.
+  - Wrote the plan (D1–D11): `C:\xampp\backups\sharayu\phase12-plan.txt`. Waiting for approval; nothing implemented.
+- **Phase 12 (theme compatibility):**
+  - The user approved D1–D11 (with Twenty Twenty-Four), F–H, the Plain-permalink Health check error and Dashboard warning, and D12 (author Mosin Shaikh, shop name removed; a separate earlier commit).
+  - D12 done first: header, README and one test URL; "durga" found nowhere in the plugin folder; phase2-main and phase4 passed; its diff saved as `phase12-d12-author.patch`.
+  - Prototyped a theme switch and its exact restore (WooCommerce regenerates the placeholder image sizes; WordPress rewrites `sidebars_widgets` and the old theme's mods). Confirmed F1 with WP Fastest Cache (a logged-out PUT poisoned `/scan/` in the cache), then fixed it; added the cache constants, the permalink notice audience, the Health check error and the Dashboard warning.
+  - Added `tests/phase12-themes.php`, `tests/theme-check/`, `tests/phase12-repair.php`; updated the Phase 6 and 11 checks (false by design), both READMEs and this file.
+  - Development runs: the first spanned a sleep (lid closed at 01:24, woke 09:54; not counted) and left three options, removed after listing; found test-side issues (fixture names containing "pqbg", the caret in screenshots, the document's own 4xx status as a console error, the permalink form's redirect not followed). The second: 272 passed, 2 failed (screenshot anti-aliasing noise; a GD comparison with a 0.01% tolerance added).
+  - Final: Phase 12 274/274; every other suite one at a time; Phase 11 re-run after a missed false-by-design count (130/130). Total 2,239 passed, 0 failed, 0 skipped; 0 plugin notices; crash count 139 throughout. The site is back to its start state (Twenty Twenty-Five, `/%postname%/`, no test theme, cache plugin or mu-plugins).
+  - Not committed; waiting for the user's review. Report: `C:\xampp\backups\sharayu\phase12-report.txt`.

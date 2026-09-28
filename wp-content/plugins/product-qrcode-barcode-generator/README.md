@@ -7,7 +7,7 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-## Current scope: Phases 2–11 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard, hardening)
+## Current scope: Phases 2–12 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard, hardening, theme compatibility)
 
 Implemented:
 
@@ -28,6 +28,7 @@ Implemented:
 - **Phase 10:** bulk and CSV tools (Code tools | Import cost prices, each tab with its own capability; under WooCommerce → QR & Barcodes until Phase 10B): resumable generation of missing codes with "Print labels" links, the codes CSV export, the administrator-only cost price import (preview, apply, report, template) and an audit log. No schema change. See [Bulk tools](#bulk-tools).
 - **Phase 10B:** the plugin's own top-level menu **QR & Barcodes** (Dashboard, In-store sales, In-store reports, Bulk tools, Settings; nothing under WooCommerce), a shared tab row on every plugin page, redirects from the old addresses, one source for admin URLs (`AdminUrl`) and screen detection by stored hook suffix (`AdminMenu`), and the plugin **Dashboard**. No schema, capability or data change. See [Admin menu](#admin-menu) and [Dashboard](#dashboard).
 - **Phase 11 (hardening):** the read-only [Health check](#health-check) (Settings → Health check, and a count on the Dashboard for administrators); the Undo button hides itself when its 10 minutes end (no reload, no JavaScript); the bulk log's writes run under a lock; an administrators-only [performance signal](#performance-signal) on the Dashboard; CSV formula neutralisation also after leading spaces, for line feeds and for full-width characters; multisite refused; uninstall also removes the Phase 11 runtime state and the save-failure notices. No schema change (`DB_VERSION` 4), no new capability, the sale path unchanged. Tests for migrations from real v1–v3 tables, both uninstall branches on a cloned database, time and money edge cases and malformed input on every entry point.
+- **Phase 12 (theme compatibility, owner's decision B):** verified with six themes (block and classic) and with block and classic cart/checkout; see [Theme compatibility](#theme-compatibility). Compatibility fixes only: a logged-out visitor gets the login redirect for any method (a page cache stored a 405 page otherwise), scan responses set `DONOTCACHEPAGE`, `DONOTMINIFY` and `DONOTCDN`, and Plain or `index.php` permalinks are an error in the Health check, a Dashboard warning and an admin notice that shop managers see too. No theme-specific code, no schema or capability change, the sale path unchanged.
 
 **Not implemented yet (later phases):**
 - CSV import of codes (left out of Phase 10 by decision D6; in the backlog), an undo of a cost import, bulk regeneration or retirement of codes
@@ -222,6 +223,7 @@ Phase 11. QR & Barcodes → Settings → **Health check** (`admin.php?page=pqbg-
 | Check | Severity | Finds | What to do |
 |---|---|---|---|
 | Database tables | error | a plugin table missing, or `pqbg_db_version` different from the code | deactivate and reactivate the plugin |
+| Scan links (permalinks) | error | permalinks set to Plain, or a structure with `index.php` (Phase 12): every printed label opens an error page | choose any other structure under Settings → Permalinks; labels need no reprint |
 | Negative stock | error | stock below zero on an item with an active code, or on the parent product holding a variation's stock | count the item, correct the stock on the product screen |
 | Sales without a stock snapshot | warning | completed sales with `stock_after` NULL (the Phase 7 crash window after the atomic statement) | nothing: stock and sale agree, only the snapshot is missing |
 | Interrupted sales | warning | sales still `pending` after 15 minutes (a request that died before changing stock) | nothing: the next sale of the same stock holder marks them failed ("interrupted") automatically |
@@ -591,8 +593,8 @@ The plugin answers on `parse_request`. That is before the main query, WordPress'
 | Step | Response |
 |---|---|
 | Permalinks are Plain or contain `index.php` | Not handled (see [Permalinks](#permalinks)). |
+| Logged out (any method, since Phase 12) | **302** to `wp_login_url()`. `redirect_to` is the canonical scan URL, or `/scan/` when the path is not a well-formed code. The code's existence is never checked. A logged-out visitor never gets a page, so a page cache has nothing to store (see [Page caches](#page-caches-and-optimisation-plugins)). |
 | Method other than GET or HEAD, except POST on a code URL | **405** with `Allow: GET, HEAD` (entry page) or `Allow: GET, HEAD, POST` (code URL). |
-| Logged out | **302** to `wp_login_url()`. `redirect_to` is the canonical scan URL, or `/scan/` when the path is not a well-formed code. The code's existence is never checked. |
 | Logged in without `pqbg_view_products` (customers, subscribers) | **403**: one fixed page with no box and no product data. No lookup runs, so the response is byte-identical for existing, retired, unknown and invalid codes, and for the entry page. |
 | POST to `/scan/{CODE}/` (Phase 7: sell or undo) | Handled by `SaleRequest` (see [Mark as Sold](#mark-as-sold)). A POST to a non-canonical URL gets **400**; POSTs are never redirected. |
 | `/scan/{CODE}/?sale={id}` (Phase 7 sale page) | **200** with the sale, or **303** (never 301, so it is not cached) to the code URL when the sale does not exist, belongs to another code, or is not the user's to see. |
@@ -653,6 +655,7 @@ Every staff screen has the **"Scan or type a code"** box at the top and a **Log 
   ```
 
   HTML pages also carry `<meta name="robots" content="noindex, nofollow">`.
+- **Cache constants** (Phase 12): every scan response, redirects included, also defines `DONOTCACHEPAGE`, `DONOTMINIFY` and `DONOTCDN` (`ScanRoute::no_page_cache()`), which most page-cache and optimisation plugins check before storing, minifying or CDN-rewriting a response. Only for scan responses; a constant already defined is left alone.
 - **Sitemaps:** scan pages are not posts or terms, so core sitemaps never list them. This is tested with sitemaps forced on.
 
 ### Login
@@ -666,9 +669,13 @@ Every staff screen has the **"Scan or type a code"** box at the top and a **Log 
 
 ### Permalinks
 
-Scan URLs need **pretty permalinks**: any structure except "Plain", and not `/index.php/…`.
-- With Plain or `index.php` permalinks the route is inactive, and users with `pqbg_manage_settings` see an admin notice.
-- Printed labels keep the `/scan/{CODE}/` format either way; switching permalinks back makes them work again.
+Scan URLs need **pretty permalinks**: any structure except "Plain", and not `/index.php/…`. Tested in Phase 12 with `/%postname%/`, `/%year%/%monthnum%/%postname%/`, `/archives/%post_id%` and `/blog/%postname%/` (the scan path stays at the site root: `/scan/…`, never `/blog/scan/…`), each saved through Settings → Permalinks.
+- **Plain or `index.php` breaks every printed label** (the route is inactive, so a scan opens the theme's 404 page). Since Phase 12 this shows as:
+  - an **error** in the [Health check](#health-check) ("Scan links (permalinks)"), counted on the Dashboard for administrators;
+  - a **Dashboard warning** for everyone who sees the Dashboard (with a Settings → Permalinks link for users who may change it);
+  - an **admin notice** on every admin page for users with `pqbg_manage_settings` **or `pqbg_manage_codes`** (shop managers print labels).
+- **There is no fallback URL.** The `/scan/{CODE}/` format on printed labels is permanent, so the plugin offers no `?pqbg_code=` alternative. The fix is always the same: choose any structure other than Plain (Post name is recommended) under Settings → Permalinks. The labels need no reprint; they work again as soon as the structure is changed.
+- Rewrite rules: the plugin adds its two rules on every request (`init`) and flushes them once per plugin/rules version; WordPress rebuilds them itself after a permalink change or a theme switch, so nothing needs to be done after either (tested).
 
 **Slug conflicts:** a page, post, product or public term may have an address at or below `/scan/`.
 - The scan page takes precedence over it.
@@ -1293,6 +1300,66 @@ Since Phase 11 every write re-reads the log under a MySQL named lock (`BulkLog::
 - There is no undo of a cost import; keep the downloaded report for the old values.
 - Items saved while a run is in progress with an ID below its cursor are picked up by the next run.
 - The codes export and the template read current product data (names, SKUs, statuses).
+
+## Theme compatibility
+
+Phase 12 (owner's decision B): the plugin works with any WooCommerce theme, classic or block, with **no theme-specific code**. It relies only on WordPress and WooCommerce APIs and its own stylesheet.
+
+### Why the theme cannot break it
+
+- **The staff screens do not use the theme.** The scan pages (entry box, product screen, sale page, My sales, the 400/403/404/405 pages) are one standalone document (`templates/pqbg-scan.php`): no `get_header()`/`get_footer()`, no `wp_head()`/`wp_footer()`, no admin bar, no JavaScript, and exactly one stylesheet (`assets/pqbg-scan.css`, printed with `wp_print_styles( 'pqbg-scan' )`, which does not run the `wp_print_styles` action). The request is answered on `parse_request`, before the template hierarchy, block templates, `template_redirect` and Coming Soon. No theme CSS or script can reach these pages, and the plugin's CSS never reaches theme pages.
+- **The plugin prints nothing on the store.** It adds no output, asset, shortcode, block, widget or template override to the shop, product, cart, checkout or My Account pages, or to emails. (Its only front-end hooks: the scan route, the two login redirects, the cost-price meta filters, the product save/delete hooks.)
+- **The login round trip** uses `wp-login.php` (core), which themes do not replace.
+
+What a theme still influences, and was tested: the size of the product image on the scan page (`woocommerce_thumbnail` comes from the theme; the CSS caps it at the screen width), filters on image attributes and prices, and the theme's own admin menus (QR & Barcodes stays directly below Products).
+
+### Tested themes (2026-09-28)
+
+| Theme | Version | Type |
+|---|---|---|
+| Twenty Twenty-Five (the site's theme) | 1.5 | block |
+| Twenty Twenty-Four | 1.6 | block |
+| Storefront | 4.6.2 | classic (WooCommerce's own) |
+| Astra | 4.14.0 | classic |
+| Kadence | 1.5.2 | classic |
+| OceanWP | 4.2.6 | classic (overrides many WooCommerce templates and ships its own store scripts) |
+
+With WordPress 7.1.2, WooCommerce 11.1.2, Coming Soon on; block cart and checkout (the real pages) and classic `[woocommerce_cart]` / `[woocommerce_checkout]` pages; headless Edge and Chrome. Under every theme (`tests/phase12-themes.php`):
+- every scan screen: the status the plugin decides, the security headers, only the plugin stylesheet, no script; no console error, failed request or CSP violation; no horizontal scroll at 375, 320 and 1280 px; every link, button, field and payment option at least 44 × 44 px; the code box focused on load, and a hardware scanner's "code + Enter" lands on the code page with the box focused again; computed styles **identical** to Twenty Twenty-Five's and screenshots identical too (the same hash, or the same size with at most 0.01% of pixels differing: Chromium's anti-aliasing of a border edge varies by a few dozen pixels between renders), so the theme cannot reach the page; the login round trip; Back after Log out does not show the product page (no-store);
+- the theme's own pages (home, shop, products, both carts and checkouts with an item, My Account, the Coming Soon page): 200, no plugin asset or markup, and no browser error that is not also there with the plugin switched off for that request;
+- no PHP notice, warning or deprecation from plugin code;
+- the plugin's admin pages load and the menu position holds.
+
+Screenshots of every staff screen under every theme (phone 375 px and desktop 1280 px) are written to the folder in `PQBG_SCREENS` (see `tests/README.md`).
+
+### Page caches and optimisation plugins
+
+Scan pages, My sales and the login round trip are per user and must never be stored by a page cache, a CDN or a browser:
+- every scan response sends `Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private` and a past `Expires`, and no `Last-Modified`;
+- every scan response defines `DONOTCACHEPAGE`, `DONOTMINIFY` and `DONOTCDN`;
+- **a logged-out visitor only ever gets the 302 to the login page**, whatever the method. Found in Phase 12: WP Fastest Cache stores any logged-out, non-POST HTML response and ignores `no-store`, so one logged-out `PUT` used to store the 405 page, which was then served to every logged-out visitor of that scan URL instead of the login redirect;
+- `wp-login.php` sends WordPress's own no-cache headers.
+
+Tested with **WP Fastest Cache 1.5.2** (page cache on) under Twenty Twenty-Five and Storefront: a second seller and a logged-out visitor never get the first seller's scan page, sale page or My sales; logged-out `PUT`/`DELETE`/`OPTIONS` do not change what a logged-out `GET` gets; no cache file is ever written for a `/scan/` path, while ordinary pages are cached. WP Super Cache and LiteSpeed Cache were not run: WP Super Cache writes to `wp-config.php` (which this project never edits) and LiteSpeed's page cache needs a LiteSpeed server.
+
+**On the live site, whatever cache is used:**
+- exclude `/scan/` and everything below it from the page cache, any CDN HTML cache and any "cache for logged-in users" option;
+- exclude it from CSS/JS combining, minifying, inlining, "critical CSS", lazy-loading rewrites and CDN URL rewriting. The scan pages allow only this site's own stylesheet and no script (Content-Security-Policy), so an inlined, combined or CDN-hosted copy of the stylesheet is blocked and the page shows unstyled;
+- keep `wp-login.php` uncached (every cache plugin does by default).
+
+### Permalinks
+
+See [Permalinks](#permalinks) under Scan page: any structure except Plain; Plain or `index.php` is a Health check error, a Dashboard warning and an admin notice; there is no fallback URL.
+
+### Phase 12 checklist
+
+**Phase 12 checklist (theme compatibility).** Part of the pre-launch acceptance checklist in `progress.md`: do it once on the **live** site, with the production theme, host and cache/CDN settings in place.
+
+1. On a phone, logged out, scan a printed label: the login page opens; after logging in as a Store Seller, the product screen appears styled (not plain text), with the code box focused.
+2. Sell one item, check the sale page and its Undo button, open My sales, then Log out and press Back: the product page does not reappear.
+3. Log in on a second phone as another seller and open the first seller's sale page address and My sales: the sale page goes back to the product, My sales shows only the second seller's sales.
+4. In the cache/CDN settings, confirm `/scan/*` is excluded from caching and from CSS/JS optimisation, and that the response headers of a scan page (browser developer tools) show `Cache-Control: no-store …` and no cache "HIT" header.
+5. Settings → Permalinks is not Plain, and QR & Barcodes → Settings → Health check shows no "Scan links (permalinks)" error.
 
 ## Requirements
 

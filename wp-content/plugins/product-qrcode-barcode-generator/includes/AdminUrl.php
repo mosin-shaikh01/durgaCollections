@@ -172,6 +172,13 @@ final class AdminUrl {
 	}
 
 	/**
+	 * Settings → Permalinks (core; Phase 12: linked from the permalink warning).
+	 */
+	public static function permalinks(): string {
+		return admin_url( 'options-permalink.php' );
+	}
+
+	/**
 	 * options.php (the Settings form's action).
 	 */
 	public static function options(): string {

@@ -125,6 +125,8 @@ final class HealthCheckAdmin {
 	private static function details( array $row ): string {
 		$reasons = array(
 			'tables_missing' => __( 'A plugin table is missing. Deactivate and reactivate the plugin to recreate it.', 'product-qrcode-barcode-generator' ),
+			'plain'          => __( 'Permalinks are set to "Plain".', 'product-qrcode-barcode-generator' ),
+			'index_php'      => __( 'The permalink structure contains index.php.', 'product-qrcode-barcode-generator' ),
 			'missing'        => __( 'The item no longer exists.', 'product-qrcode-barcode-generator' ),
 			'not_product'    => __( 'Not a product or variation.', 'product-qrcode-barcode-generator' ),
 			'type'           => __( 'The product is no longer a simple product (e.g. now variable, grouped or external).', 'product-qrcode-barcode-generator' ),
@@ -173,6 +175,8 @@ final class HealthCheckAdmin {
 	private static function labels(): array {
 		return array(
 			'schema'           => array( __( 'Database tables', 'product-qrcode-barcode-generator' ), __( 'The plugin\'s tables exist and their version matches the plugin.', 'product-qrcode-barcode-generator' ) ),
+			/* translators: %s: example scan page address. */
+			'permalinks'       => array( __( 'Scan links (permalinks)', 'product-qrcode-barcode-generator' ), sprintf( __( 'Printed labels open addresses such as %s. They work only with a permalink structure other than "Plain" and without index.php; otherwise every label opens an error page. Choose another structure under Settings → Permalinks (the labels need no reprint).', 'product-qrcode-barcode-generator' ), ScanUrl::example() ) ),
 			'negative_stock'   => array( __( 'Negative stock', 'product-qrcode-barcode-generator' ), __( 'Items with a product code (or the parent product that holds their stock) with stock below zero. Count the item and correct its stock on the product screen.', 'product-qrcode-barcode-generator' ) ),
 			'stock_after_null' => array( __( 'Sales without a stock snapshot', 'product-qrcode-barcode-generator' ), __( 'Completed sales whose "stock after" was not recorded because the request stopped right after changing the stock. The stock and the sale agree; only the snapshot is missing. Nothing to repair.', 'product-qrcode-barcode-generator' ) ),
 			'stale_pending'    => array( __( 'Interrupted sales', 'product-qrcode-barcode-generator' ), __( 'Sales still "in progress" after 15 minutes: the request stopped before changing the stock, so no stock changed. The next sale of the same item marks them failed automatically.', 'product-qrcode-barcode-generator' ) ),

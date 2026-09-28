@@ -105,7 +105,9 @@ final class DashboardAdmin {
 		}
 
 		if ( ! ScanRoute::is_available() ) {
-			$items[] = array( __( 'Scan links do not work with the current permalink setting. Choose another structure under Settings → Permalinks.', 'product-qrcode-barcode-generator' ), '', '' );
+			// Phase 12: stated as what it breaks (every printed label), linked for users who may change it.
+			$can_fix = current_user_can( 'manage_options' );
+			$items[] = array( __( 'Scan links do not work with the current permalink setting, so every printed label opens an error page. Choose another structure under Settings → Permalinks (the labels need no reprint).', 'product-qrcode-barcode-generator' ), $can_fix ? AdminUrl::permalinks() : '', $can_fix ? __( 'Permalink settings', 'product-qrcode-barcode-generator' ) : '' );
 		}
 
 		$conflicts = count( ScanRoute::conflicts() );

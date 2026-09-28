@@ -745,7 +745,8 @@ try {
 		$wp_rewrite->permalink_structure = $structure;
 		pqbg_t( "{$name}: route reported unavailable", ! ScanRoute::is_available() );
 		$n = $notice( $A );
-		pqbg_t( "{$name}: admin notice for pqbg_manage_settings only", str_contains( $n, 'need pretty permalinks' ) && str_contains( $n, esc_html( $url() ) ) && '' === $notice( $user_ids['sm'] ) );
+		// Phase 12 (false by design): the permalink notice also goes to code managers (they print labels); sellers still see none.
+		pqbg_t( "{$name}: admin notice for pqbg_manage_settings and pqbg_manage_codes (shop manager), not for sellers", str_contains( $n, 'need pretty permalinks' ) && str_contains( $n, esc_html( $url() ) ) && str_contains( $notice( $user_ids['sm'] ), 'need pretty permalinks' ) && '' === $notice( $user_ids['seller'] ) );
 		$fake             = new WP();
 		$fake->query_vars = array( ScanRoute::ROUTE_VAR => '1', ScanRoute::CODE_VAR => $c );
 		ScanRoute::handle( $fake ); // Would exit the suite if it handled the request.

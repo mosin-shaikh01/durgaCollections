@@ -6,8 +6,8 @@
  * the theme and WooCommerce Coming Soon, which all run later):
  *
  *   route unavailable (plain or index.php permalinks) → not handled
+ *   logged out (any method)                          → 302 to the login page, back to the scan URL
  *   method other than GET/HEAD (or POST on a code)   → 405
- *   logged out                                       → 302 to the login page, back to the scan URL
  *   no pqbg_view_products                            → 403, identical for every code (no lookup)
  *   POST to /scan/{CODE}/ (sell, undo; Phase 7)      → SaleRequest::handle(); 400 unless the URL is canonical
  *   /scan/{CODE}/?sale={id} (sale result page)       → SaleRequest::sale_page(), or 303 to the code URL
@@ -21,6 +21,13 @@
  * GET and HEAD are read-only: nothing here writes to the database except the
  * rewrite-rules flag. Writes happen only on POST, in SaleService.
  * No REST routes, AJAX handlers or shortcodes.
+ *
+ * Page caches (Phase 12): a logged-out visitor only ever gets the 302 to the login
+ * page, whatever the method, because some page caches store any logged-out HTML
+ * response of a non-POST request (a 405 page stored after one PUT was then served
+ * to every logged-out GET instead of the login redirect). Every response also sets
+ * DONOTCACHEPAGE, DONOTMINIFY and DONOTCDN, the constants most cache and
+ * optimisation plugins honour, besides the no-store headers.
  *
  * Rewrite rules are flushed once on activation and when RULES_VERSION or the
  * plugin version changes (flag option), never on ordinary requests, and are
@@ -49,6 +56,9 @@ final class ScanRoute {
 
 	/** Bump when the rules in ScanUrl::rewrite_rules() change. */
 	const RULES_VERSION = '1';
+
+	/** Constants set on every scan response, see no_page_cache(). */
+	const NO_CACHE_CONSTANTS = array( 'DONOTCACHEPAGE', 'DONOTMINIFY', 'DONOTCDN' );
 
 	/**
 	 * Hooks used on every request.
@@ -177,25 +187,25 @@ final class ScanRoute {
 	 * @return array{status: int, location?: string, view?: array<string, mixed>, headers?: array<string, string>}
 	 */
 	public static function decide( string $method, string $request_uri, ?string $code, ?string $box, array $post = array() ): array {
-		$is_mine = ScanUrl::MY_SALES === $code;
-		$is_post = 'POST' === $method && null !== $code && ! $is_mine;
+		$is_mine   = ScanUrl::MY_SALES === $code;
+		$is_post   = 'POST' === $method && null !== $code && ! $is_mine;
+		$candidate = null === $code ? '' : ScanUrl::extract_code( rawurldecode( $code ) );
+		$valid     = '' !== $candidate && CodeGenerator::is_valid_format( $candidate );
+
+		if ( ! is_user_logged_in() ) {
+			// Any method (Phase 12: a page cache must never get a cacheable page for a logged-out visitor).
+			// The login page returns to the canonical code URL, or to the entry page. Existence is never checked here.
+			return array(
+				'status'   => 302,
+				'location' => wp_login_url( $is_mine ? ScanUrl::my_sales_url() : ScanUrl::site_url( $valid ? $candidate : '' ) ),
+			);
+		}
 
 		if ( ! in_array( $method, array( 'GET', 'HEAD' ), true ) && ! $is_post ) {
 			return array(
 				'status'  => 405,
 				'view'    => ScanScreen::method_not_allowed(),
 				'headers' => array( 'Allow' => null === $code || $is_mine ? 'GET, HEAD' : 'GET, HEAD, POST' ),
-			);
-		}
-
-		$candidate = null === $code ? '' : ScanUrl::extract_code( rawurldecode( $code ) );
-		$valid     = '' !== $candidate && CodeGenerator::is_valid_format( $candidate );
-
-		if ( ! is_user_logged_in() ) {
-			// The login page returns to the canonical code URL, or to the entry page. Existence is never checked here.
-			return array(
-				'status'   => 302,
-				'location' => wp_login_url( $is_mine ? ScanUrl::my_sales_url() : ScanUrl::site_url( $valid ? $candidate : '' ) ),
 			);
 		}
 
@@ -432,11 +442,14 @@ final class ScanRoute {
 	}
 
 	/**
-	 * Admin notices for users who can manage settings: permalinks that cannot
-	 * serve scan URLs, and content whose address is taken over by the scan route.
+	 * Admin notices: permalinks that cannot serve scan URLs (for users who manage settings
+	 * or codes; code managers print labels, Phase 12), and content whose address is taken
+	 * over by the scan route (for users who manage settings).
 	 */
 	public static function admin_notices(): void {
-		if ( ! Permissions::can_manage_settings() ) {
+		$settings = Permissions::can_manage_settings();
+
+		if ( ! $settings && ! Permissions::can_manage_codes() ) {
 			return;
 		}
 
@@ -445,12 +458,12 @@ final class ScanRoute {
 		if ( ! self::is_available() ) {
 			$messages[] = sprintf(
 				/* translators: %s: scan page address. */
-				__( 'Scan links such as %s need pretty permalinks. They do not work with the "Plain" permalink setting or with permalinks that contain index.php. Choose another structure under Settings → Permalinks.', 'product-qrcode-barcode-generator' ),
+				__( 'Scan links such as %s need pretty permalinks. They do not work with the "Plain" permalink setting or with permalinks that contain index.php, so every printed label opens an error page. Choose another structure under Settings → Permalinks.', 'product-qrcode-barcode-generator' ),
 				ScanUrl::site_url()
 			);
 		}
 
-		foreach ( self::conflicts() as $label ) {
+		foreach ( $settings ? self::conflicts() : array() as $label ) {
 			$messages[] = sprintf(
 				/* translators: 1: content title and type, 2: scan page address. */
 				__( '%1$s uses an address at or below %2$s. The scan page takes precedence, so visitors cannot reach that content. Change its slug.', 'product-qrcode-barcode-generator' ),
@@ -518,6 +531,8 @@ final class ScanRoute {
 	 * @param array{status: int, location?: string, view?: array<string, mixed>, headers?: array<string, string>} $response Response.
 	 */
 	private static function send( array $response ): void {
+		self::no_page_cache();
+
 		$headers = array_merge( self::security_headers(), $response['headers'] ?? array() );
 
 		if ( isset( $response['view']['style_nonce'] ) && '' !== $response['view']['style_nonce'] ) {
@@ -543,6 +558,20 @@ final class ScanRoute {
 		}
 
 		exit;
+	}
+
+	/**
+	 * The constants page-cache and optimisation plugins check before storing, minifying or
+	 * CDN-rewriting a response (Phase 12). Scan pages are per-user, and their CSP allows only
+	 * this site's own stylesheet, so an inlined, combined or CDN-hosted copy would be blocked.
+	 * Defined for scan responses only; a constant already defined elsewhere is left alone.
+	 */
+	public static function no_page_cache(): void {
+		foreach ( self::NO_CACHE_CONSTANTS as $name ) {
+			if ( ! defined( $name ) ) {
+				define( $name, true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.VariableConstantNameFound -- the unprefixed names cache plugins check.
+			}
+		}
 	}
 
 	/**

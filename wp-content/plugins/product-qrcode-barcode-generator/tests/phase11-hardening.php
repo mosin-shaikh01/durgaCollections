@@ -422,9 +422,10 @@ try {
 	$ad   = wp_insert_post( array( 'post_type' => 'product', 'post_status' => 'auto-draft', 'post_title' => 'PQBG 11 auto-draft' ) );
 	$base = HealthCheck::run();
 	$bc   = $counts( $base );
-	pqbg_t( 'health check: all nine checks run, with the documented severities', array( 'schema', 'negative_stock', 'stock_after_null', 'stale_pending', 'code_items', 'active_codes', 'cost_meta', 'code_items_trash', 'sales_no_item' ) === array_keys( $base ) && 'error' === $base['negative_stock']['severity'] && 'warning' === $base['stock_after_null']['severity'] && 'warning' === $base['stale_pending']['severity'] && 'error' === $base['code_items']['severity'] && 'error' === $base['active_codes']['severity'] && 'warning' === $base['cost_meta']['severity'] && 'info' === $base['code_items_trash']['severity'] && 'info' === $base['sales_no_item']['severity'] && 'error' === $base['schema']['severity'] );
+	// Phase 12 (false by design): the permalinks check (error) after schema.
+	pqbg_t( 'health check: all ten checks run, with the documented severities (Phase 12: permalinks)', array( 'schema', 'permalinks', 'negative_stock', 'stock_after_null', 'stale_pending', 'code_items', 'active_codes', 'cost_meta', 'code_items_trash', 'sales_no_item' ) === array_keys( $base ) && 'error' === $base['negative_stock']['severity'] && 'warning' === $base['stock_after_null']['severity'] && 'warning' === $base['stale_pending']['severity'] && 'error' === $base['code_items']['severity'] && 'error' === $base['active_codes']['severity'] && 'warning' === $base['cost_meta']['severity'] && 'info' === $base['code_items_trash']['severity'] && 'info' === $base['sales_no_item']['severity'] && 'error' === $base['schema']['severity'] && 'error' === $base['permalinks']['severity'] && 0 === $base['permalinks']['count'] );
 	pqbg_t( 'health check: the clean control finds nothing among this suite\'s fixtures', array() === $rows_of( $base, 'negative_stock', 'item', $P1 ) && array() === $rows_of( $base, 'code_items', 'item', $P2 ) && 0 === $bc['schema'] && 0 === $bc['active_codes'], wp_json_encode( $bc ) );
-	pqbg_t( 'health check: the Dashboard set leaves the information checks out', array( 'schema', 'negative_stock', 'stock_after_null', 'stale_pending', 'code_items', 'active_codes', 'cost_meta' ) === array_keys( HealthCheck::run( false ) ) );
+	pqbg_t( 'health check: the Dashboard set leaves the information checks out', array( 'schema', 'permalinks', 'negative_stock', 'stock_after_null', 'stale_pending', 'code_items', 'active_codes', 'cost_meta' ) === array_keys( HealthCheck::run( false ) ) );
 
 	// ------------------------------------------------------------------ plants
 	pqbg_section( 'health check: planted problems (D3)' );
@@ -493,7 +494,8 @@ try {
 	$st1 = $state();
 	$h   = $http( 'admin', 'GET', $url );
 	pqbg_t( 'administrator: 200, heading, the tab row with Health check current', 200 === $h['code'] && str_contains( $h['body'], '<h1>Settings</h1>' ) && str_contains( $h['body'], 'aria-current="page">Health check</a>' ) && str_contains( $h['body'], $href( AdminUrl::settings() ) . ' class="nav-tab"' ) );
-	pqbg_t( 'administrator: every check has its section, and the problem count is shown', 9 === preg_match_all( '/<section class="pqbg-health pqbg-health--(error|warning|info)"/', $h['body'] ) && str_contains( $h['body'], number_format_i18n( HealthCheck::problems( $r ) ) . ' problems found.' ) );
+	// Phase 12 (false by design): ten sections (the permalinks check).
+	pqbg_t( 'administrator: every check has its section (ten since Phase 12), and the problem count is shown', 10 === preg_match_all( '/<section class="pqbg-health pqbg-health--(error|warning|info)"/', $h['body'] ) && str_contains( $h['body'], number_format_i18n( HealthCheck::problems( $r ) ) . ' problems found.' ) );
 	pqbg_t( 'administrator: planted rows are listed with links (product edit, sale)', str_contains( $h['body'], $href( AdminUrl::product_edit( $P1 ) ) ) && str_contains( $h['body'], $href( AdminUrl::sale( $pend_old ) ) ) && str_contains( $h['body'], $href( AdminUrl::product_edit( $VP2 ) ) ) && str_contains( $h['body'], 'Item #999999911' ) );
 	pqbg_t( 'administrator: no cost value appears (777.777, -5, abc, 450.00)', ! str_contains( $h['body'], '777.777' ) && ! str_contains( $h['body'], '450.00' ) && ! preg_match( '/>\s*-5\s*</', $h['body'] ) );
 	pqbg_t( 'HEAD: 200', 200 === $http( 'admin', 'HEAD', $url )['code'] );
