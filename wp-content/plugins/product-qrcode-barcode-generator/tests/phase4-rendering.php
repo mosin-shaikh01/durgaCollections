@@ -237,7 +237,7 @@ try {
 	} else {
 		echo "   decoder: {$decoder} (node {$node_version})\n";
 		$jobs = array();
-		foreach ( array( '', 'https://shop.example.com', 'https://durgacollections.example/store' ) as $base ) {
+		foreach ( array( '', 'https://shop.example.com', 'https://store.example.net/shop' ) as $base ) {
 			$set( array( 'scan_base_url' => $base ) );
 			foreach ( array_slice( $codes, 0, 4 ) as $code ) {
 				$jobs[] = array( 'qr', ScanUrl::for_code( $code ), $qr->render( $code ) );

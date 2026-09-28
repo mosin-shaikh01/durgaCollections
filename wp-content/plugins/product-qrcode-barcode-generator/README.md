@@ -1,6 +1,8 @@
 # Product QR Code and Barcode Generator
 
-WooCommerce plugin for Durga Collections: product QR/barcode inventory for our own shop staff ("sellers").
+WooCommerce plugin: product QR/barcode inventory for a shop's own staff ("sellers").
+
+Author: Mosin Shaikh (https://www.linkedin.com/in/mosin-shaikh01s/). License: GPL-2.0-or-later.
 Staff scan a product's code, see live WooCommerce product information, and mark it sold. Stock updates automatically and every sale is logged.
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
@@ -286,16 +288,13 @@ The CLI regression suites for Phases 2–11 are in [`tests/`](tests/README.md): 
 
 ## Naming and the rename
 
-This plugin was developed as **"Durga Product Codes"** and was renamed before its first real use. The name is generic, so the header sets `Update URI: false`. That stops WordPress from ever offering a wordpress.org plugin with the same slug as an update that would overwrite this one.
+This plugin was developed under an earlier working name (identifier prefix `dpc_` / `DPC_`) and was renamed before its first real use. The name is generic, so the header sets `Update URI: false`. That stops WordPress from ever offering a wordpress.org plugin with the same slug as an update that would overwrite this one.
 
 There is **no legacy migration code**. The old tables held no data, so they were removed with a one-time CLI script that was not committed, and the renamed plugin rebuilt its schema through the normal installer.
 
 | Kind | Before | After |
 |---|---|---|
-| Display name | Durga Product Codes | Product QR Code and Barcode Generator |
-| Folder / main file | `durga-product-codes/durga-product-codes.php` | `product-qrcode-barcode-generator/product-qrcode-barcode-generator.php` |
-| Text domain, log source | `durga-product-codes` | `product-qrcode-barcode-generator` |
-| PHP namespace | `Durga\ProductCodes` | `ProductQrBarcode` |
+| Display name, folder / main file, text domain / log source, PHP namespace | the earlier working name | Product QR Code and Barcode Generator; `product-qrcode-barcode-generator/product-qrcode-barcode-generator.php`; `product-qrcode-barcode-generator`; `ProductQrBarcode` |
 | Constants | `DPC_VERSION`, `DPC_PLUGIN_FILE`, `DPC_PLUGIN_DIR`, `DPC_PLUGIN_URL`, `DPC_UNINSTALL_DELETE_ALL_DATA` | `PQBG_VERSION`, `PQBG_PLUGIN_FILE`, `PQBG_PLUGIN_DIR`, `PQBG_PLUGIN_URL`, `PQBG_UNINSTALL_DELETE_ALL_DATA` |
 | Tables | `{prefix}dpc_codes`, `{prefix}dpc_sales` | `{prefix}pqbg_codes`, `{prefix}pqbg_sales` (identical structure) |
 | CHECK constraint | `{prefix}dpc_codes_active_chk` | `{prefix}pqbg_codes_active_chk` |
@@ -306,10 +305,9 @@ There is **no legacy migration code**. The old tables held no data, so they were
 | `WP_Error` codes | `dpc_*` | `pqbg_*` |
 
 **Not renamed:**
-- the product code format `DC-XXXX-XXXX-XXXX`: "DC" is the store brand, Durga Collections
+- the product code format `DC-XXXX-XXXX-XXXX` (the `DC-` prefix is part of the permanent code format)
 - the alphabet and all generator logic
 - every column, index and business rule, and `DB_VERSION` (still 1)
-- `Author: Durga Collections` and other references to the store
 
 ## Product codes
 

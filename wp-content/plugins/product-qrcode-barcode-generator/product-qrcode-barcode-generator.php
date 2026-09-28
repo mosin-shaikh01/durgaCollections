@@ -1,9 +1,10 @@
 <?php
 /**
  * Plugin Name:          Product QR Code and Barcode Generator
- * Description:          Product QR/barcode inventory for Durga Collections: secure product codes, QR code and optional barcode rendering, seller role and capabilities.
+ * Description:          Product QR/barcode inventory for a WooCommerce shop's own staff: secure product codes, QR code and optional barcode rendering, seller role and capabilities.
  * Version:              0.1.0
- * Author:               Durga Collections
+ * Author:               Mosin Shaikh
+ * Author URI:           https://www.linkedin.com/in/mosin-shaikh01s/
  * Text Domain:          product-qrcode-barcode-generator
  * Domain Path:          /languages
  * Requires at least:    6.7
