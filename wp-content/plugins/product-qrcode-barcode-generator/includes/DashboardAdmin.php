@@ -6,7 +6,8 @@
  *
  * An overview, not an analysis screen (that is In-store reports): what needs attention,
  * today's in-store sales, products and codes, recent bulk runs, the scan setup and quick
- * links. Every figure comes from existing code, never a second calculation:
+ * links, and (1.0.1) the "Plugin guide" button to the user manual and a link to the seller guide.
+ * Every figure comes from existing code, never a second calculation:
  *   - today's sales, payment methods, voids, low/out of stock and "Published products
  *     without a code": ReportsAdmin::dashboard_data() for ReportPeriod "today", the same
  *     function and period as In-store reports → Summary → Today;
@@ -58,7 +59,8 @@ final class DashboardAdmin {
 	public static function enqueue( $hook_suffix ): void {
 		if ( AdminMenu::is_page( AdminUrl::DASHBOARD, (string) $hook_suffix ) ) {
 			wp_enqueue_style( 'pqbg-reports', PQBG_PLUGIN_URL . 'assets/pqbg-reports.css', array(), PQBG_VERSION );
-			wp_enqueue_style( 'pqbg-dashboard', PQBG_PLUGIN_URL . 'assets/pqbg-dashboard.css', array( 'pqbg-reports' ), PQBG_VERSION );
+			wp_enqueue_style( 'pqbg-dashboard', PQBG_PLUGIN_URL . 'assets/pqbg-dashboard.css', array( 'pqbg-reports', 'dashicons' ), PQBG_VERSION );
+			wp_enqueue_script( 'pqbg-help', PQBG_PLUGIN_URL . 'assets/pqbg-help.js', array(), PQBG_VERSION, true );
 		}
 	}
 
@@ -171,7 +173,9 @@ final class DashboardAdmin {
 
 		echo '<div class="wrap pqbg-reports pqbg-dashboard">';
 		AdminMenu::render_nav( AdminUrl::DASHBOARD );
-		echo '<h1>' . esc_html__( 'Dashboard', 'product-qrcode-barcode-generator' ) . '</h1>';
+		echo '<h1 class="wp-heading-inline">' . esc_html__( 'Dashboard', 'product-qrcode-barcode-generator' ) . '</h1>';
+		self::render_help();
+		echo '<hr class="wp-header-end">';
 		/* translators: %s: link to In-store reports. */
 		echo '<p class="pqbg-dashboard__intro">' . wp_kses( sprintf( __( 'Today at a glance. For trends and analysis, open %s.', 'product-qrcode-barcode-generator' ), '<a href="' . esc_url( AdminUrl::reports() ) . '">' . esc_html__( 'In-store reports', 'product-qrcode-barcode-generator' ) . '</a>' ), array( 'a' => array( 'href' => true ) ) ) . '</p>';
 
@@ -188,6 +192,23 @@ final class DashboardAdmin {
 		self::render_setup( $settings );
 		self::render_links( $codes, $costs, $settings );
 		echo '</div></div>';
+	}
+
+	/**
+	 * The "Plugin guide" button (1.0.1) next to the heading, with its tooltip, and the seller guide.
+	 *
+	 * A link with a visible label and an icon, never icon-only; the tooltip is a real element the
+	 * link describes (aria-describedby), shown on hover and on keyboard focus (CSS) and hidden with
+	 * Escape (pqbg-help.js). No title attribute: it is not keyboard-accessible and would be read twice.
+	 */
+	private static function render_help(): void {
+		$new_tab = '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'product-qrcode-barcode-generator' ) . '</span>';
+
+		echo '<span class="pqbg-help">';
+		echo '<a class="page-title-action pqbg-help__link" href="' . esc_url( AdminUrl::user_manual() ) . '" target="_blank" rel="noopener" aria-describedby="pqbg-help-tip"><span class="dashicons dashicons-editor-help" aria-hidden="true"></span>' . esc_html__( 'Plugin guide', 'product-qrcode-barcode-generator' ) . $new_tab . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $new_tab escaped above.
+		echo '<span class="pqbg-help__tip" id="pqbg-help-tip" role="tooltip">' . esc_html__( 'How to use this plugin: step-by-step guide (PDF)', 'product-qrcode-barcode-generator' ) . '</span>';
+		echo '</span>';
+		echo '<a class="pqbg-help__secondary" href="' . esc_url( AdminUrl::seller_guide() ) . '" target="_blank" rel="noopener">' . esc_html__( 'Seller guide (1 page, for staff)', 'product-qrcode-barcode-generator' ) . $new_tab . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $new_tab escaped above.
 	}
 
 	/**

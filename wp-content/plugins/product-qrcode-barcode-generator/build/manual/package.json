@@ -1,0 +1,11 @@
+{
+  "name": "pqbg-manual-build",
+  "private": true,
+  "description": "Build-time only: turns docs/user-manual.md into docs/user-manual.pdf. Install outside the site (see README.md); never shipped.",
+  "license": "GPL-2.0-or-later",
+  "type": "module",
+  "dependencies": {
+    "marked": "18.0.14",
+    "pdfjs-dist": "6.3.289"
+  }
+}

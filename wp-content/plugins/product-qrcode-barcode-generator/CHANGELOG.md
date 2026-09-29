@@ -2,6 +2,17 @@
 
 All notable changes to Product QR Code and Barcode Generator.
 
+## 1.0.1 (2026-09-28)
+
+### Added
+- A user manual (`docs/user-manual.pdf`) in plain language, with worked examples and screenshots of a sample shop, a table of contents and page numbers. It replaces the owner guide (`docs/owner-guide.md` is removed; its content is in the manual).
+- A "Plugin guide" button on the plugin's Dashboard, with a help icon and the tooltip "How to use this plugin: step-by-step guide (PDF)"; it opens the manual in a new tab and works with the keyboard and screen readers. Everyone who can open the Dashboard sees it.
+- A "User manual" link in the plugin's row on the Plugins screen.
+- Links to the one-page seller guide on the Dashboard and at the bottom of My sales. The scan pages' security headers are unchanged.
+
+### Upgrading from 1.0.0
+- Nothing to do. No data, settings or database changes.
+
 ## 1.0.0 (2026-09-28)
 
 The first release. It brings together everything built and tested before launch.

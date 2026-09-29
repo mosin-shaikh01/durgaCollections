@@ -51,7 +51,8 @@ const PQBG_PKG_REQUIRED = array(
 	'README.md',
 	'CHANGELOG.md',
 	'languages/product-qrcode-barcode-generator.pot',
-	'docs/owner-guide.md',
+	'docs/user-manual.md',
+	'docs/user-manual.pdf',
 	'docs/seller-guide.html',
 	'docs/seller-guide.pdf',
 	'vendor-prefixed/NOTICE.md',
@@ -62,7 +63,7 @@ const PQBG_PKG_REQUIRED = array(
 );
 
 /** Timestamp of every entry (reproducible builds). */
-const PQBG_PKG_MTIME = 1790553600; // 2026-09-28 00:00:00 UTC, the 1.0.0 release date.
+const PQBG_PKG_MTIME = 1790553600; // 2026-09-28 00:00:00 UTC, the release date of 1.0.0 and of 1.0.1.
 
 /**
  * Prints a message and stops.

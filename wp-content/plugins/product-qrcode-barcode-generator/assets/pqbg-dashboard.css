@@ -20,7 +20,22 @@
 .pqbg-dashboard__links { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 .pqbg-dashboard__links .button { white-space: normal; height: auto; min-height: 32px; line-height: 1.4; padding-top: 4px; padding-bottom: 4px; }
 
+/* 1.0.1: the "Plugin guide" button, its tooltip (hover and keyboard focus; Escape via pqbg-help.js) and the seller guide link. */
+.pqbg-help { position: relative; display: inline-block; }
+.pqbg-dashboard .pqbg-help__link { display: inline-flex; align-items: center; gap: 4px; }
+.pqbg-help__link .dashicons { width: 18px; height: 18px; font-size: 18px; line-height: 1; }
+.pqbg-help__link:focus-visible { outline: 2px solid #2271b1; outline-offset: 2px; box-shadow: none; }
+/* The transparent top border bridges the gap, so the pointer can move onto the tooltip without it closing. */
+.pqbg-help__tip { position: absolute; top: 100%; left: 0; z-index: 10; width: max-content; max-width: 260px; padding: 6px 8px; border-top: 6px solid transparent; background: #1d2327; background-clip: padding-box; color: #fff; font-size: 12px; line-height: 1.4; visibility: hidden; opacity: 0; }
+.pqbg-help:hover .pqbg-help__tip, .pqbg-help:focus-within .pqbg-help__tip { visibility: visible; opacity: 1; }
+.pqbg-help.pqbg-help--dismissed .pqbg-help__tip { visibility: hidden; opacity: 0; }
+.pqbg-help__secondary { display: inline-block; margin-left: 8px; vertical-align: middle; }
+.rtl .pqbg-help__tip { left: auto; right: 0; }
+.rtl .pqbg-help__secondary { margin-left: 0; margin-right: 8px; }
+
 @media (max-width: 782px) {
+	.pqbg-dashboard .pqbg-help__link { min-height: 44px; }
+	.pqbg-help__secondary { display: block; margin: 8px 0 0; }
 	.pqbg-dashboard__grid { grid-template-columns: 1fr; }
 	.pqbg-dashboard__links { flex-direction: column; }
 	.pqbg-dashboard__links .button { width: 100%; min-height: 44px; text-align: center; justify-content: center; display: flex; align-items: center; }

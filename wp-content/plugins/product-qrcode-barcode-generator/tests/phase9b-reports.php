@@ -50,6 +50,7 @@ $max        = static fn( string $table, string $col ) => (int) $wpdb->get_var( "
 $start_c    = $max( $C, 'id' );
 $start_s    = $max( $S, 'id' );
 $as_mark    = pqbg_test_as_mark(); // Action Scheduler cleanup, see bootstrap.php.
+$cl_mark    = pqbg_test_catlookup_mark(); // 1.0.1: category lookup rows of the test categories, see bootstrap.php.
 $start_post = $max( $wpdb->posts, 'ID' );
 $start_ord  = $max( $wpdb->prefix . 'wc_orders', 'id' );
 $start_oi   = $max( $wpdb->prefix . 'woocommerce_order_items', 'order_item_id' );
@@ -1020,6 +1021,8 @@ try {
 	pqbg_t( 'cleanup: the posts AUTO_INCREMENT only moved by the posts this suite created (no jump)', $posts_ai() - $start_ai < 5000, $start_ai . ' → ' . $posts_ai() );
 	pqbg_t( 'cleanup: no temporary tables left', array() === $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $mig_prefix ) . '%' ) ) );
 	pqbg_test_as_check( $as_mark );
+	pqbg_test_catlookup_cleanup( $cl_mark );
+	pqbg_test_catlookup_check( $cl_mark );
 }
 
 pqbg_test_done();

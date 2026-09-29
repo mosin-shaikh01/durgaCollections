@@ -304,6 +304,79 @@ function pqbg_test_as_check( array $mark ): void {
 	pqbg_t( 'zero Action Scheduler jobs or logs left for test data', array() === $left['actions'] && 0 === $left['orphan_logs'], count( $left['actions'] ) . ' job(s), ' . $left['orphan_logs'] . ' orphan log(s)' );
 }
 
+/*
+ * WooCommerce category lookup leak guard (1.0.1). WooCommerce keeps a deleted product category's rows
+ * in wp_wc_category_lookup, so a suite that creates and deletes categories left them behind: 93
+ * orphaned rows had built up by 2026-09-28 (removed with the owner's approval). Suites that create
+ * categories take a mark, delete their own rows in cleanup and check; run.php also fails any suite
+ * after which the site has more orphaned rows than before (tests/lookup-guard.php).
+ */
+
+/**
+ * Rows of wp_wc_category_lookup whose category (or tree root) no longer exists as a taxonomy term.
+ */
+function pqbg_test_catlookup_orphans(): int {
+	global $wpdb;
+
+	$l = $wpdb->prefix . 'wc_category_lookup';
+	$t = $wpdb->term_taxonomy;
+
+	return (int) $wpdb->get_var( "SELECT COUNT(*) FROM $l l WHERE NOT EXISTS (SELECT 1 FROM $t t WHERE t.term_id = l.category_id) OR NOT EXISTS (SELECT 1 FROM $t t WHERE t.term_id = l.category_tree_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifiers.
+}
+
+/**
+ * Rows of wp_wc_product_meta_lookup whose product_id has no matching post (1.0.1; WooCommerce removes the
+ * row when a product is deleted through its API, but not when the post goes some other way).
+ */
+function pqbg_test_prodlookup_orphans(): int {
+	global $wpdb;
+
+	$l = $wpdb->prefix . 'wc_product_meta_lookup';
+
+	return (int) $wpdb->get_var( "SELECT COUNT(*) FROM $l l WHERE NOT EXISTS (SELECT 1 FROM {$wpdb->posts} p WHERE p.ID = l.product_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifiers.
+}
+
+/**
+ * The mark: the highest term ID and the orphaned lookup rows when a suite starts.
+ *
+ * @return array{term: int, orphans: int}
+ */
+function pqbg_test_catlookup_mark(): array {
+	global $wpdb;
+
+	return array(
+		'term'    => (int) $wpdb->get_var( "SELECT COALESCE(MAX(term_id), 0) FROM {$wpdb->terms}" ),
+		'orphans' => pqbg_test_catlookup_orphans(),
+	);
+}
+
+/**
+ * Removes the lookup rows of categories created (and deleted) since the mark. Rows of older
+ * categories are never touched.
+ *
+ * @param array $mark From pqbg_test_catlookup_mark().
+ * @return int Rows removed.
+ */
+function pqbg_test_catlookup_cleanup( array $mark ): int {
+	global $wpdb;
+
+	$l = $wpdb->prefix . 'wc_category_lookup';
+	$t = $wpdb->term_taxonomy;
+
+	return (int) $wpdb->query( $wpdb->prepare( "DELETE l FROM $l l WHERE ( l.category_id > %d OR l.category_tree_id > %d ) AND ( NOT EXISTS (SELECT 1 FROM $t t WHERE t.term_id = l.category_id) OR NOT EXISTS (SELECT 1 FROM $t t WHERE t.term_id = l.category_tree_id) )", $mark['term'], $mark['term'] ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifiers.
+}
+
+/**
+ * The zero-leak check for the category lookup table, at the end of a suite's cleanup.
+ *
+ * @param array $mark From pqbg_test_catlookup_mark().
+ */
+function pqbg_test_catlookup_check( array $mark ): void {
+	$now = pqbg_test_catlookup_orphans();
+
+	pqbg_t( 'no orphaned WooCommerce category lookup rows left by test categories', $now <= $mark['orphans'], "{$mark['orphans']} before, {$now} after" );
+}
+
 /**
  * Plugin basename as WordPress stores it in active_plugins.
  */

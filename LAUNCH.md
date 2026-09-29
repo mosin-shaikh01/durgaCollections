@@ -1,12 +1,12 @@
 # Launch runbook
 
-The ordered steps to take the shop from this development laptop (`http://localhost/sharayu`) to its live host, with the Product QR Code and Barcode Generator plugin 1.0.0. It replaces the "Pre-launch acceptance checklist" that was in `progress.md` (moved here in Phase 13, 2026-09-28): every item of that checklist is a step below, marked **[acceptance]**.
+The ordered steps to take the shop from this development laptop (`http://localhost/sharayu`) to its live host, with the Product QR Code and Barcode Generator plugin 1.0.1 (1.0.0 until 2026-09-28; 1.0.1 adds the user manual and help links). It replaces the "Pre-launch acceptance checklist" that was in `progress.md` (moved here in Phase 13, 2026-09-28): every item of that checklist is a step below, marked **[acceptance]**.
 
 How to use it:
 - Work from top to bottom. Tick a box only when its **Check** passes.
 - **Who:** *Owner* = the shop owner; *Admin* = whoever looks after the website (may be the same person).
 - The detailed steps of each **[acceptance]** check are in the plugin README (`wp-content/plugins/product-qrcode-barcode-generator/README.md`), in the checklist named in brackets.
-- The plain-language guides are in the plugin's `docs/` folder: `owner-guide.md`, and `seller-guide.pdf` / `seller-guide.html` for the staff.
+- The plain-language guides are in the plugin's `docs/` folder: the user manual `user-manual.pdf` (since 1.0.1; it replaced `owner-guide.md` and opens from the Dashboard's "Plugin guide" button), and `seller-guide.pdf` / `seller-guide.html` for the staff.
 - Write the date and your initials next to each ticked box.
 
 State on 2026-09-28 (checked read-only at the start of this runbook): plugin 1.0.0 on WordPress 7.1.2, WooCommerce 11.1.2, PHP 8.5.6; permalinks `/%postname%/`; Scan base URL empty (the site address); WooCommerce Coming Soon **on**; Settings → Reading "Discourage search engines" **on** (`blog_public` = 0); the phone-test snippet is **not** in the local `wp-config.php`.
@@ -25,6 +25,7 @@ State on 2026-09-28 (checked read-only at the start of this runbook): plugin 1.0
   (Phone tests on the laptop need the Cloudflare tunnel and the phone-test `wp-config.php` snippet from the README's "Phone testing" section. **Remove the snippet and clear the Scan base URL afterwards**, see C3.)
 - [ ] **A7. Interim label check without a printer [acceptance].** *Owner.* Open a label sheet (the print page), Save as PDF, and scan several codes from the screen with a phone.
 - [ ] **A8. 50,000-sale stress checks [acceptance].** *Admin.* **Done 2026-09-28** at `1b583f9` (Phase 13): the reports and the Dashboard under 2 s and the Health check under 1 s at 50,000 sales (see the Phase 13 section of `progress.md`). Re-run (`PQBG_STRESS=1`, phase9b, phase10b and phase11 suites) only if a later change touches what the reports read.
+- [ ] **A8b. User manual and help links (1.0.1) [acceptance].** *Owner.* On the computer: QR & Barcodes → Dashboard → **Plugin guide** opens the manual in a new tab; the tooltip shows when you point at the button or reach it with the Tab key, and Escape hides it; **Seller guide (1 page, for staff)** opens the seller guide; Plugins → the plugin's row → **User manual** opens the manual. On a phone: My sales → **How to sell (guide)** opens the seller guide (or downloads it: open the file). Print two pages of the manual (for example the table of contents and End of day): readable, page numbers at the bottom. Check that the screenshots still match the screens (Dashboard, End of day, Bulk tools); a mismatch means the manual needs rebuilding (`build/manual/README.md`).
 - [ ] **A9. Choose the label stock and, if possible, the printer.** *Owner.* If the stock is not A4 3 × 7, note its sizes for a custom layout (or a new default preset, which needs a small plugin change).
 
 ## B. Hosting
@@ -38,7 +39,7 @@ State on 2026-09-28 (checked read-only at the start of this runbook): plugin 1.0
 
 ## C. Moving the site
 
-- [ ] **C1. Copy files and database.** *Admin.* Files (WordPress, `wp-content` with uploads, themes and plugins; **not** the plugin's `tests/` and `build/` folders: install the plugin from `product-qrcode-barcode-generator-1.0.0.zip` instead) and the database. Replace every `http://localhost/sharayu` with the new `https://` address using a tool that understands serialized data (`wp search-replace` or a migration plugin), never a plain text replace in the `.sql` file.
+- [ ] **C1. Copy files and database.** *Admin.* Files (WordPress, `wp-content` with uploads, themes and plugins; **not** the plugin's `tests/` and `build/` folders: install the plugin from the latest release zip, `product-qrcode-barcode-generator-1.0.1.zip`, instead) and the database. Replace every `http://localhost/sharayu` with the new `https://` address using a tool that understands serialized data (`wp search-replace` or a migration plugin), never a plain text replace in the `.sql` file.
 - [ ] **C2. `wp-config.php` for the host.** *Admin.* New database credentials, **new salts** (https://api.wordpress.org/secret-key/1.1/salt/), `WP_ENVIRONMENT_TYPE` set to `production`, `WP_DEBUG` off. Do not set `PQBG_UNINSTALL_DELETE_ALL_DATA`.
 - [ ] **C3. Phone-test snippet removed.** *Admin.* The "PQBG phone testing via a Cloudflare quick tunnel" block must not be in the live `wp-config.php`, and remove it from the laptop's too when phone testing is over. Stop any tunnel.
   Check: search the live `wp-config.php` for `trycloudflare`: no result.

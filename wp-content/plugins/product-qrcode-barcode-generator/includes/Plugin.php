@@ -61,6 +61,9 @@ final class Plugin {
 			// The "QR & Barcodes" top-level menu, its pages and old-URL redirects, and the Dashboard (Phase 10B).
 			AdminMenu::register();
 			DashboardAdmin::register();
+
+			// The "User manual" link in the plugin's row on the Plugins screen (1.0.1).
+			PluginLinks::register();
 		}
 	}
 

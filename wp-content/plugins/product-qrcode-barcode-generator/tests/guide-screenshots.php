@@ -46,6 +46,7 @@ $keep       = (string) getenv( 'PQBG_GUIDE_SHOTS' );
 wp_mkdir_p( $work );
 
 $mark     = pqbg_test_as_mark();
+$cl_mark  = pqbg_test_catlookup_mark(); // 1.0.1: category lookup rows of the sample categories, see bootstrap.php.
 $created  = array( 'products' => array(), 'terms' => array(), 'user' => 0 );
 $pqbg_opt = static fn(): string => (string) $wpdb->get_var( "SELECT GROUP_CONCAT(CONCAT(option_name, '=', MD5(option_value)) ORDER BY option_name) FROM {$wpdb->options} WHERE option_name LIKE 'pqbg%'" );
 $opts0    = $pqbg_opt();
@@ -181,6 +182,8 @@ try {
 	pqbg_t( 'cleanup: no sample product, code, sale, term or user left', 0 === (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_title LIKE 'Cotton kurta – indigo%' OR post_title LIKE 'Silk dupatta – maroon%'" ) && ! get_user_by( 'login', 'pqbg_guide_asha' ) && ! term_exists( 'Kurtas (sample)', 'product_cat' ) && ( array() === $ids || 0 === (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . Schema::sales_table() . ' WHERE product_id IN (' . implode( ',', array_map( 'intval', $ids ) ) . ')' ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	pqbg_t( 'cleanup: the plugin options are unchanged', $opts0 === $pqbg_opt() );
 	pqbg_test_as_check( $mark );
+	pqbg_test_catlookup_cleanup( $cl_mark );
+	pqbg_test_catlookup_check( $cl_mark );
 }
 
 pqbg_test_done();

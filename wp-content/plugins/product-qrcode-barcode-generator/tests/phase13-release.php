@@ -11,8 +11,8 @@
  * - code: a direct-access guard in every runtime PHP file, a silence index.php in every runtime
  *   folder, no debug calls, no TODO/FIXME, every translation call with the plugin's text domain;
  * - the .pot is up to date (regenerated with WP-CLI into a temporary file; the same strings);
- * - the guides: the owner guide, the built seller guide (self-contained, four screenshots, the
- *   current version) and its one-page PDF;
+ * - the guides: the user manual (1.0.1; replaces the owner guide), the built seller guide
+ *   (self-contained, four screenshots, the current version) and its one-page PDF;
  * - the package: build/package.php --dry-run lists the runtime files only and passes its own checks;
  * - no shipped text file names the shop (this site's name).
  *
@@ -50,7 +50,9 @@ try {
 	$hfield = static fn( string $name ): string => preg_match( '/^\s*\*\s*' . preg_quote( $name, '/' ) . ':\s*(.+?)\s*$/m', $main, $m ) ? $m[1] : '';
 	$change = preg_match( '/^## (\d+\.\d+\.\d+) \((\d{4}-\d{2}-\d{2})\)/m', $read( 'CHANGELOG.md' ), $cm ) ? $cm : array( '', '', '' );
 	$pot    = $read( 'languages/product-qrcode-barcode-generator.pot' );
-	pqbg_t( 'the version is 1.0.0 in the header, PQBG_VERSION, readme.txt (Stable tag), CHANGELOG.md (top entry) and the .pot', '1.0.0' === $header['Version'] && '1.0.0' === PQBG_VERSION && '1.0.0' === $field( $readme, 'Stable tag' ) && '1.0.0' === $change[1] && str_contains( $pot, '"Project-Id-Version: Product QR Code and Barcode Generator 1.0.0\n"' ), wp_json_encode( array( $header['Version'], PQBG_VERSION, $field( $readme, 'Stable tag' ), $change[1] ) ) );
+	// 1.0.1: one version everywhere, and it is the top CHANGELOG entry (no longer a fixed number).
+	pqbg_t( 'the version (' . PQBG_VERSION . ') is the same in the header, PQBG_VERSION, readme.txt (Stable tag), CHANGELOG.md (top entry) and the .pot', preg_match( '/^\d+\.\d+\.\d+$/', PQBG_VERSION ) && PQBG_VERSION === $header['Version'] && PQBG_VERSION === $field( $readme, 'Stable tag' ) && PQBG_VERSION === $change[1] && str_contains( $pot, '"Project-Id-Version: Product QR Code and Barcode Generator ' . PQBG_VERSION . '\n"' ), wp_json_encode( array( $header['Version'], PQBG_VERSION, $field( $readme, 'Stable tag' ), $change[1] ) ) );
+	pqbg_t( 'readme.txt has a changelog entry for this version', str_contains( $readme, '= ' . PQBG_VERSION . ' =' ) );
 	pqbg_t( 'the CHANGELOG entry has a date', '' !== $change[2] );
 	pqbg_t( 'the minimums agree: header, readme.txt and Requirements (WordPress 6.7, PHP 8.2, WooCommerce 9.0)', Requirements::MIN_WP === $header['RequiresWP'] && Requirements::MIN_PHP === $header['RequiresPHP'] && Requirements::MIN_WP === $field( $readme, 'Requires at least' ) && Requirements::MIN_PHP === $field( $readme, 'Requires PHP' ) && Requirements::MIN_WC === $hfield( 'WC requires at least' ) );
 	$wp_mm = implode( '.', array_slice( explode( '.', get_bloginfo( 'version' ) ), 0, 2 ) );
@@ -174,8 +176,9 @@ try {
 	}
 
 	pqbg_section( 'guides' );
-	$owner = $read( 'docs/owner-guide.md' );
-	pqbg_t( 'docs/owner-guide.md: the current version and every section', str_contains( $owner, 'version ' . PQBG_VERSION ) && 14 === preg_match_all( '/^## \d+\. /m', $owner ) );
+	// 1.0.1: the user manual replaces the owner guide (its full checks are in phase14-manual).
+	$manual = $read( 'docs/user-manual.md' );
+	pqbg_t( 'docs/user-manual.md (14 numbered chapters) and docs/user-manual.pdf (a PDF of at most 4 MB) replace docs/owner-guide.md', 14 === preg_match_all( '/^## \d+\. /m', $manual ) && str_starts_with( $read( 'docs/user-manual.pdf' ), '%PDF-' ) && strlen( $read( 'docs/user-manual.pdf' ) ) <= 4 * 1024 * 1024 && ! file_exists( $dir . '/docs/owner-guide.md' ) );
 	$guide = $read( 'docs/seller-guide.html' );
 	pqbg_t( 'docs/seller-guide.html: built (no placeholder), the current version, four inlined PNG screenshots, self-contained (no external src or href)', '' !== $guide && ! str_contains( $guide, '{{' ) && str_contains( $guide, 'Product QR Code and Barcode Generator ' . PQBG_VERSION ) && 8 === substr_count( $guide, 'src="data:image/png;base64,' ) && ! preg_match( '/\b(src|href)="(?!data:|#)/', $guide ) && ! preg_match( '/@import|url\(\s*[\'"]?https?:/i', $guide ) );
 	$tpl = $read( 'tests/guide/seller-guide.template.html' );
@@ -194,6 +197,16 @@ try {
 	$expected = $runtime;
 	sort( $expected );
 	pqbg_t( 'the package holds exactly the runtime files (everything outside tests/ and build/)', $listed === $expected, count( $listed ) . ' files; missing: ' . implode( ', ', array_diff( $expected, $listed ) ) . '; extra: ' . implode( ', ', array_diff( $listed, $expected ) ) );
+	pqbg_t( 'the package holds the user manual (PDF and source) and the seller guide, not the old owner guide', array() === array_diff( array( 'docs/user-manual.pdf', 'docs/user-manual.md', 'docs/seller-guide.pdf', 'docs/seller-guide.html' ), $listed ) && ! in_array( 'docs/owner-guide.md', $listed, true ) );
+	// 1.0.1: a real test zip (from the working tree, into a temporary folder) stays within the 6 MB upload-friendly limit.
+	$zip_dir = get_temp_dir() . 'pqbg-zip-' . wp_generate_password( 8, false );
+	$zip_out = (string) shell_exec( escapeshellarg( PHP_BINARY ) . ' -d extension=zip ' . escapeshellarg( $dir . '/build/package.php' ) . ' --allow-dirty --out=' . escapeshellarg( $zip_dir ) . ' 2>&1' );
+	$zip_sz  = preg_match( '/^Size: ([\d,]+) bytes$/m', $zip_out, $zm ) ? (int) str_replace( ',', '', $zm[1] ) : 0;
+	// package.php re-reads every entry from the written zip and compares it byte for byte before listing it.
+	$zip_has = (bool) preg_match( '/^\s*' . preg_quote( number_format( strlen( $read( 'docs/user-manual.pdf' ) ) ), '/' ) . '\s+product-qrcode-barcode-generator\/docs\/user-manual\.pdf$/m', $zip_out );
+	array_map( 'unlink', glob( $zip_dir . '/*' ) ?: array() );
+	@rmdir( $zip_dir );
+	pqbg_t( 'a test zip is at most 6 MB and contains docs/user-manual.pdf', $zip_sz > 0 && $zip_sz <= 6 * 1024 * 1024 && $zip_has, number_format( $zip_sz ) . ' bytes' . ( $zip_sz ? '' : ': ' . trim( substr( $zip_out, -300 ) ) ) );
 
 	pqbg_section( 'no shop name' );
 	$shop   = trim( wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) );

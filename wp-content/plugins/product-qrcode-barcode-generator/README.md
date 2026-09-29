@@ -7,9 +7,9 @@ Staff scan a product's code, see live WooCommerce product information, and mark 
 
 This is **not** a marketplace or multi-vendor system. Sellers are our own staff selling our own catalog.
 
-**Version 1.0.0.** For shop owners and sellers, the plain-language guides are in [`docs/`](docs/): the [owner guide](docs/owner-guide.md) and the one-page seller guide (`docs/seller-guide.html`, also as `docs/seller-guide.pdf` to send to staff). What changed is in [`CHANGELOG.md`](CHANGELOG.md); `readme.txt` has the WordPress-format metadata. This README is the developer documentation.
+**Version 1.0.1.** For shop owners, managers and sellers, the plain-language documents are in [`docs/`](docs/): the **user manual** (`docs/user-manual.pdf`, built from [`docs/user-manual.md`](docs/user-manual.md); it replaced the owner guide in 1.0.1) and the one-page seller guide (`docs/seller-guide.html`, also as `docs/seller-guide.pdf` to send to staff). The manual opens from the Dashboard's "Plugin guide" button and the Plugins screen (see [Help links](#help-links-user-manual-and-seller-guide-101)). What changed is in [`CHANGELOG.md`](CHANGELOG.md); `readme.txt` has the WordPress-format metadata. This README is the developer documentation.
 
-## Current scope: version 1.0.0, Phases 2–13 (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard, hardening, theme compatibility, release packaging)
+## Current scope: version 1.0.1, Phases 2–13 plus the 1.0.1 user manual (foundation, data layer, code generation, rendering, admin code management, scan page, Mark as Sold, label printing, sales history, reports, bulk and CSV tools, the plugin menu and Dashboard, hardening, theme compatibility, release packaging, the user manual and help links)
 
 Implemented:
 
@@ -279,13 +279,21 @@ The libraries are bundled inside the plugin; no Composer is needed on the server
 
 The CLI regression suites for Phases 2–11 are in [`tests/`](tests/README.md): a runner with an Action Scheduler leak guard, a cooperative stop for low memory in every suite (Phase 11), an optional error capture that counts every PHP notice, warning and deprecation from plugin code over CLI and HTTP (Phase 11), round-trip QR/barcode decoding (also at printed size, 203 and 300 dpi), HTTP checks of the admin, scan, sale and print flows, concurrency tests with worker processes, and optional headless Chrome/Edge checks of the print page. `tests/` and `build/` are never loaded by the plugin, their PHP files exit outside the CLI, and `.htaccess` denies them over HTTP.
 
+## Help links: user manual and seller guide (1.0.1)
+
+- **Dashboard:** a "Plugin guide" button next to the heading (`DashboardAdmin::render_help()`): a link with a visible label and a dashicons help icon (`aria-hidden`), `target="_blank" rel="noopener"`, a screen-reader note "(opens in a new tab)", and `aria-describedby` pointing to a real tooltip element (`role="tooltip"`, "How to use this plugin: step-by-step guide (PDF)"). The tooltip shows on hover and on keyboard focus (CSS in `pqbg-dashboard.css`), stays while the pointer is on it, and Escape hides it (`assets/pqbg-help.js`, the Dashboard only). No `title` attribute. Next to it, "Seller guide (1 page, for staff)". Everyone who can open the Dashboard (`pqbg_view_all_sales`) sees both.
+- **Plugins screen:** "User manual" in this plugin's row meta (`PluginLinks`, `plugin_row_meta`, this plugin's basename only).
+- **My sales:** "How to sell (guide)" at the bottom, to the seller guide PDF. A plain same-origin link: `ScanRoute::security_headers()` and `csp()` are unchanged (byte-identical to 1.0.0; the 1.0.1 suite compares them with the tagged file), and the scan pages stay script-free.
+- **URLs** only from `AdminUrl::user_manual()` / `AdminUrl::seller_guide()`: the static PDFs in `docs/` with `?ver=PQBG_VERSION`. No other file writes a `docs/` address (the 1.0.1 suite checks). The PDFs are public static files, like every plugin asset: they contain only sample data and no shop name.
+- **The manual** is built by `build/manual/build-manual.php` from `docs/user-manual.md` with screenshots of a sample shop; see [`build/manual/README.md`](build/manual/README.md). Rebuild it (with `--with-seller-guide`) after a version change or a change to a screen it shows.
+
 ## Production deployment
 
 **Exclude `tests/` and `build/` from any production deployment.** Deploy only the runtime files, which is exactly what the release zip contains (see [Release and packaging](#release-and-packaging)):
 
 - `product-qrcode-barcode-generator.php`, `uninstall.php`, `index.php`
 - `includes/`, `assets/`, `languages/`, `templates/`, `vendor-prefixed/`
-- `docs/` (the owner and seller guides), `README.md`, `readme.txt`, `CHANGELOG.md`, `LICENSE`
+- `docs/` (the user manual and the seller guide), `README.md`, `readme.txt`, `CHANGELOG.md`, `LICENSE`
 
 `tests/` and `build/` are development tooling. They are kept in the repository so the vendor bundle can be rebuilt exactly and the regression suites can be rerun, but they must never reach a live server:
 - The test suites create and delete data, and one briefly deactivates the plugin.
@@ -302,7 +310,8 @@ C:\xampp\php\php.exe -d extension=zip build\package.php --out=C:\xampp\backups\s
 
 - `-d extension=zip` loads PHP's zip extension for that one run (XAMPP's `php.ini`, which Apache shares, does not load it; nothing is changed).
 - It packs **the files committed at HEAD**, read from git (so the bytes are the committed ones), and refuses to build when the plugin folder differs from HEAD. `--allow-dirty` packs the working tree instead (a test build before a commit; the `.sha256` file says so). `--dry-run` only lists.
-- It leaves out `tests/`, `build/`, `node_modules`, package and composer files, `.git*` files, patches, logs, dumps and archives, and refuses to build when a required file is missing (the main file, `uninstall.php`, `LICENSE`, `readme.txt`, `README.md`, `CHANGELOG.md`, the .pot, the three guides, `NOTICE.md` and the four library licence files), when the version differs between the header, `PQBG_VERSION`, `readme.txt` and `CHANGELOG.md`, when a PHP file has no direct-access guard, or when a folder has no silence `index.php`.
+- It leaves out `tests/`, `build/`, `node_modules`, package and composer files, `.git*` files, patches, logs, dumps and archives, and refuses to build when a required file is missing (the main file, `uninstall.php`, `LICENSE`, `readme.txt`, `README.md`, `CHANGELOG.md`, the .pot, the user manual (`.md` and `.pdf`) and the seller guide (`.html` and `.pdf`), `NOTICE.md` and the four library licence files), when the version differs between the header, `PQBG_VERSION`, `readme.txt` and `CHANGELOG.md`, when a PHP file has no direct-access guard, or when a folder has no silence `index.php`.
+- Size: at most 6 MB (1.0.1; many hosts limit uploads to 8 MB or less, and the plugin is installed by uploading the zip); the Phase 13 suite builds a test zip and checks it.
 - The zip has one top folder `product-qrcode-barcode-generator/`, forward-slash paths, sorted entries, a fixed timestamp (2026-09-28 00:00 UTC) and fixed Unix permissions, so the same files always give a byte-identical zip. It is re-read and compared file by file after writing. The SHA-256 is printed and saved next to it (`.sha256`).
 - `--out` must be outside the repository.
 
@@ -312,11 +321,11 @@ C:\xampp\php\php.exe -d extension=zip build\package.php --out=C:\xampp\backups\s
 C:\xampp\php\php.exe C:\xampp\tools\pqbg\wp-cli\wp-cli.phar i18n make-pot . languages/product-qrcode-barcode-generator.pot --slug=product-qrcode-barcode-generator --domain=product-qrcode-barcode-generator --exclude=tests,build,vendor-prefixed,node_modules,docs --headers="{\"Report-Msgid-Bugs-To\":\"\",\"Language-Team\":\"\"}"
 ```
 
-Regenerate it after changing any user-facing string; the Phase 13 suite fails when it is out of date. 811 strings in 1.0.0. Translations themselves (`.po`/`.mo`) go in `languages/`; none are shipped yet.
+Regenerate it after changing any user-facing string; the Phase 13 suite fails when it is out of date. 811 strings in 1.0.0, 817 in 1.0.1 (the six help-link strings). Translations themselves (`.po`/`.mo`) go in `languages/`; none are shipped yet.
 
-**The guides:** `docs/owner-guide.md` is written by hand. `docs/seller-guide.html` and `docs/seller-guide.pdf` are built by `tests/guide-screenshots.php` from `tests/guide/seller-guide.template.html` with screenshots of sample data (see `tests/README.md`).
+**The guides:** `docs/user-manual.md` is written by hand; `docs/user-manual.pdf` is built from it by `build/manual/build-manual.php` (1.0.1; see `build/manual/README.md`). `docs/seller-guide.html` and `docs/seller-guide.pdf` are built by `tests/guide-screenshots.php` from `tests/guide/seller-guide.template.html` with screenshots of sample data (see `tests/README.md`); `build-manual.php --with-seller-guide` runs it first.
 
-**Versions tested for 1.0.0:** WordPress 7.1.2, WooCommerce 11.1.2, PHP 8.5.6 (PHP 8.2.34: `php -l` only). The minimums (WordPress 6.7, WooCommerce 9.0, PHP 8.2) are enforced by `Requirements` but were not run.
+**Versions tested for 1.0.0 and 1.0.1:** WordPress 7.1.2, WooCommerce 11.1.2, PHP 8.5.6 (PHP 8.2.34: `php -l` only). The minimums (WordPress 6.7, WooCommerce 9.0, PHP 8.2) are enforced by `Requirements` but were not run.
 
 ## Naming and the rename
 

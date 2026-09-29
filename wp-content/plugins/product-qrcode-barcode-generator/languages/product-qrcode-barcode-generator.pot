@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Product QR Code and Barcode Generator 1.0.0\n"
+"Project-Id-Version: Product QR Code and Barcode Generator 1.0.1\n"
 "Report-Msgid-Bugs-To: \n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-28T09:56:50+02:00\n"
+"POT-Creation-Date: 2026-09-28T19:44:57+02:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: product-qrcode-barcode-generator\n"
@@ -90,7 +90,7 @@ msgid "Product codes"
 msgstr ""
 
 #: includes/AdminMenu.php:61
-#: includes/DashboardAdmin.php:174
+#: includes/DashboardAdmin.php:176
 msgid "Dashboard"
 msgstr ""
 
@@ -102,21 +102,21 @@ msgstr ""
 
 #. translators: %s: link to In-store reports.
 #: includes/AdminMenu.php:75
-#: includes/DashboardAdmin.php:176
-#: includes/DashboardAdmin.php:262
+#: includes/DashboardAdmin.php:180
+#: includes/DashboardAdmin.php:283
 #: includes/ReportsAdmin.php:203
 msgid "In-store reports"
 msgstr ""
 
 #: includes/AdminMenu.php:82
-#: includes/DashboardAdmin.php:309
+#: includes/DashboardAdmin.php:330
 #: includes/ToolsAdmin.php:133
 #: includes/ToolsAdmin.php:168
 msgid "Bulk tools"
 msgstr ""
 
 #: includes/AdminMenu.php:89
-#: includes/DashboardAdmin.php:357
+#: includes/DashboardAdmin.php:378
 #: includes/SettingsPage.php:138
 #: includes/SettingsPage.php:142
 #: includes/SettingsPage.php:145
@@ -186,9 +186,9 @@ msgstr ""
 #: includes/SalesListTable.php:64
 #: includes/ToolsAdmin.php:599
 #: templates/pqbg-print.php:25
-#: templates/pqbg-scan.php:158
-#: templates/pqbg-scan.php:222
-#: templates/pqbg-scan.php:249
+#: templates/pqbg-scan.php:160
+#: templates/pqbg-scan.php:224
+#: templates/pqbg-scan.php:251
 msgid "SKU"
 msgstr ""
 
@@ -199,9 +199,9 @@ msgstr ""
 #: includes/CodesExport.php:215
 #: includes/SalesAdmin.php:358
 #: includes/SalesExport.php:131
-#: templates/pqbg-scan.php:165
-#: templates/pqbg-scan.php:225
-#: templates/pqbg-scan.php:252
+#: templates/pqbg-scan.php:167
+#: templates/pqbg-scan.php:227
+#: templates/pqbg-scan.php:254
 msgid "Code"
 msgstr ""
 
@@ -416,8 +416,8 @@ msgid "Stop the run before dismissing it."
 msgstr ""
 
 #: includes/BulkLog.php:163
-#: includes/DashboardAdmin.php:273
-#: includes/DashboardAdmin.php:346
+#: includes/DashboardAdmin.php:294
+#: includes/DashboardAdmin.php:367
 #: includes/ToolsAdmin.php:192
 #: includes/ToolsAdmin.php:332
 msgid "Generate missing codes"
@@ -895,8 +895,8 @@ msgstr ""
 msgid "The file is larger than %s. Split it into smaller files."
 msgstr ""
 
-#: includes/DashboardAdmin.php:49
-#: includes/DashboardAdmin.php:162
+#: includes/DashboardAdmin.php:50
+#: includes/DashboardAdmin.php:164
 #: includes/ReportsAdmin.php:178
 #: includes/ReportsAdmin.php:196
 #: includes/SalesAdmin.php:55
@@ -908,59 +908,59 @@ msgstr ""
 msgid "Sorry, you are not allowed to access this page."
 msgstr ""
 
-#: includes/DashboardAdmin.php:98
+#: includes/DashboardAdmin.php:100
 #: includes/SettingsPage.php:247
 msgid "Scan base URL settings"
 msgstr ""
 
 #. translators: %s: scan base URL.
-#: includes/DashboardAdmin.php:102
+#: includes/DashboardAdmin.php:104
 #, php-format
 msgid "QR codes currently point to a local address (%s). Do not print labels until the production URL is set."
 msgstr ""
 
-#: includes/DashboardAdmin.php:104
+#: includes/DashboardAdmin.php:106
 #: includes/PrintAdmin.php:132
 #: includes/SettingsPage.php:240
 #: templates/pqbg-print.php:22
 msgid "Labels should use an https:// scan URL in production."
 msgstr ""
 
-#: includes/DashboardAdmin.php:110
+#: includes/DashboardAdmin.php:112
 msgid "Scan links do not work with the current permalink setting, so every printed label opens an error page. Choose another structure under Settings → Permalinks (the labels need no reprint)."
 msgstr ""
 
-#: includes/DashboardAdmin.php:110
+#: includes/DashboardAdmin.php:112
 msgid "Permalink settings"
 msgstr ""
 
 #. translators: 1: number of items, 2: scan page address.
-#: includes/DashboardAdmin.php:117
+#: includes/DashboardAdmin.php:119
 #, php-format
 msgid "%1$s item uses an address at or below %2$s, which the scan page takes over."
 msgid_plural "%1$s items use an address at or below %2$s, which the scan page takes over."
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/DashboardAdmin.php:123
+#: includes/DashboardAdmin.php:125
 msgid "Code generation is running."
 msgstr ""
 
-#: includes/DashboardAdmin.php:123
+#: includes/DashboardAdmin.php:125
 msgid "Code generation was interrupted (no batch for several minutes)."
 msgstr ""
 
-#: includes/DashboardAdmin.php:123
 #: includes/DashboardAdmin.php:125
+#: includes/DashboardAdmin.php:127
 msgid "Continue in Bulk tools"
 msgstr ""
 
-#: includes/DashboardAdmin.php:125
+#: includes/DashboardAdmin.php:127
 msgid "Code generation was stopped before it finished."
 msgstr ""
 
 #. translators: %s: number of problems.
-#: includes/DashboardAdmin.php:145
+#: includes/DashboardAdmin.php:147
 #, php-format
 msgid "The health check found %s problem in the plugin's data."
 msgid_plural "The health check found %s problems in the plugin's data."
@@ -968,22 +968,40 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: number of problems.
-#: includes/DashboardAdmin.php:145
+#: includes/DashboardAdmin.php:147
 msgid "Open Health check"
 msgstr ""
 
 #. translators: %s: link to In-store reports.
-#: includes/DashboardAdmin.php:176
+#: includes/DashboardAdmin.php:180
 #, php-format
 msgid "Today at a glance. For trends and analysis, open %s."
 msgstr ""
 
-#: includes/DashboardAdmin.php:203
+#: includes/DashboardAdmin.php:205
+#: includes/PluginLinks.php:42
+#: templates/pqbg-scan.php:131
+msgid "(opens in a new tab)"
+msgstr ""
+
+#: includes/DashboardAdmin.php:208
+msgid "Plugin guide"
+msgstr ""
+
+#: includes/DashboardAdmin.php:209
+msgid "How to use this plugin: step-by-step guide (PDF)"
+msgstr ""
+
+#: includes/DashboardAdmin.php:211
+msgid "Seller guide (1 page, for staff)"
+msgstr ""
+
+#: includes/DashboardAdmin.php:224
 msgid "Needs attention"
 msgstr ""
 
-#: includes/DashboardAdmin.php:221
-#: includes/DashboardAdmin.php:257
+#: includes/DashboardAdmin.php:242
+#: includes/DashboardAdmin.php:278
 #: includes/ReportData.php:99
 #: includes/ReportData.php:249
 #: includes/ReportData.php:393
@@ -994,55 +1012,55 @@ msgstr ""
 msgid "Revenue"
 msgstr ""
 
-#: includes/DashboardAdmin.php:222
-#: includes/DashboardAdmin.php:257
+#: includes/DashboardAdmin.php:243
+#: includes/DashboardAdmin.php:278
 #: includes/ReportData.php:97
 #: includes/ReportData.php:248
 #: includes/ReportData.php:392
 #: includes/ReportData.php:484
 #: includes/ReportsAdmin.php:369
 #: includes/ReportsAdmin.php:835
-#: templates/pqbg-scan.php:104
+#: templates/pqbg-scan.php:105
 msgid "Sales"
 msgstr ""
 
-#: includes/DashboardAdmin.php:223
+#: includes/DashboardAdmin.php:244
 #: includes/ReportData.php:247
 #: includes/ReportsAdmin.php:370
 msgid "Items sold"
 msgstr ""
 
-#: includes/DashboardAdmin.php:227
+#: includes/DashboardAdmin.php:248
 #: includes/ReportData.php:109
 #: includes/ReportsAdmin.php:375
 msgid "Gross profit"
 msgstr ""
 
-#: includes/DashboardAdmin.php:228
+#: includes/DashboardAdmin.php:249
 #: includes/ReportData.php:110
 #: includes/ReportsAdmin.php:376
 msgid "Margin"
 msgstr ""
 
-#: includes/DashboardAdmin.php:231
+#: includes/DashboardAdmin.php:252
 msgid "Today in the shop"
 msgstr ""
 
 #. translators: 1: date, 2: timezone.
-#: includes/DashboardAdmin.php:233
+#: includes/DashboardAdmin.php:254
 #, php-format
 msgid "%1$s · in-store sales, completed only · %2$s"
 msgstr ""
 
-#: includes/DashboardAdmin.php:255
+#: includes/DashboardAdmin.php:276
 msgid "No completed in-store sales yet today."
 msgstr ""
 
-#: includes/DashboardAdmin.php:257
+#: includes/DashboardAdmin.php:278
 msgid "Today by payment method"
 msgstr ""
 
-#: includes/DashboardAdmin.php:257
+#: includes/DashboardAdmin.php:278
 #: includes/ReportData.php:483
 #: includes/ReportData.php:582
 #: includes/ReportsAdmin.php:423
@@ -1053,13 +1071,13 @@ msgstr ""
 #: includes/SalesAdmin.php:362
 #: includes/SalesExport.php:136
 #: includes/SalesListTable.php:68
-#: templates/pqbg-scan.php:194
-#: templates/pqbg-scan.php:213
+#: templates/pqbg-scan.php:196
+#: templates/pqbg-scan.php:215
 msgid "Paid by"
 msgstr ""
 
 #. translators: %s: number of sales.
-#: includes/DashboardAdmin.php:261
+#: includes/DashboardAdmin.php:282
 #, php-format
 msgid "Voided today: %s sale."
 msgid_plural "Voided today: %s sales."
@@ -1067,116 +1085,116 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: number of sales.
-#: includes/DashboardAdmin.php:261
+#: includes/DashboardAdmin.php:282
 msgid "See voids"
 msgstr ""
 
-#: includes/DashboardAdmin.php:262
-#: includes/DashboardAdmin.php:349
+#: includes/DashboardAdmin.php:283
+#: includes/DashboardAdmin.php:370
 #: includes/ReportPrint.php:79
 #: includes/ReportPrint.php:97
 #: includes/ReportsAdmin.php:73
 msgid "End of day"
 msgstr ""
 
-#: includes/DashboardAdmin.php:262
-#: includes/DashboardAdmin.php:350
+#: includes/DashboardAdmin.php:283
+#: includes/DashboardAdmin.php:371
 msgid "Today's sales"
 msgstr ""
 
-#: includes/DashboardAdmin.php:273
+#: includes/DashboardAdmin.php:294
 msgid "Published products without a code"
 msgstr ""
 
-#: includes/DashboardAdmin.php:274
+#: includes/DashboardAdmin.php:295
 msgid "Low on stock"
 msgstr ""
 
-#: includes/DashboardAdmin.php:274
-#: includes/DashboardAdmin.php:275
+#: includes/DashboardAdmin.php:295
+#: includes/DashboardAdmin.php:296
 msgid "See the items"
 msgstr ""
 
-#: includes/DashboardAdmin.php:275
+#: includes/DashboardAdmin.php:296
 #: includes/ReportData.php:945
 #: includes/ReportsAdmin.php:629
-#: includes/ScanScreen.php:549
+#: includes/ScanScreen.php:551
 msgid "Out of stock"
 msgstr ""
 
-#: includes/DashboardAdmin.php:278
+#: includes/DashboardAdmin.php:299
 msgid "Products and codes"
 msgstr ""
 
-#: includes/DashboardAdmin.php:284
+#: includes/DashboardAdmin.php:305
 msgid "Published products and variations only. Bulk tools → Code tools also counts drafts, private, pending and scheduled items, so its number can be higher. Stock uses the WooCommerce low and out-of-stock thresholds (published and private items)."
 msgstr ""
 
-#: includes/DashboardAdmin.php:293
+#: includes/DashboardAdmin.php:314
 #: includes/ToolsAdmin.php:365
 msgid "Recent bulk runs"
 msgstr ""
 
-#: includes/DashboardAdmin.php:296
+#: includes/DashboardAdmin.php:317
 #: includes/ToolsAdmin.php:368
 msgid "None yet."
 msgstr ""
 
 #. translators: 1: date and time, 2: tool, 3: user.
-#: includes/DashboardAdmin.php:303
+#: includes/DashboardAdmin.php:324
 #, php-format
 msgid "%1$s — %2$s (%3$s)"
 msgstr ""
 
-#: includes/DashboardAdmin.php:320
+#: includes/DashboardAdmin.php:341
 msgid "Setup"
 msgstr ""
 
-#: includes/DashboardAdmin.php:321
+#: includes/DashboardAdmin.php:342
 msgid "Scan links point to"
 msgstr ""
 
-#: includes/DashboardAdmin.php:322
+#: includes/DashboardAdmin.php:343
 msgid "Example scan link"
 msgstr ""
 
-#: includes/DashboardAdmin.php:323
+#: includes/DashboardAdmin.php:344
 msgid "Barcodes"
 msgstr ""
 
-#: includes/DashboardAdmin.php:323
+#: includes/DashboardAdmin.php:344
 msgid "On (Code 128, for hardware scanners)"
 msgstr ""
 
-#: includes/DashboardAdmin.php:323
+#: includes/DashboardAdmin.php:344
 msgid "Off (QR codes only)"
 msgstr ""
 
-#: includes/DashboardAdmin.php:324
+#: includes/DashboardAdmin.php:345
 #: includes/SettingsPage.php:119
 #: includes/SettingsPage.php:195
 msgid "Payment methods offered"
 msgstr ""
 
-#: includes/DashboardAdmin.php:328
+#: includes/DashboardAdmin.php:349
 msgid "Change in Settings"
 msgstr ""
 
-#: includes/DashboardAdmin.php:342
+#: includes/DashboardAdmin.php:363
 msgid "Open the scan page (sell on a phone)"
 msgstr ""
 
-#: includes/DashboardAdmin.php:345
+#: includes/DashboardAdmin.php:366
 msgid "Print labels (Products → select → \"Print QR labels\")"
 msgstr ""
 
-#: includes/DashboardAdmin.php:353
+#: includes/DashboardAdmin.php:374
 #: includes/ToolsAdmin.php:130
 #: includes/ToolsAdmin.php:483
 msgid "Import cost prices"
 msgstr ""
 
-#: includes/DashboardAdmin.php:360
+#: includes/DashboardAdmin.php:381
 msgid "Quick links"
 msgstr ""
 
@@ -1458,6 +1476,10 @@ msgstr ""
 
 #: includes/PerfSignal.php:145
 msgid "In-store reports may be getting slow: the plugin README (In-store reports → Performance) describes the planned daily summary table or result cache."
+msgstr ""
+
+#: includes/PluginLinks.php:42
+msgid "User manual"
 msgstr ""
 
 #: includes/PrintAdmin.php:64
@@ -1930,7 +1952,7 @@ msgstr ""
 #: includes/ReportData.php:246
 #: includes/ReportData.php:947
 #: includes/ReportsAdmin.php:630
-#: includes/ScanScreen.php:548
+#: includes/ScanScreen.php:550
 msgid "In stock"
 msgstr ""
 
@@ -1995,7 +2017,7 @@ msgstr ""
 #: includes/SalesListTable.php:67
 #: includes/ScanScreen.php:429
 #: includes/ToolsAdmin.php:323
-#: templates/pqbg-scan.php:211
+#: templates/pqbg-scan.php:213
 msgid "Total"
 msgstr ""
 
@@ -2297,7 +2319,7 @@ msgid "Products"
 msgstr ""
 
 #: includes/ReportsAdmin.php:70
-#: templates/pqbg-scan.php:162
+#: templates/pqbg-scan.php:164
 msgid "Categories"
 msgstr ""
 
@@ -2397,7 +2419,7 @@ msgstr ""
 
 #. translators: 1: an amount or a stock status, 2: the number of sales or the quantity in stock.
 #: includes/ReportsAdmin.php:400
-#: templates/pqbg-scan.php:152
+#: templates/pqbg-scan.php:154
 #, php-format
 msgid "%1$s (%2$s)"
 msgstr ""
@@ -2630,7 +2652,7 @@ msgstr ""
 
 #. translators: %s: number of sales.
 #: includes/ReportsAdmin.php:749
-#: includes/ScanScreen.php:451
+#: includes/ScanScreen.php:453
 #, php-format
 msgid "%s sale"
 msgid_plural "%s sales"
@@ -2674,7 +2696,7 @@ msgid "By seller (who sold) — net collected"
 msgstr ""
 
 #: includes/ReportsAdmin.php:849
-#: templates/pqbg-scan.php:106
+#: templates/pqbg-scan.php:107
 msgid "No sales in this period."
 msgstr ""
 
@@ -2981,8 +3003,8 @@ msgstr ""
 
 #: includes/SalesAdmin.php:359
 #: includes/SalesExport.php:132
-#: templates/pqbg-scan.php:177
-#: templates/pqbg-scan.php:209
+#: templates/pqbg-scan.php:179
+#: templates/pqbg-scan.php:211
 msgid "Quantity"
 msgstr ""
 
@@ -3138,14 +3160,14 @@ msgid "Code not found."
 msgstr ""
 
 #: includes/SaleService.php:84
-#: includes/ScanScreen.php:508
-#: includes/ScanScreen.php:531
+#: includes/ScanScreen.php:510
+#: includes/ScanScreen.php:533
 msgid "This label is out of date."
 msgstr ""
 
 #: includes/SaleService.php:96
 #: includes/SaleService.php:139
-#: includes/ScanScreen.php:534
+#: includes/ScanScreen.php:536
 msgid "This label is no longer valid."
 msgstr ""
 
@@ -3359,22 +3381,22 @@ msgid "You do not have permission to view sales."
 msgstr ""
 
 #. translators: %s: number of items.
-#: includes/ScanScreen.php:453
+#: includes/ScanScreen.php:455
 #, php-format
 msgid "%s item"
 msgid_plural "%s items"
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/ScanScreen.php:464
+#: includes/ScanScreen.php:466
 msgid "This page can only be opened, not submitted to."
 msgstr ""
 
-#: includes/ScanScreen.php:503
+#: includes/ScanScreen.php:505
 msgid "Open the product to reprint its label"
 msgstr ""
 
-#: includes/ScanScreen.php:550
+#: includes/ScanScreen.php:552
 msgid "On backorder"
 msgstr ""
 
@@ -3909,79 +3931,83 @@ msgstr ""
 msgid "Printed %s"
 msgstr ""
 
-#: templates/pqbg-scan.php:47
-#: templates/pqbg-scan.php:57
+#: templates/pqbg-scan.php:48
+#: templates/pqbg-scan.php:58
 msgid "Scan"
 msgstr ""
 
-#: templates/pqbg-scan.php:59
+#: templates/pqbg-scan.php:60
 msgid "My sales"
 msgstr ""
 
-#: templates/pqbg-scan.php:61
+#: templates/pqbg-scan.php:62
 msgid "Log out"
 msgstr ""
 
-#: templates/pqbg-scan.php:66
+#: templates/pqbg-scan.php:67
 msgid "Scan or type a code"
 msgstr ""
 
-#: templates/pqbg-scan.php:69
+#: templates/pqbg-scan.php:70
 msgid "Look up"
 msgstr ""
 
-#: templates/pqbg-scan.php:86
+#: templates/pqbg-scan.php:87
 msgid "Summary (completed sales)"
 msgstr ""
 
 #. translators: %s: number of voided sales.
-#: templates/pqbg-scan.php:99
+#: templates/pqbg-scan.php:100
 #, php-format
 msgid "Voided: %s"
 msgstr ""
 
 #. translators: %s: number of older sales not listed.
-#: templates/pqbg-scan.php:125
+#: templates/pqbg-scan.php:126
 #, php-format
 msgid "%s older sales in this period are not listed. The summary includes them."
 msgstr ""
 
-#: templates/pqbg-scan.php:143
+#: templates/pqbg-scan.php:131
+msgid "How to sell (guide)"
+msgstr ""
+
+#: templates/pqbg-scan.php:145
 msgid "Price not set"
 msgstr ""
 
-#: templates/pqbg-scan.php:171
+#: templates/pqbg-scan.php:173
 msgid "Sell"
 msgstr ""
 
 #. translators: %s: unit price.
-#: templates/pqbg-scan.php:189
+#: templates/pqbg-scan.php:191
 #, php-format
 msgid "Total = quantity × %s"
 msgstr ""
 
-#: templates/pqbg-scan.php:199
+#: templates/pqbg-scan.php:201
 msgid "Confirm sale"
 msgstr ""
 
-#: templates/pqbg-scan.php:216
+#: templates/pqbg-scan.php:218
 msgid "Stock now"
 msgstr ""
 
-#: templates/pqbg-scan.php:219
+#: templates/pqbg-scan.php:221
 msgid "Time"
 msgstr ""
 
-#: templates/pqbg-scan.php:234
+#: templates/pqbg-scan.php:236
 msgid "Undo this sale"
 msgstr ""
 
 #. translators: %s: time.
-#: templates/pqbg-scan.php:238
+#: templates/pqbg-scan.php:240
 #, php-format
 msgid "Undo available until %s"
 msgstr ""
 
-#: templates/pqbg-scan.php:242
+#: templates/pqbg-scan.php:244
 msgid "Undo is no longer available. Ask a manager to void the sale if needed."
 msgstr ""

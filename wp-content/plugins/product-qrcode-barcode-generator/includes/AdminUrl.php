@@ -14,6 +14,10 @@
  *   edit.php?post_type=product&page=pqbg-print       hidden print setup (Phase 8)
  *   edit.php?post_type=product&page=pqbg-regenerate  hidden Regenerate confirmation (Phase 5)
  *
+ * Also the plugin's documents (1.0.1): the user manual and the seller guide, static PDFs in docs/
+ * with the version as a query string, so a browser never shows an older copy after an update.
+ * No other class writes a docs/ address (the Phase 10B scope check).
+ *
  * @package ProductQrBarcode
  */
 
@@ -33,6 +37,12 @@ final class AdminUrl {
 	const SETTINGS   = 'pqbg-settings';
 	const PRINT      = 'pqbg-print';
 	const REGENERATE = 'pqbg-regenerate';
+
+	/** The user manual (1.0.1), under docs/. */
+	const USER_MANUAL = 'user-manual.pdf';
+
+	/** The one-page seller guide (Phase 13), under docs/. */
+	const SELLER_GUIDE = 'seller-guide.pdf';
 
 	/**
 	 * A plugin page under admin.php. Values are URL-encoded (arrays element by element).
@@ -213,6 +223,29 @@ final class AdminUrl {
 			),
 			admin_url( 'post.php' )
 		);
+	}
+
+	/**
+	 * The user manual (PDF): the Dashboard's "Plugin guide" button and the Plugins screen link.
+	 */
+	public static function user_manual(): string {
+		return self::doc( self::USER_MANUAL );
+	}
+
+	/**
+	 * The one-page seller guide (PDF): linked from the Dashboard and from My sales.
+	 */
+	public static function seller_guide(): string {
+		return self::doc( self::SELLER_GUIDE );
+	}
+
+	/**
+	 * A document in the plugin's docs/ folder, with the version so an update is never hidden by a cached copy.
+	 *
+	 * @param string $file USER_MANUAL or SELLER_GUIDE.
+	 */
+	private static function doc( string $file ): string {
+		return add_query_arg( 'ver', rawurlencode( PQBG_VERSION ), PQBG_PLUGIN_URL . 'docs/' . $file );
 	}
 
 	/**

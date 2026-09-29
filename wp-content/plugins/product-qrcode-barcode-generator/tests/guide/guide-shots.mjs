@@ -24,7 +24,8 @@ const result = { ok: false, files: [], errors: [] };
 
 try {
 	const page = await browser.newPage();
-	page.on('pageerror', (e) => result.errors.push(String(e)));
+	// With the page's address (without the query) and the first line of the stack, to find the source.
+	page.on('pageerror', (e) => result.errors.push(page.url().replace(/\?.*$/, '') + ': ' + String(e) + ((e && e.stack) ? ' (' + String(e.stack).split('\n').slice(1, 2).join('').trim() + ')' : '')));
 
 	if ('pdf' === job.mode) {
 		await page.goto(pathToFileURL(job.html).href, { waitUntil: 'load' });

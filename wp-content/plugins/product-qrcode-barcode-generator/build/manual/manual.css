@@ -1,0 +1,56 @@
+/* The user manual's print styles (A4). Page margins, header and footer are set by render.mjs. */
+:root { --ink: #1d2327; --muted: #50575e; --line: #dcdcde; --accent: #2271b1; --soft: #f0f6fc; --admin: #8a2424; --admin-bg: #fcf0f1; }
+* { box-sizing: border-box; }
+html { font-family: "Segoe UI", Arial, "Noto Sans", "Nirmala UI", sans-serif; font-size: 10.5pt; line-height: 1.5; color: var(--ink); }
+body { margin: 0; }
+h1, h2, h3, h4 { line-height: 1.25; hyphens: none; break-after: avoid; page-break-after: avoid; }
+/* padding-top: with none, Chrome writes a chapter's bookmark twice ("1. Title1. Title") when the heading starts a page. */
+h2 { font-size: 18pt; margin: 0 0 10pt; padding-top: 2pt; padding-bottom: 4pt; border-bottom: 2px solid var(--accent); break-before: page; page-break-before: always; }
+h3 { font-size: 13pt; margin: 16pt 0 6pt; }
+h4 { font-size: 11pt; margin: 12pt 0 4pt; }
+p, ul, ol { margin: 0 0 7pt; }
+li { margin: 0 0 3pt; }
+a { color: var(--accent); text-decoration: none; }
+code { font-family: Consolas, "Courier New", monospace; font-size: 0.92em; background: #f6f7f7; padding: 0 3px; border-radius: 2px; }
+strong { font-weight: 600; }
+
+.badge { display: inline-block; margin-left: 8pt; padding: 1pt 6pt; border: 1px solid var(--admin); border-radius: 3pt; background: var(--admin-bg); color: var(--admin); font-size: 8.5pt; font-weight: 600; vertical-align: middle; letter-spacing: 0.02em; }
+h2 .badge { font-size: 9pt; }
+
+table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9.5pt; break-inside: auto; }
+th, td { border: 1px solid var(--line); padding: 4pt 6pt; text-align: left; vertical-align: top; }
+th { background: #f6f7f7; font-weight: 600; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+
+blockquote { margin: 8pt 0 10pt; padding: 7pt 10pt; border-left: 4px solid var(--accent); background: var(--soft); break-inside: avoid; page-break-inside: avoid; }
+blockquote p:last-child { margin-bottom: 0; }
+
+figure.shot { margin: 8pt 0 12pt; break-inside: avoid; page-break-inside: avoid; }
+figure.shot img { display: block; max-width: 100%; border: 1px solid var(--line); }
+figure.shot--phone img { width: 58mm; border-radius: 4pt; }
+figure.shot--wide img { width: 100%; }
+figcaption { margin-top: 3pt; color: var(--muted); font-size: 8.5pt; }
+.shots { display: flex; flex-wrap: wrap; gap: 8mm; align-items: flex-start; break-inside: avoid; page-break-inside: avoid; }
+.shots figure.shot { margin: 8pt 0 12pt; width: 58mm; }
+.shot--missing { padding: 12pt; border: 1px dashed var(--admin); color: var(--admin); }
+
+.cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; break-after: page; page-break-after: always; }
+.cover__kicker { font-size: 12pt; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 6pt; }
+.cover__title { font-size: 28pt; margin: 0 0 8pt; }
+.cover__subtitle { font-size: 13pt; color: var(--muted); margin: 0 0 24pt; }
+.cover__facts { display: flex; gap: 24pt; margin: 0 0 24pt; }
+.cover__facts dt { font-size: 8.5pt; color: var(--muted); text-transform: uppercase; }
+.cover__facts dd { margin: 0; font-size: 12pt; font-weight: 600; }
+.cover__note { max-width: 130mm; padding: 8pt 10pt; border-left: 4px solid var(--line); color: var(--muted); font-size: 9.5pt; }
+
+.toc__title { break-before: auto; page-break-before: auto; }
+.toc ol { list-style: none; margin: 0; padding: 0; }
+.toc li { margin: 0; }
+.toc a { display: flex; align-items: baseline; color: var(--ink); padding: 1.5pt 0; }
+.toc .toc__h2 > a { font-weight: 600; margin-top: 5pt; }
+.toc .toc__h3 > a { padding-left: 14pt; font-size: 9.5pt; }
+.toc__text { flex: 0 1 auto; }
+.toc__dots { flex: 1 1 auto; border-bottom: 1px dotted #a7aaad; margin: 0 4pt; min-width: 10pt; transform: translateY(-3pt); }
+.toc__page { flex: 0 0 auto; width: 3.2ch; text-align: right; font-variant-numeric: tabular-nums; }
+.toc .badge { font-size: 7.5pt; margin-left: 6pt; padding: 0 4pt; }
+.toc__end { margin-top: 10pt; color: var(--muted); font-size: 8.5pt; }

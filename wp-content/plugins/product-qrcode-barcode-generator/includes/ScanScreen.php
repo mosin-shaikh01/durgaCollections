@@ -430,6 +430,8 @@ final class ScanScreen {
 					'voided'  => (int) $totals['voided'],
 					'lines'   => $lines,
 					'more'    => max( 0, $count - count( $lines ) ),
+					// 1.0.1: a plain link to the static seller guide PDF; the page's headers and CSP are unchanged.
+					'guide'   => AdminUrl::seller_guide(),
 				),
 			)
 		);

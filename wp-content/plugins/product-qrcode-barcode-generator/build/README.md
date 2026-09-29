@@ -15,6 +15,7 @@ This directory is build tooling only, and must be **excluded from any production
 | `build.php` | Runs the steps below and verifies the result |
 | `licenses/gpl-3.0.txt` | The official GPL-3.0 text (https://www.gnu.org/licenses/gpl-3.0.txt, unchanged; SHA-256 `3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986`, pinned in `build.php`), copied next to the LGPL-3.0 library (Phase 13) |
 | `package.php` | Builds the release zip (Phase 13); see "Release and packaging" in the plugin README |
+| `manual/` | Builds the user manual, `docs/user-manual.pdf`, with screenshots of a sample shop (1.0.1); see `manual/README.md` |
 
 Not committed, and listed in the root `.gitignore`: `tools/`, `vendor/`, `scoped/`.
 

@@ -56,6 +56,7 @@ foreach ( array( Plugin::SETTINGS_OPTION, 'woocommerce_coming_soon', 'permalink_
 }
 $start_id    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(id), 0) FROM $C" );
 $as_mark  = pqbg_test_as_mark(); // Action Scheduler cleanup, see bootstrap.php.
+$cl_mark  = pqbg_test_catlookup_mark(); // 1.0.1: category lookup rows of the test categories, see bootstrap.php.
 $start_post  = (int) $wpdb->get_var( "SELECT COALESCE(MAX(ID), 0) FROM {$wpdb->posts}" );
 $start_term  = (int) $wpdb->get_var( "SELECT COALESCE(MAX(term_id), 0) FROM {$wpdb->terms}" );
 $base_c      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $C" );
@@ -842,6 +843,8 @@ try {
 	$removed_as = pqbg_test_as_cleanup( $as_mark );
 	echo '   removed ' . count( $ids ) . ' post(s) and ' . $removed_as . " Action Scheduler job(s)\n";
 	pqbg_test_as_check( $as_mark );
+	pqbg_test_catlookup_cleanup( $cl_mark );
+	pqbg_test_catlookup_check( $cl_mark );
 	$sync();
 	if ( is_dir( $tmp ) ) {
 		array_map( 'unlink', glob( $tmp . '/*' ) );

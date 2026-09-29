@@ -16,7 +16,8 @@
  * and never submits a sale.
  *
  * The header links to My sales for users who may see their own sales (Phase 9A),
- * and back to the scan page from My sales.
+ * and back to the scan page from My sales. My sales ends with a plain link to the seller
+ * guide PDF (1.0.1; a link needs nothing from the page's CSP).
  *
  * Loaded by ScanScreen::render() with $view, $entry_url, $logout_url and
  * $sales_url ('' when the user may not see My sales) in scope.
@@ -127,6 +128,7 @@ $pqbg_undo    = $view['undo'];
 			</p>
 		<?php endif; ?>
 	</section>
+	<p class="pqbg-scan__hint pqbg-scan__guide"><a href="<?php echo esc_url( $pqbg_mine['guide'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'How to sell (guide)', 'product-qrcode-barcode-generator' ); ?><span class="screen-reader-text"> <?php esc_html_e( '(opens in a new tab)', 'product-qrcode-barcode-generator' ); ?></span></a></p>
 <?php elseif ( is_array( $pqbg_product ) ) : ?>
 	<article class="pqbg-scan__product">
 		<?php if ( '' !== $pqbg_product['image_html'] ) : ?>

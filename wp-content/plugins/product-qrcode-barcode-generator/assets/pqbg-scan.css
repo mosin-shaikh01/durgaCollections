@@ -427,3 +427,17 @@
 	color: #666;
 	text-decoration: line-through;
 }
+
+/* 1.0.1: the seller guide link at the end of My sales. */
+
+.pqbg-scan__guide {
+	margin-top: 24px;
+}
+
+/* A touch target of at least 44 px whatever the font (as the header links). */
+.pqbg-scan__guide a {
+	display: inline-flex;
+	align-items: center;
+	min-height: 48px;
+	color: #0a58ca;
+}

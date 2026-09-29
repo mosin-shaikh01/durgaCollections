@@ -2,7 +2,7 @@
 /**
  * Plugin Name:          Product QR Code and Barcode Generator
  * Description:          QR code and barcode labels for a WooCommerce shop's own staff: secure product codes, label printing, in-store selling by scanning, sales history, reports and bulk tools.
- * Version:              1.0.0
+ * Version:              1.0.1
  * Author:               Mosin Shaikh
  * Author URI:           https://www.linkedin.com/in/mosin-shaikh01s/
  * Text Domain:          product-qrcode-barcode-generator
@@ -23,7 +23,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'PQBG_VERSION', '1.0.0' );
+define( 'PQBG_VERSION', '1.0.1' );
 define( 'PQBG_PLUGIN_FILE', __FILE__ );
 define( 'PQBG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PQBG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

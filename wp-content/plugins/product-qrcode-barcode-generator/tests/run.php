@@ -6,7 +6,9 @@
  *   php tests/run.php phase3 phase4   only suites whose file name contains one of the arguments
  *
  * Each suite is followed by the Action Scheduler leak guard (as-guard.php), which runs
- * after the suite's process has exited; a leak fails that suite.
+ * after the suite's process has exited; a leak fails that suite. Since 1.0.1 the WooCommerce
+ * lookup-table guard (lookup-guard.php) runs the same way: more orphaned category lookup or product
+ * meta lookup rows after a suite than before fails it.
  *
  * Exit code 0 only if every selected suite passed. See tests/README.md.
  *
@@ -42,6 +44,7 @@ $suites = array(
 	'phase11-hardening.php',
 	'phase12-themes.php',
 	'phase13-release.php',
+	'phase14-manual.php',
 );
 
 $filters = array_slice( $argv, 1 );
@@ -122,7 +125,8 @@ function pqbg_run_capture( string $log, int $offset, string $suite ): array {
 foreach ( $suites as $suite ) {
 	echo "\n########## {$suite}\n";
 
-	$mark = trim( (string) shell_exec( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __DIR__ . '/as-guard.php' ) . ' mark' ) );
+	$mark        = trim( (string) shell_exec( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __DIR__ . '/as-guard.php' ) . ' mark' ) );
+	$lookup_mark = trim( (string) shell_exec( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __DIR__ . '/lookup-guard.php' ) . ' mark' ) );
 
 	if ( '' !== $capture ) {
 		clearstatcache();
@@ -141,9 +145,16 @@ foreach ( $suites as $suite ) {
 	exec( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __DIR__ . '/as-guard.php' ) . ' check ' . escapeshellarg( $mark ) . ' 2>&1', $guard, $guard_code );
 	echo implode( "\n", $guard ), "\n";
 
+	// 1.0.1: orphaned WooCommerce category and product meta lookup rows (see lookup-guard.php).
+	$lookup      = array();
+	$lookup_code = 0;
+	exec( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __DIR__ . '/lookup-guard.php' ) . ' check ' . escapeshellarg( $lookup_mark ) . ' 2>&1', $lookup, $lookup_code );
+	echo implode( "\n", $lookup ), "\n";
+
 	$result = preg_grep( '/^RESULT: /', $output );
 	$line   = array() !== $result ? substr( (string) end( $result ), 8 ) : 'no result line (exit ' . $code . ')';
 	$line  .= 0 === $guard_code ? '; AS guard PASS' : '; AS guard FAIL';
+	$line  .= 0 === $lookup_code ? '; lookup guard PASS' : '; lookup guard FAIL';
 
 	if ( 3 === $code && ! str_contains( $line, 'STOPPED' ) ) {
 		$line .= '; STOPPED';
@@ -165,7 +176,7 @@ foreach ( $suites as $suite ) {
 	}
 
 	$summary[ $suite ] = $line;
-	$failed            = $failed || 0 !== $code || 0 !== $guard_code;
+	$failed            = $failed || 0 !== $code || 0 !== $guard_code || 0 !== $lookup_code;
 }
 
 echo "\n========== SUMMARY\n";

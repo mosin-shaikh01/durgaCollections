@@ -138,6 +138,7 @@ $start = array(
 	'structure'   => (string) get_option( 'permalink_structure' ),
 );
 $as_mark = pqbg_test_as_mark();
+$cl_mark = pqbg_test_catlookup_mark(); // 1.0.1: category lookup rows of the test categories, see bootstrap.php.
 
 // Kept until the cleanup has run, so tests/phase12-repair.php can restore a run that was killed.
 $state_file = str_replace( '\\', '/', sys_get_temp_dir() ) . '/pqbg-phase12-start.ser';
@@ -1045,6 +1046,8 @@ try {
 	pqbg_t( 'guard: users, codes, sales, WooCommerce sessions back to the start', (int) count_users()['total_users'] === $start['users'] && (int) $wpdb->get_var( "SELECT COALESCE(MAX(id), 0) FROM $C" ) === $start['codes'] && (int) $wpdb->get_var( "SELECT COALESCE(MAX(id), 0) FROM $S" ) === $start['sales'] && (int) $wpdb->get_var( "SELECT COALESCE(MAX(session_id), 0) FROM {$wpdb->prefix}woocommerce_sessions" ) <= $start['sessions'] );
 	pqbg_t( 'guard: the permalink structure and the scan rules are back; /scan/ answers', $start['structure'] === get_option( 'permalink_structure' ) && ScanRoute::is_available() && 302 === $http( 'anon-final', 'GET', ScanUrl::site_url() )['code'] );
 	pqbg_test_as_check( $as_mark );
+	pqbg_test_catlookup_cleanup( $cl_mark );
+	pqbg_test_catlookup_check( $cl_mark );
 	echo "   (removed {$removed} Action Scheduler job(s) caused by the suite)\n";
 	if ( is_file( $state_file ) ) {
 		unlink( $state_file );
