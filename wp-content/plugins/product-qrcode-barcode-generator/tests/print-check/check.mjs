@@ -218,7 +218,7 @@ async function pdf(page, spec) {
       w: pt(x1 - x0),
       h: pt(y1 - y0),
       codes: content.items
-        .filter((it) => /^DC-/.test(it.str))
+        .filter((it) => /^[A-Z][A-Z0-9]{1,5}-/.test(it.str)) // Any code prefix (Phase 15).
         .map((it) => ({ str: it.str, x: pt(it.transform[4] - x0), baseline: pt(y1 - it.transform[5]) })),
     });
   }

@@ -181,6 +181,7 @@ It uses the WordPress Settings API:
 |---|---|---|
 | Enable barcodes (for hardware scanners) | `barcodes_enabled` (bool) | `false`. Only a stored boolean `true` enables barcodes. |
 | Scan base URL | `scan_base_url` (string) | `''`, meaning use the site URL (`home_url()`). The effective URL and an example payload are shown on the page. |
+| Code prefix (Phase 15, not yet released) | `code_prefix` (string) | `DC`. See [Code prefix](#code-prefix). |
 | Payment methods offered (section "In-store sales", Phase 9A) | `payment_methods` (list of `cash`, `upi`, `card`, `other`) | `cash`, `upi`, `card`. At least one must stay enabled: unticking all of them is refused with "At least one payment method must stay enabled. The previous choice was kept." |
 
 No new option was added, and no migration was needed: defaults are merged on read.
@@ -346,7 +347,7 @@ There is **no legacy migration code**. The old tables held no data, so they were
 | `WP_Error` codes | `dpc_*` | `pqbg_*` |
 
 **Not renamed:**
-- the product code format `DC-XXXX-XXXX-XXXX` (the `DC-` prefix is part of the permanent code format)
+- the product code format `DC-XXXX-XXXX-XXXX` (since Phase 15 the prefix of new codes is a setting; `DC` is the default, and existing codes never change)
 - the alphabet and all generator logic
 - every column, index and business rule, and `DB_VERSION` (still 1)
 
@@ -355,10 +356,10 @@ There is **no legacy migration code**. The old tables held no data, so they were
 ### Format
 
 ```
-DC-XXXX-XXXX-XXXX        e.g. DC-7K4M-9P2X-Q8RT
+PREFIX-XXXX-XXXX-XXXX    e.g. DC-7K4M-9P2X-Q8RT (DC is the default prefix)
 ```
 
-- The prefix `DC-` is fixed. It is followed by 3 groups of 4 characters separated by hyphens, 17 characters in total.
+- The prefix (see [Code prefix](#code-prefix)) is followed by 3 groups of 4 characters separated by hyphens: 17 characters in total with `DC`, at most 21.
 - The alphabet is `CodeGenerator::ALPHABET`, which has 31 symbols:
 
   ```
@@ -366,10 +367,23 @@ DC-XXXX-XXXX-XXXX        e.g. DC-7K4M-9P2X-Q8RT
   ```
 
   That is A–Z without `I`, `L` and `O`, plus 2–9 without `0` and `1`. It is uppercase only and uses no punctuation other than the group hyphens. The excluded characters are easy to confuse when printed, scanned or typed by hand.
-- The strict format is `CodeGenerator::FORMAT_PATTERN` = `/^DC(-[A-HJKMNP-Z2-9]{4}){3}$/D`. Its character class matches the alphabet exactly. The `D` modifier rejects a trailing newline.
+- The strict format is `CodeGenerator::FORMAT_PATTERN` = `/^[A-Z][A-Z0-9]{1,5}(-[A-HJKMNP-Z2-9]{4}){3}$/D`. The groups' character class matches the alphabet exactly; the prefix may use any letter or digit. The `D` modifier rejects a trailing newline.
 - There are 31¹² ≈ 7.9 × 10¹⁷ possible codes (about 59 bits).
 
-`CodeRepository::CODE_PATTERN` is intentionally broader: 4–32 characters of `A-Z 0-9 -`. It is the storage-level sanity check. `CodeGenerator::is_valid_format()` is the check for the `DC-` format.
+`CodeRepository::CODE_PATTERN` is intentionally broader: 4–32 characters of `A-Z 0-9 -`. It is the storage-level sanity check. `CodeGenerator::is_valid_format()` is the check for the code format.
+
+### Code prefix
+
+Phase 15 (in the working tree, not yet released; the version is still 1.0.1). QR & Barcodes → Settings → **Code prefix**, administrators only (`pqbg_manage_settings`), key `code_prefix`, default `DC`.
+
+- **Rule** (`CodeGenerator::PREFIX_PATTERN`, `Settings::validate_code_prefix()`): 2–4 characters, `A-Z` and `0-9` only, a letter first, no hyphen. Spaces around it are removed and lowercase is converted to uppercase. Anything else is refused with "The code prefix must be 2 to 4 letters or digits (A-Z, 0-9), starting with a letter. The previous prefix was kept." `Settings::get_code_prefix()` returns `DC` for a stored value that breaks the rule and for settings saved before Phase 15 (no key; no migration).
+- **New codes only.** `CodeGenerator::generate()` reads the prefix, so automatic codes, bulk generation and Regenerate all use it. Codes are stored whole and never change.
+- **Every issued code keeps working.** The format check accepts any 2–6 character prefix (`CodeGenerator::PREFIX_ANY`), deliberately wider than the Settings rule and independent of it, so changing the prefix (or, later, the Settings limit) never makes a printed label stop scanning or selling. After a change the shop simply has labels with both prefixes.
+- **Why 2–4, uppercase A-Z/0-9, a letter first:** codes are matched in uppercase; these characters need no URL encoding, are plain ASCII for QR byte mode, Code 128 set B and keyboard-emulating scanners, and a cell can never start with a spreadsheet formula character. The hyphen separates the groups. Each extra character adds 11 Code 128 modules (2.75 mm at the 0.25 mm module), one byte to the scan URL (rarely the next QR version) and about 0.8 mm of code text at 6.5 pt.
+- **Barcodes:** a DC code's barcode needs 60.5 mm inside the label margins, exactly the A4 3 × 7 sheet's width. With a longer prefix the barcode is omitted (reason "width") on every A4 preset; the QR code still prints. `Settings::prefix_barcode_warning()` shows a warning on Settings and on the print setup screen when barcodes are on and the prefix is longer than 2 characters.
+- **Label layout** uses the longest code actually printed (`PrintLayout::longest_code()`, the `$chars` argument of `PrintLayout::fit()`, `barcode_min_mm()`), and wraps the code text after its second hyphen (`PrintLayout::split_code()`).
+- **Scan route:** no rewrite change. Logged-out requests still go to the login page without an existence check; the random part (about 59 bits) is unchanged, and the prefix, printed on every label, is not a secret.
+- Placeholders (`CodeGenerator::example_code()`, `ScanUrl::example()`, the scan entry box) show the current prefix.
 
 ### Randomness
 
@@ -1041,7 +1055,7 @@ Cold time is almost all QR encoding (about 45 ms per new code, in bacon's pure-P
 
 - The browser's print dialog settings (scale, margins, headers and footers) are the user's; the page can only explain them. Always print one test page on plain paper first.
 - Printer hardware margins: most office printers cannot print within 3–5 mm of the paper edge, so the edge-to-edge 3 × 8 sheet needs a printer that can.
-- The QR size assumes all codes have the same length (they do: `DC-XXXX-XXXX-XXXX`); the page still uses the largest version in the job.
+- Codes with different prefixes (Phase 15) can differ in length: the page uses the largest QR version, the longest code text and the widest barcode of the job.
 - Prices on labels are a snapshot; the QR always opens the live price.
 - No PDF output, print history, label designer or printer drivers (out of scope).
 
@@ -1115,7 +1129,7 @@ From the sale detail, **Void sale** (for `pqbg_void_sale`) opens a confirmation 
 - Tabs Today / Yesterday / Last 7 days; lines newest first (time, item, "qty × price = total", paid by, status; each links to its sale page), completed and voided (failed attempts changed no stock and are not listed); at most 300 lines, the summary always covers the whole range.
 - **Summary (completed sales):** per payment method (every method offered, even without sales) and a total, plus the number of voided sales.
 - Never shows cost or profit.
-- The route reuses the scan rewrite rule: `my-sales` is lowercase and has no `DC-` prefix, so it can never be a product code. `ScanUrl::my_sales_url()` builds the URL. No new rewrite rule.
+- The route reuses the scan rewrite rule: `my-sales` is compared as the raw path segment, and even uppercased (`MY-SALES`) it has no 3 groups of 4, so it can never be a product code, whatever the prefix. `ScanUrl::my_sales_url()` builds the URL. No new rewrite rule.
 
 ### Indexes and timings (dev machine, 50,000 sales)
 
@@ -1486,7 +1500,7 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 | Option | Autoload | Purpose |
 |---|---|---|
 | `pqbg_db_version` | yes | integer schema version (currently `4`) |
-| `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`, `payment_methods`); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
+| `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`, `payment_methods`, `code_prefix` since Phase 15); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 | `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
 | `pqbg_svg_cache_index` | no | Phase 8 render cache index: `{transient key} => last used`, at most 2,000 entries. Not data; removed on every uninstall. |

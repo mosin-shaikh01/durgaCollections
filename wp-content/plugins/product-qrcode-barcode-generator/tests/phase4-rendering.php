@@ -165,7 +165,7 @@ try {
 
 	pqbg_section( 'defaults and requirements' );
 	pqbg_t( 'libraries not loaded at start (lazy loading)', 0 === $bacon_at_start && 0 === $picqer_at_start );
-	pqbg_t( 'default settings (payment_methods since Phase 9A)', array( 'settings_version' => 1, 'barcodes_enabled' => false, 'scan_base_url' => '', 'payment_methods' => array( 'cash', 'upi', 'card' ) ) === Plugin::default_settings() );
+	pqbg_t( 'default settings (payment_methods since Phase 9A, code_prefix since Phase 15)', array( 'settings_version' => 1, 'barcodes_enabled' => false, 'scan_base_url' => '', 'payment_methods' => array( 'cash', 'upi', 'card' ), 'code_prefix' => 'DC' ) === Plugin::default_settings() );
 	pqbg_t( 'barcodes off by default', false === Settings::is_barcode_enabled() );
 	pqbg_t( 'default scan base URL is the site URL', $home === Settings::get_scan_base_url() && ! Settings::has_scan_base_url_override(), Settings::get_scan_base_url() );
 	pqbg_t( 'PHP minimum is 8.2 (Requirements and plugin header)', '8.2' === Requirements::MIN_PHP && '8.2' === get_plugin_data( PQBG_PLUGIN_FILE, false, false )['RequiresPHP'] );
@@ -296,7 +296,7 @@ try {
 	list( $bw, $bh ) = $box( $b );
 	pqbg_t( 'barcode quiet zone is exactly 10 modules left and right', 10 === min( array_map( fn( $x ) => (int) $x[1], $r ) ) && $bw - 10 === max( array_map( fn( $x ) => $x[1] + $x[3], $r ) ), "viewBox {$bw}x{$bh}" );
 	pqbg_t( 'barcode prints the code beneath the bars', 1 === substr_count( $b, '<text ' ) && str_contains( $b, '>' . $codes[1] . '</text>' ) && preg_match( '/<text x="\d+" y="(\d+)"/', $b, $ty ) && (int) $ty[1] > BarcodeRenderer::TOP_MARGIN + BarcodeRenderer::BAR_HEIGHT );
-	pqbg_t( 'QR payload is ASCII scan URL only (no product data)', 1 === preg_match( '#^https?://[\x21-\x7E]+/scan/DC(-[A-HJKMNP-Z2-9]{4}){3}/$#D', (string) ScanUrl::for_code( $codes[1] ) ) );
+	pqbg_t( 'QR payload is ASCII scan URL only (no product data)', 1 === preg_match( '#^https?://[\x21-\x7E]+/scan/[A-Z][A-Z0-9]{1,5}(-[A-HJKMNP-Z2-9]{4}){3}/$#D', (string) ScanUrl::for_code( $codes[1] ) ) );
 
 	pqbg_section( 'invalid codes (barcodes enabled so both renderers reach validation)' );
 	$invalid = array(
@@ -314,7 +314,8 @@ try {
 		'surrounding spaces' => ' DC-7K4M-9P2X-Q8RT ',
 		'Greek Tau'          => "DC-7K4M-9P2X-Q8R\u{03A4}",
 		'fullwidth'          => "DC-7K4M-9P2X-Q8R\u{FF34}",
-		'wrong prefix'       => 'XC-7K4M-9P2X-Q8RT',
+		'prefix too long'    => 'DURGAC1-7K4M-9P2X-Q8RT',
+		'digit first'        => '2C-7K4M-9P2X-Q8RT',
 		'markup'             => '<script>alert(1)</script>',
 		'path traversal'     => 'DC-7K4M-9P2X-Q8RT/../x',
 		'URL'                => 'https://example.com/scan/DC-7K4M-9P2X-Q8RT/',

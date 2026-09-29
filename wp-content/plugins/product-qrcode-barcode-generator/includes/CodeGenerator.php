@@ -1,6 +1,11 @@
 <?php
 /**
- * Generates random product codes in the form DC-XXXX-XXXX-XXXX.
+ * Generates random product codes in the form PREFIX-XXXX-XXXX-XXXX.
+ *
+ * PREFIX is the code prefix from Settings (default DC, Phase 15). It applies to
+ * new codes only: codes are stored whole and never change, and the format
+ * check accepts any well-formed prefix (PREFIX_ANY), so every code ever issued
+ * keeps working after the prefix is changed.
  *
  * Every character comes from random_int() (a CSPRNG) indexing into ALPHABET.
  * Nothing about the product, the time or the request goes into the code, so
@@ -27,7 +32,23 @@ defined( 'ABSPATH' ) || exit;
  */
 final class CodeGenerator {
 
-	const PREFIX = 'DC';
+	/** Prefix of new codes until an administrator sets another one. */
+	const DEFAULT_PREFIX = 'DC';
+
+	/**
+	 * Prefix an administrator may set (Settings): a letter, then letters or digits, 2-4 in all.
+	 * Longer prefixes make the barcode too wide for the A4 sheets and the QR code and code text larger.
+	 */
+	const PREFIX_PATTERN = '/^[A-Z][A-Z0-9]{1,3}$/D';
+
+	const PREFIX_MIN = 2;
+	const PREFIX_MAX = 4;
+
+	/**
+	 * Prefix accepted in a code: 2-6 characters, deliberately wider than PREFIX_PATTERN and
+	 * independent of it, so no code ever issued stops matching if the Settings limit changes.
+	 */
+	const PREFIX_ANY = '[A-Z][A-Z0-9]{1,5}';
 
 	/** Unambiguous uppercase symbols: A-Z without I, L, O; 2-9 (no 0, 1). */
 	const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -36,10 +57,11 @@ final class CodeGenerator {
 	const GROUP_LENGTH = 4;
 
 	/**
-	 * Exact format. The character class matches ALPHABET exactly: A-H, J, K, M, N, P-Z, 2-9.
+	 * Exact format: any PREFIX_ANY prefix, then 3 groups of 4. The character class matches
+	 * ALPHABET exactly: A-H, J, K, M, N, P-Z, 2-9 (the prefix may use any letter or digit).
 	 * The D modifier stops "$" from also matching before a trailing newline.
 	 */
-	const FORMAT_PATTERN = '/^DC(-[A-HJKMNP-Z2-9]{4}){3}$/D';
+	const FORMAT_PATTERN = '/^' . self::PREFIX_ANY . '(-[A-HJKMNP-Z2-9]{4}){3}$/D';
 
 	/**
 	 * How many candidates to try before giving up.
@@ -87,7 +109,27 @@ final class CodeGenerator {
 	}
 
 	/**
-	 * Returns one random code. It does not check whether the code is already taken.
+	 * Whether a string is a prefix an administrator may set (already uppercased; see PREFIX_PATTERN).
+	 *
+	 * @param string $prefix Prefix to check.
+	 */
+	public static function is_valid_prefix( string $prefix ): bool {
+		return 1 === preg_match( self::PREFIX_PATTERN, $prefix );
+	}
+
+	/**
+	 * Placeholder code for display and measuring, e.g. DC-XXXX-XXXX-XXXX. Never stored or printed as a code.
+	 *
+	 * @param string $prefix Prefix; the current Settings prefix when ''.
+	 */
+	public static function example_code( string $prefix = '' ): string {
+		$prefix = '' === $prefix ? Settings::get_code_prefix() : $prefix;
+
+		return $prefix . str_repeat( '-' . str_repeat( 'X', self::GROUP_LENGTH ), self::GROUPS );
+	}
+
+	/**
+	 * Returns one random code with the current Settings prefix. It does not check whether the code is already taken.
 	 *
 	 * @throws \Exception When the random source fails or returns an out-of-range value.
 	 */
@@ -111,7 +153,7 @@ final class CodeGenerator {
 			$groups[] = $group;
 		}
 
-		$code = self::PREFIX . '-' . implode( '-', $groups );
+		$code = Settings::get_code_prefix() . '-' . implode( '-', $groups );
 
 		if ( ! self::is_valid_format( $code ) ) {
 			throw new \UnexpectedValueException( 'Generated code failed format validation.' );

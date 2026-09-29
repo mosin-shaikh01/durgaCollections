@@ -632,6 +632,7 @@ final class ScanScreen {
 				'links'       => array(),
 				'box'         => true,
 				'value'       => '',
+				'placeholder' => CodeGenerator::example_code(),
 				'sell'        => null,
 				'sale'        => null,
 				'undo'        => null,

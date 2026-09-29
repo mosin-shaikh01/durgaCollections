@@ -118,7 +118,7 @@ $pqbg_texts = array(
 	<?php endif; ?>
 	<?php if ( '' !== $pqbg_fit['barcode_omitted'] ) : ?>
 		<?php /* translators: %s: barcode width in mm. */ ?>
-		<p class="pqbg-note pqbg-barcode-omitted"><?php echo esc_html( sprintf( __( 'Barcode not printed on this label size: it needs a label at least %s mm wide inside its margins, with room left for the QR code.', 'product-qrcode-barcode-generator' ), PrintLayout::mm( PrintLayout::BARCODE_MAX_MODULES * PrintLayout::BARCODE_X_MM ) ) ); ?></p>
+		<p class="pqbg-note pqbg-barcode-omitted"><?php echo esc_html( sprintf( __( 'Barcode not printed on this label size: it needs a label at least %s mm wide inside its margins, with room left for the QR code.', 'product-qrcode-barcode-generator' ), PrintLayout::mm( $pqbg_fit['barcode_min'] ) ) ); ?></p>
 	<?php endif; ?>
 <?php endif; ?>
 
@@ -174,7 +174,7 @@ $pqbg_texts = array(
 					endif;
 				endforeach;
 				?>
-				<div class="pqbg-l pqbg-l-code"><?php echo 2 === $pqbg_fit['code_lines'] ? esc_html( substr( $pqbg_code, 0, 8 ) ) . '<br>' . esc_html( substr( $pqbg_code, 8 ) ) : esc_html( $pqbg_code ); ?></div>
+				<div class="pqbg-l pqbg-l-code"><?php echo 2 === $pqbg_fit['code_lines'] ? esc_html( PrintLayout::split_code( $pqbg_code )[0] ) . '<br>' . esc_html( PrintLayout::split_code( $pqbg_code )[1] ) : esc_html( $pqbg_code ); ?></div>
 			</div>
 			<?php if ( '' !== $pqbg_label['barcode_svg'] ) : ?>
 				<div class="pqbg-bc"><?php echo $pqbg_label['barcode_svg']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer SVG. ?></div>

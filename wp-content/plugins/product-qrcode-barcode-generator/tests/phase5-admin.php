@@ -204,7 +204,7 @@ $js_nonce = static function ( string $html, string $key ): string {
 };
 /** Rendered product-code SVGs in a page: QR codes and barcodes (barcodes carry a <text>). */
 $svgs = static function ( string $html ): array {
-	preg_match_all( '/<svg\b[^>]*aria-label="DC-[^"]*"[^>]*>.*?<\/svg>/s', $html, $m );
+	preg_match_all( '/<svg\b[^>]*aria-label="[A-Z][A-Z0-9]{1,5}-[^"]*"[^>]*>.*?<\/svg>/s', $html, $m );
 	return array(
 		'qr'      => count( array_filter( $m[0], static fn( $s ) => ! str_contains( $s, '<text' ) ) ),
 		'barcode' => count( array_filter( $m[0], static fn( $s ) => str_contains( $s, '<text' ) ) ),
@@ -553,7 +553,7 @@ try {
 	CodeLifecycle::failure_notice();
 	$n2 = (string) ob_get_clean();
 	wp_set_current_user( 0 );
-	pqbg_t( 'the saving user gets one dismissible notice, shown once', str_contains( $n1, 'is-dismissible' ) && str_contains( $n1, 'pqbg_code_generation_failed' ) && ! preg_match( '/DC-[A-Z0-9]{4}/', $n1 ) && '' === $n2 );
+	pqbg_t( 'the saving user gets one dismissible notice, shown once', str_contains( $n1, 'is-dismissible' ) && str_contains( $n1, 'pqbg_code_generation_failed' ) && ! preg_match( '/[A-Z][A-Z0-9]{1,5}-[A-Z0-9]{4}/', $n1 ) && '' === $n2 );
 	$r = ( new ProductCodeService() )->get_or_create( $fail, $A );
 	pqbg_t( 'the item can be given a code later by someone permitted', is_array( $r ) && null !== $active( $fail ) );
 
@@ -669,7 +669,7 @@ try {
 
 	$alphabet = CodeGenerator::ALPHABET;
 	$spell    = static function ( string $code ) use ( $alphabet ): callable {
-		$queue = array_map( static fn( $ch ) => strpos( $alphabet, $ch ), str_split( str_replace( '-', '', substr( $code, 3 ) ) ) );
+		$queue = array_map( static fn( $ch ) => strpos( $alphabet, $ch ), str_split( str_replace( '-', '', substr( $code, strpos( $code, '-' ) + 1 ) ) ) );
 		$all   = $queue;
 		return static function () use ( &$queue, $all ) {
 			if ( array() === $queue ) {

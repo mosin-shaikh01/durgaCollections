@@ -56,7 +56,7 @@ add_filter( 'woocommerce_logging_class', static fn() => $logger );
 $rng_for = static function ( array $codes, &$calls ) use ( $alphabet ) {
 	$queue = array();
 	foreach ( $codes as $code ) {
-		foreach ( str_split( str_replace( '-', '', substr( $code, 3 ) ) ) as $ch ) {
+		foreach ( str_split( str_replace( '-', '', substr( $code, strpos( $code, '-' ) + 1 ) ) ) as $ch ) {
 			$queue[] = strpos( $alphabet, $ch );
 		}
 	}
@@ -71,7 +71,7 @@ $fresh_code = static fn() => ( new CodeGenerator() )->generate();
 try {
 	pqbg_section( 'alphabet and format' );
 	pqbg_t( 'alphabet constant', 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' === $alphabet && 31 === strlen( $alphabet ) && 31 === count( array_unique( str_split( $alphabet ) ) ) );
-	pqbg_t( 'format pattern constant', '/^DC(-[A-HJKMNP-Z2-9]{4}){3}$/D' === CodeGenerator::FORMAT_PATTERN );
+	pqbg_t( 'format pattern constant (Phase 15: any 2-6 character prefix)', '/^[A-Z][A-Z0-9]{1,5}(-[A-HJKMNP-Z2-9]{4}){3}$/D' === CodeGenerator::FORMAT_PATTERN );
 	pqbg_t( 'positive control: a valid code is accepted', CodeGenerator::is_valid_format( 'DC-7K4M-9P2X-Q8RT' ) );
 	$base = 'DC-AAAA-AAAA-AAAA';
 	for ( $g = 0; $g < 3; $g++ ) {
@@ -98,7 +98,11 @@ try {
 		'two groups'            => 'DC-7K4M-9P2X',
 		'four groups'           => 'DC-7K4M-9P2X-Q8RT-ABCD',
 		'no hyphens'            => 'DC7K4M9P2XQ8RT',
-		'wrong prefix'          => 'XC-7K4M-9P2X-Q8RT',
+		'prefix too short'      => 'D-7K4M-9P2X-Q8RT',
+		'prefix too long'       => 'DURGAC1-7K4M-9P2X-Q8RT',
+		'prefix starts digit'   => '2C-7K4M-9P2X-Q8RT',
+		'lowercase prefix'      => 'dc-7K4M-9P2X-Q8RT',
+		'prefix with hyphen'    => 'D-C-7K4M-9P2X-Q8RT',
 		'underscores'           => 'DC_7K4M_9P2X_Q8RT',
 		'contains 0'            => 'DC-7K4M-9P2X-Q8R0',
 		'contains 1'            => 'DC-7K4M-9P2X-Q8R1',
@@ -119,11 +123,11 @@ try {
 		$samples[] = $gen->generate();
 	}
 	pqbg_t( 'all well-formed', count( $samples ) === count( array_filter( $samples, array( CodeGenerator::class, 'is_valid_format' ) ) ) );
-	pqbg_t( 'no excluded characters', ! preg_grep( '/[01ILOa-z]/', array_map( fn( $c ) => substr( $c, 3 ), $samples ) ) );
+	pqbg_t( 'no excluded characters', ! preg_grep( '/[01ILOa-z]/', array_map( fn( $c ) => substr( $c, strpos( $c, '-' ) + 1 ), $samples ) ) );
 	pqbg_t( 'all distinct', 20000 === count( array_unique( $samples ) ) );
 	$positions = array_fill( 0, 12, array() );
 	foreach ( $samples as $s ) {
-		foreach ( str_split( str_replace( '-', '', substr( $s, 3 ) ) ) as $p => $ch ) {
+		foreach ( str_split( str_replace( '-', '', substr( $s, strpos( $s, '-' ) + 1 ) ) ) as $p => $ch ) {
 			$positions[ $p ][ $ch ] = true;
 		}
 	}
@@ -310,7 +314,7 @@ try {
 	$persist         = ( new ProductCodeService( new CodeGenerator( $rng_for( $forever, $rng_calls ), fn() => false ) ) )->get_or_create( $simple_c, $sm_id );
 	pqbg_t( 'persistent conflict fails after exactly 3 saves (36 RNG calls)', is_wp_error( $persist ) && 'pqbg_code_generation_failed' === $persist->get_error_code() && 36 === $rng_calls, "$rng_calls calls" );
 	pqbg_t( 'no partial row', 0 === $count_p( $simple_c ) );
-	pqbg_t( 'one log entry, without any code value', 1 === count( $logger->entries ) && ! str_contains( $logger->entries[0][1], $new['code'] ) && ! preg_match( '/DC-[A-Z0-9]{4}/', $logger->entries[0][1] ), json_encode( $logger->entries ) );
+	pqbg_t( 'one log entry, without any code value', 1 === count( $logger->entries ) && ! str_contains( $logger->entries[0][1], $new['code'] ) && ! preg_match( '/[A-Z][A-Z0-9]{1,5}-[A-Z0-9]{4}/', $logger->entries[0][1] ), json_encode( $logger->entries ) );
 	$logger->entries = array();
 	$exhaust         = ( new ProductCodeService( new CodeGenerator( null, fn() => true ) ) )->get_or_create( $simple_d, $sm_id );
 	pqbg_t( 'generator exhaustion through the service writes no row', is_wp_error( $exhaust ) && 'pqbg_code_generation_failed' === $exhaust->get_error_code() && 0 === $count_p( $simple_d ) );

@@ -6,6 +6,8 @@
  *   barcodes_enabled  bool    Code 128 barcodes for hardware scanners. Off by default.
  *   scan_base_url     string  Absolute http(s) base for scan URLs. '' means home_url().
  *   payment_methods   array   Payment methods the sale form offers (PaymentMethods keys, at least one).
+ *   code_prefix       string  Prefix of NEW product codes (CodeGenerator::PREFIX_PATTERN), default DC.
+ *                             Existing codes never change; every well-formed prefix keeps scanning.
  *
  * Only the scan base URL is stored, never a full scan URL. Codes live in
  * pqbg_codes, so changing the base URL never touches any code.
@@ -74,6 +76,55 @@ final class Settings {
 
 		// The site URL is always used, even if it fails the stricter override rules (e.g. its length).
 		return untrailingslashit( (string) preg_replace( '/[?#].*$/s', '', $home ) );
+	}
+
+	/**
+	 * The prefix for new codes. A stored value that fails the rule (e.g. edited in the database) gives the default.
+	 */
+	public static function get_code_prefix(): string {
+		$stored = self::get()['code_prefix'];
+
+		return is_string( $stored ) && CodeGenerator::is_valid_prefix( $stored ) ? $stored : CodeGenerator::DEFAULT_PREFIX;
+	}
+
+	/**
+	 * Validates and normalises a code prefix: spaces around it removed, uppercased, then CodeGenerator::PREFIX_PATTERN.
+	 *
+	 * @param mixed $value Submitted value.
+	 * @return string|WP_Error Normalised prefix.
+	 */
+	public static function validate_code_prefix( $value ) {
+		$prefix = is_string( $value ) ? strtoupper( trim( $value ) ) : '';
+
+		if ( ! CodeGenerator::is_valid_prefix( $prefix ) ) {
+			return new WP_Error(
+				'pqbg_invalid_code_prefix',
+				sprintf(
+					/* translators: 1: minimum length, 2: maximum length. */
+					__( 'The code prefix must be %1$d to %2$d letters or digits (A-Z, 0-9), starting with a letter. The previous prefix was kept.', 'product-qrcode-barcode-generator' ),
+					CodeGenerator::PREFIX_MIN,
+					CodeGenerator::PREFIX_MAX
+				)
+			);
+		}
+
+		return $prefix;
+	}
+
+	/**
+	 * The warning shown when barcodes are on and the prefix makes new codes' barcodes too wide
+	 * for the A4 label sheets (longer than the default prefix); '' otherwise.
+	 */
+	public static function prefix_barcode_warning(): string {
+		if ( ! self::is_barcode_enabled() || strlen( self::get_code_prefix() ) <= strlen( CodeGenerator::DEFAULT_PREFIX ) ) {
+			return '';
+		}
+
+		return sprintf(
+			/* translators: %d: number of characters. */
+			__( 'With barcodes on, a code prefix longer than %d characters makes the barcode too wide for the A4 label sheets. The QR code still prints.', 'product-qrcode-barcode-generator' ),
+			strlen( CodeGenerator::DEFAULT_PREFIX )
+		);
 	}
 
 	/**
@@ -224,6 +275,18 @@ final class Settings {
 				} else {
 					$output['scan_base_url'] = $valid;
 				}
+			}
+		}
+
+		if ( array_key_exists( 'code_prefix', $input ) ) {
+			$prefix = self::validate_code_prefix( $input['code_prefix'] );
+
+			if ( is_wp_error( $prefix ) ) {
+				if ( function_exists( 'add_settings_error' ) ) {
+					add_settings_error( Plugin::SETTINGS_OPTION, $prefix->get_error_code(), $prefix->get_error_message() );
+				}
+			} else {
+				$output['code_prefix'] = $prefix;
 			}
 		}
 

@@ -45,6 +45,7 @@ $suites = array(
 	'phase12-themes.php',
 	'phase13-release.php',
 	'phase14-manual.php',
+	'phase15-prefix.php',
 );
 
 $filters = array_slice( $argv, 1 );

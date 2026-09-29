@@ -169,12 +169,14 @@ final class PrintPage {
 			return $view;
 		}
 
-		// Every code of the job is the same length, so they share one QR version; take the largest to be safe.
+		// Codes with different prefixes (Phase 15) can differ in length and so in QR version:
+		// the layout takes the largest QR code and the longest code text of the job.
 		$items   = $resolved['items'];
+		$codes   = array_unique( array_map( static fn( $i ) => $items[ $i ]['code'], $job['labels'] ) );
 		$qr      = array();
 		$modules = 0;
 
-		foreach ( array_unique( array_map( static fn( $i ) => $items[ $i ]['code'], $job['labels'] ) ) as $code ) {
+		foreach ( $codes as $code ) {
 			$svg = PrintCache::qr( $code );
 
 			if ( is_wp_error( $svg ) ) {
@@ -185,7 +187,7 @@ final class PrintPage {
 			$modules     = max( $modules, PrintLayout::qr_modules( $svg ) );
 		}
 
-		$fit = PrintLayout::fit( $spec, $modules, $options['fields'], Settings::is_barcode_enabled(), $local );
+		$fit = PrintLayout::fit( $spec, $modules, $options['fields'], Settings::is_barcode_enabled(), $local, strlen( PrintLayout::longest_code( $codes ) ) );
 
 		if ( is_wp_error( $fit ) ) {
 			PrintCache::flush();

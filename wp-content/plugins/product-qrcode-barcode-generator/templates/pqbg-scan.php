@@ -66,7 +66,7 @@ $pqbg_undo    = $view['undo'];
 	<form class="pqbg-scan__form" method="get" action="<?php echo esc_url( $entry_url ); ?>" role="search">
 		<label class="pqbg-scan__label" for="pqbg-code"><?php echo esc_html( '' !== $view['box_label'] ? $view['box_label'] : __( 'Scan or type a code', 'product-qrcode-barcode-generator' ) ); ?></label>
 		<div class="pqbg-scan__row">
-			<input class="pqbg-scan__input" id="pqbg-code" name="code" type="text" value="<?php echo esc_attr( $view['value'] ); ?>" placeholder="DC-XXXX-XXXX-XXXX" maxlength="200" required autofocus autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go">
+			<input class="pqbg-scan__input" id="pqbg-code" name="code" type="text" value="<?php echo esc_attr( $view['value'] ); ?>" placeholder="<?php echo esc_attr( $view['placeholder'] ); ?>" maxlength="200" required autofocus autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go">
 			<button class="pqbg-scan__button" type="submit"><?php esc_html_e( 'Look up', 'product-qrcode-barcode-generator' ); ?></button>
 		</div>
 	</form>

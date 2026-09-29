@@ -34,7 +34,7 @@ final class CodeRepository {
 	const STATUS_ACTIVE  = 'active';
 	const STATUS_RETIRED = 'retired';
 
-	/** Uppercase letters, digits and inner hyphens, 4-32 chars (e.g. DC-XXXX-XXXX-XXXX). */
+	/** Uppercase letters, digits and inner hyphens, 4-32 chars (e.g. DC-XXXX-XXXX-XXXX; any prefix). */
 	const CODE_PATTERN = '/^[A-Z0-9][A-Z0-9-]{2,30}[A-Z0-9]$/';
 
 	/**

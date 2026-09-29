@@ -32,13 +32,11 @@ final class ScanUrl {
 
 	/**
 	 * The seller's "My sales" page, {home}/scan/my-sales/ (Phase 9A). Served by the
-	 * existing scan rule; lowercase and without the DC- prefix, so it can never be a
-	 * product code (CodeGenerator::FORMAT_PATTERN).
+	 * existing scan rule and compared as the raw path segment before any code check;
+	 * even uppercased ("MY-SALES") it has no 3 groups of 4, so it can never be a
+	 * product code (CodeGenerator::FORMAT_PATTERN), whatever the code prefix.
 	 */
 	const MY_SALES = 'my-sales';
-
-	/** Placeholder shown in the admin UI in place of a real code. */
-	const EXAMPLE_CODE = 'DC-XXXX-XXXX-XXXX';
 
 	/**
 	 * The effective scan base URL (no trailing slash).
@@ -62,10 +60,10 @@ final class ScanUrl {
 	}
 
 	/**
-	 * Example scan URL with a placeholder code, for display only. Never encode it.
+	 * Example scan URL with a placeholder code in the current prefix, for display only. Never encode it.
 	 */
 	public static function example(): string {
-		return self::build( self::EXAMPLE_CODE );
+		return self::build( CodeGenerator::example_code() );
 	}
 
 	/**

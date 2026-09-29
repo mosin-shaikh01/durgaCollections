@@ -440,7 +440,7 @@ try {
 		++$batches;
 	}
 	pqbg_t( 'batches of 4: finished in 4 batches with every qualifying item coded once', is_array( $state ) && 'done' === $state['status'] && 4 === $batches && count( $Q ) === $state['created'] && 0 === $state['failed'] && 0 === $state['skipped'], wp_json_encode( is_array( $state ) ? array_intersect_key( $state, array_flip( array( 'status', 'created', 'had_code', 'skipped', 'failed', 'batches' ) ) ) : $state ) );
-	pqbg_t( 'every qualifying item has exactly one active code, created by the acting user, in the DC- format', ! array_filter( $Q, static fn( $id ) => 1 !== $active_n( $id ) || (int) $code_row( $id )['created_by'] !== $A || ! ProductQrBarcode\CodeGenerator::is_valid_format( (string) $code_row( $id )['code'] ) ) );
+	pqbg_t( 'every qualifying item has exactly one active code, created by the acting user, in the code format (the current prefix)', ! array_filter( $Q, static fn( $id ) => 1 !== $active_n( $id ) || (int) $code_row( $id )['created_by'] !== $A || ! ProductQrBarcode\CodeGenerator::is_valid_format( (string) $code_row( $id )['code'] ) ) );
 	pqbg_t( 'no excluded item got a code', ! array_filter( array_diff( $NOT, array( $s_coded ) ), static fn( $id ) => 0 !== $active_n( $id ) ) );
 	pqbg_t( 'the existing code is unchanged (same row)', (int) $code_row( $s_coded )['id'] === (int) $coded_row['id'] );
 	pqbg_t( 'the retired code stays retired; that item got a new, different code', 'retired' === CodeRepository::find_by_code( (string) $ret_row['code'] )['status'] && (string) $code_row( $s_retired )['code'] !== (string) $ret_row['code'] );

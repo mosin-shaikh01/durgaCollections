@@ -90,6 +90,7 @@ final class Plugin {
 			'barcodes_enabled' => false,
 			'scan_base_url'    => '',
 			'payment_methods'  => PaymentMethods::DEFAULT_ENABLED,
+			'code_prefix'      => CodeGenerator::DEFAULT_PREFIX,
 		);
 	}
 

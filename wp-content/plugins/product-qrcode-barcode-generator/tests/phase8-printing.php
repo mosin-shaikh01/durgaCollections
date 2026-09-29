@@ -599,7 +599,8 @@ try {
 	$h = PrintPage::render( $build( array( $simple ), array( 'fields' => array() ) ) );
 	pqbg_t( 'fields: all off → the code text only (always printed)', array( 'code' ) === $fields_of( $h ) && str_contains( $h, '<div class="pqbg-l pqbg-l-code">' . $code_of( $simple ) . '</div>' ) );
 	$h = PrintPage::render( $build( array( $simple ), array( 'layout' => 'a4-5x13', 'fields' => PrintLayout::OPTIONAL_FIELDS ) ) );
-	pqbg_t( 'narrow label: the code text wraps after its second hyphen', str_contains( $h, '<div class="pqbg-l pqbg-l-code">' . substr( $code_of( $simple ), 0, 8 ) . '<br>' . substr( $code_of( $simple ), 8 ) . '</div>' ) );
+	$wrap_at = strpos( $code_of( $simple ), '-', strpos( $code_of( $simple ), '-' ) + 1 ) + 1; // After the second hyphen, whatever the prefix length (Phase 15).
+	pqbg_t( 'narrow label: the code text wraps after its second hyphen', str_contains( $h, '<div class="pqbg-l pqbg-l-code">' . substr( $code_of( $simple ), 0, $wrap_at ) . '<br>' . substr( $code_of( $simple ), $wrap_at ) . '</div>' ) );
 	$set_settings( array() );
 	$h = PrintPage::render( $build( array( $simple ), array( 'layout' => 'a4-5x13', 'fields' => PrintLayout::OPTIONAL_FIELDS ) ) );
 	pqbg_t( 'fields that do not fit are listed as not printed (5 × 13 with the TEST line: store name)', str_contains( $h, 'pqbg-dropped' ) && str_contains( $h, 'Not printed on this label size (not enough room): store name.' ) && ! str_contains( $h, 'pqbg-l-store' ) );

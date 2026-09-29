@@ -112,6 +112,15 @@ final class SettingsPage {
 			array( 'label_for' => 'pqbg_scan_base_url' )
 		);
 
+		add_settings_field(
+			'pqbg_code_prefix',
+			__( 'Code prefix', 'product-qrcode-barcode-generator' ),
+			array( __CLASS__, 'render_code_prefix_field' ),
+			self::SLUG,
+			self::SECTION,
+			array( 'label_for' => 'pqbg_code_prefix' )
+		);
+
 		add_settings_section( self::SALES_SECTION, __( 'In-store sales', 'product-qrcode-barcode-generator' ), '__return_null', self::SLUG );
 
 		add_settings_field(
@@ -218,6 +227,24 @@ final class SettingsPage {
 		echo '<p>' . esc_html__( 'Effective scan base URL:', 'product-qrcode-barcode-generator' ) . ' <code>' . esc_html( ScanUrl::base() ) . '</code>';
 		echo Settings::has_scan_base_url_override() ? '' : ' ' . esc_html__( '(site URL)', 'product-qrcode-barcode-generator' );
 		echo '<br />' . esc_html__( 'QR codes will contain:', 'product-qrcode-barcode-generator' ) . ' <code>' . esc_html( ScanUrl::example() ) . '</code></p>';
+	}
+
+	/**
+	 * Code prefix input (Phase 15). New codes only; the barcode warning when it applies.
+	 */
+	public static function render_code_prefix_field(): void {
+		echo '<input type="text" class="small-text code" id="pqbg_code_prefix" name="' . esc_attr( Plugin::SETTINGS_OPTION . '[code_prefix]' ) . '"'
+			. ' value="' . esc_attr( Settings::get_code_prefix() ) . '" maxlength="' . esc_attr( (string) CodeGenerator::PREFIX_MAX ) . '"'
+			. ' autocapitalize="characters" autocomplete="off" spellcheck="false" aria-describedby="pqbg_code_prefix_help" />';
+
+		/* translators: 1: minimum length, 2: maximum length, 3: example code. */
+		echo '<p class="description" id="pqbg_code_prefix_help">' . esc_html( sprintf( __( '%1$d to %2$d letters or digits, starting with a letter. Used for new codes only, for example %3$s. Existing codes, and labels already printed, keep working and never change.', 'product-qrcode-barcode-generator' ), CodeGenerator::PREFIX_MIN, CodeGenerator::PREFIX_MAX, CodeGenerator::example_code() ) ) . '</p>';
+
+		$warning = Settings::prefix_barcode_warning();
+
+		if ( '' !== $warning ) {
+			echo '<div class="notice notice-warning inline pqbg-prefix-warning"><p>' . esc_html( $warning ) . '</p></div>';
+		}
 	}
 
 	/**

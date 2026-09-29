@@ -51,8 +51,13 @@ final class PrintLayout {
 	/** Code 128 bar module (X-dimension): 2 dots at 203 dpi. */
 	const BARCODE_X_MM = 0.25;
 
-	/** Widest possible barcode: 222 modules for a 17-character code in code set B, plus 2 × 10 quiet modules. */
-	const BARCODE_MAX_MODULES = 242;
+	/**
+	 * Widest possible Code 128 barcode, code set B: 11 modules per character, plus the start
+	 * and checksum symbols (11 each), the stop symbol (13) and 2 × 10 quiet modules. A
+	 * 17-character code (DC-XXXX-XXXX-XXXX) needs 242 modules; see barcode_modules().
+	 */
+	const BARCODE_CHAR_MODULES  = 11;
+	const BARCODE_FIXED_MODULES = 55;
 
 	/** Bar height of a printed barcode. */
 	const BARCODE_BAR_MM = 7.0;
@@ -69,9 +74,14 @@ final class PrintLayout {
 	/** Millimetres per typographic point. */
 	const PT_MM = 0.352778;
 
-	/** Characters of the code text: DC-XXXX-XXXX-XXXX, and its longer half when wrapped. */
-	const CODE_CHARS      = 17;
-	const CODE_HALF_CHARS = 9;
+	/**
+	 * Characters of a code with the default prefix (DC-XXXX-XXXX-XXXX). Since Phase 15 the prefix
+	 * is a setting, so the layout takes the length of the longest code actually printed.
+	 */
+	const DEFAULT_CODE_CHARS = 17;
+
+	/** The second line of a wrapped code, "XXXX-XXXX" (it wraps after the second hyphen). */
+	const CODE_TAIL_CHARS = 9;
 
 	/** Safe inset of a custom layout. */
 	const CUSTOM_INSET_MM = 1.5;
@@ -336,6 +346,55 @@ final class PrintLayout {
 	}
 
 	/**
+	 * Code 128 modules of the widest barcode for a code of this many characters, quiet zones included.
+	 *
+	 * @param int $chars Code length.
+	 */
+	public static function barcode_modules( int $chars ): int {
+		return self::BARCODE_CHAR_MODULES * $chars + self::BARCODE_FIXED_MODULES;
+	}
+
+	/**
+	 * Narrowest label width inside the margins that can hold the barcode of a code of this many characters.
+	 *
+	 * @param int $chars Code length.
+	 */
+	public static function barcode_min_mm( int $chars ): float {
+		return self::barcode_modules( $chars ) * self::BARCODE_X_MM;
+	}
+
+	/**
+	 * The longest of these codes (the widest text and barcode, and the longest scan URL); '' for none.
+	 *
+	 * @param string[] $codes Codes.
+	 */
+	public static function longest_code( array $codes ): string {
+		$longest = '';
+
+		foreach ( $codes as $code ) {
+			if ( strlen( (string) $code ) > strlen( $longest ) ) {
+				$longest = (string) $code;
+			}
+		}
+
+		return $longest;
+	}
+
+	/**
+	 * A code split for two lines, after its second hyphen: "DC-XXXX-" and "XXXX-XXXX".
+	 * A string with fewer than two hyphens is returned whole on the first line.
+	 *
+	 * @param string $code Code.
+	 * @return array{0: string, 1: string}
+	 */
+	public static function split_code( string $code ): array {
+		$first  = strpos( $code, '-' );
+		$second = false === $first ? false : strpos( $code, '-', $first + 1 );
+
+		return false === $second ? array( $code, '' ) : array( substr( $code, 0, $second + 1 ), substr( $code, $second + 1 ) );
+	}
+
+	/**
 	 * QR modules per side, quiet zone included, from a QrRenderer SVG ("viewBox="0 0 N N"").
 	 *
 	 * @param string $svg QR SVG.
@@ -357,9 +416,10 @@ final class PrintLayout {
 	 * @param string[]             $fields    Requested optional fields (see OPTIONAL_FIELDS).
 	 * @param bool                 $barcode   Whether barcodes are wanted (enabled in Settings).
 	 * @param bool                 $test_mark Whether every label carries "TEST – NOT FOR USE".
+	 * @param int                  $chars     Length of the longest code printed (Phase 15: the prefix is a setting).
 	 * @return array<string, mixed>|WP_Error pqbg_layout_too_small when not even the code text fits.
 	 */
-	public static function fit( array $spec, int $modules, array $fields, bool $barcode, bool $test_mark ) {
+	public static function fit( array $spec, int $modules, array $fields, bool $barcode, bool $test_mark, int $chars = self::DEFAULT_CODE_CHARS ) {
 		$fields = array_values( array_intersect( self::OPTIONAL_FIELDS, $fields ) );
 		$w      = $spec['label_w'] - 2 * $spec['inset_x'];
 		$h      = $spec['label_h'] - 2 * $spec['inset_y'];
@@ -368,7 +428,7 @@ final class PrintLayout {
 		$tries  = array();
 
 		if ( $barcode ) {
-			if ( $w + 1e-6 < self::BARCODE_MAX_MODULES * self::BARCODE_X_MM ) {
+			if ( $w + 1e-6 < self::barcode_min_mm( $chars ) ) {
 				$omit = 'width';
 			} else {
 				$tries[] = true;
@@ -380,7 +440,7 @@ final class PrintLayout {
 		foreach ( $tries as $with_barcode ) {
 			for ( $keep = count( $fields ); $keep >= 0; $keep-- ) {
 				$area   = $with_barcode ? $h - self::BARCODE_BAR_MM - self::BARCODE_GAP_MM : $h;
-				$result = self::attempt( $spec, $w, $area, $pt, $modules, array_slice( $fields, 0, $keep ), $test_mark );
+				$result = self::attempt( $spec, $w, $area, $pt, $modules, array_slice( $fields, 0, $keep ), $test_mark, $chars );
 
 				if ( null === $result ) {
 					continue;
@@ -396,6 +456,7 @@ final class PrintLayout {
 				) : null;
 
 				$result['barcode_omitted'] = $barcode && ! $with_barcode ? ( '' !== $omit ? $omit : 'room' ) : '';
+				$result['barcode_min']     = round( self::barcode_min_mm( $chars ), 4 );
 
 				return $result;
 			}
@@ -439,9 +500,10 @@ final class PrintLayout {
 	 * @param int                  $modules   QR modules per side.
 	 * @param string[]             $fields    Optional fields to place, by priority.
 	 * @param bool                 $test_mark Whether the TEST line is required.
+	 * @param int                  $chars     Length of the longest code printed.
 	 * @return array<string, mixed>|null
 	 */
-	private static function attempt( array $spec, float $w, float $area, float $pt, int $modules, array $fields, bool $test_mark ): ?array {
+	private static function attempt( array $spec, float $w, float $area, float $pt, int $modules, array $fields, bool $test_mark, int $chars ): ?array {
 		if ( $area <= 0 || $w <= 0 ) {
 			return null;
 		}
@@ -469,7 +531,7 @@ final class PrintLayout {
 			$qr_y = $spec['inset_y'] + ( $area - $qr ) / 2;
 		} else {
 			// Stacked: reserve the text lines first, the QR code takes the rest.
-			$code_lines = self::code_lines( $w, $pt );
+			$code_lines = self::code_lines( $w, $pt, $chars );
 			$wanted     = $required + $code_lines + ( in_array( 'name', $fields, true ) ? 2 : 0 ) + count( array_diff( $fields, array( 'name' ) ) );
 			$side       = min( $w, $area - $wanted * $line - self::QR_GAP_MM );
 			$module     = 0 === $code_lines ? null : self::module( $spec, $side / $modules );
@@ -489,7 +551,7 @@ final class PrintLayout {
 			$qr_y = $spec['inset_y'];
 		}
 
-		$code_lines = self::code_lines( $text['w'], $pt );
+		$code_lines = self::code_lines( $text['w'], $pt, $chars );
 		$available  = (int) floor( $text['h'] / $line + 1e-6 ) - $required - $code_lines;
 
 		if ( 0 === $code_lines || $available < 0 ) {
@@ -557,18 +619,20 @@ final class PrintLayout {
 
 	/**
 	 * Lines the code text needs in a text column: 1, 2 (wrapped after the second hyphen), or 0 if it cannot fit.
+	 * Wrapped, the first line is "PREFIX-XXXX-" (chars − 9) and the second "XXXX-XXXX" (9).
 	 *
 	 * @param float $width Text column width.
 	 * @param float $pt    Font size.
+	 * @param int   $chars Code length.
 	 */
-	private static function code_lines( float $width, float $pt ): int {
+	private static function code_lines( float $width, float $pt, int $chars ): int {
 		$char = self::MONO_EM * $pt * self::PT_MM;
 
-		if ( self::CODE_CHARS * $char <= $width ) {
+		if ( $chars * $char <= $width ) {
 			return 1;
 		}
 
-		return self::CODE_HALF_CHARS * $char <= $width ? 2 : 0;
+		return max( $chars - self::CODE_TAIL_CHARS, self::CODE_TAIL_CHARS ) * $char <= $width ? 2 : 0;
 	}
 
 	/**

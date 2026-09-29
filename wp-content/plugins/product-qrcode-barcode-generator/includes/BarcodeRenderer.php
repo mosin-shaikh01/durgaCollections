@@ -7,7 +7,7 @@
  * this returns pqbg_barcode_disabled and no barcode library class is ever
  * loaded: the library is only reached through the autoloader, after the checks.
  *
- * Content: the product code only (e.g. DC-7K4M-9P2X-Q8RT), the same code the
+ * Content: the product code only (e.g. DC-7K4M-9P2X-Q8RT; DC is the default prefix), the same code the
  * QR code's URL carries, so enabling barcodes later needs no regeneration.
  * Quiet zone of 10 modules on each side; the code is printed beneath the bars.
  *
