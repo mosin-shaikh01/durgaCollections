@@ -12,6 +12,9 @@
  * filter below, the MANAGE_SETTINGS capability. Values are cleaned by
  * Settings::sanitize(), which only changes the fields on this form.
  *
+ * Sections: QR codes and barcodes; In-store sales; Receipts and UPI payment QR (Phase 16,
+ * with a notice when the UPI QR is set up but not shown, and why).
+ *
  * Also shows the scan URL warnings (local address, or http:// on a public host) to users who can manage settings.
  *
  * @package ProductQrBarcode
@@ -31,6 +34,10 @@ final class SettingsPage {
 
 	/** Phase 9A: in-store sales settings. */
 	const SALES_SECTION = 'pqbg_sales_section';
+
+	/** Phase 16: receipts and the UPI payment QR. */
+	const RECEIPT_SECTION = 'pqbg_receipt_section';
+	const UPI_SECTION     = 'pqbg_upi_section';
 
 	/** Settings API option group; equals the option name so options.php uses "pqbg_settings-options" as the nonce action. */
 	const GROUP = Plugin::SETTINGS_OPTION;
@@ -130,6 +137,114 @@ final class SettingsPage {
 			self::SLUG,
 			self::SALES_SECTION
 		);
+
+		add_settings_section( self::RECEIPT_SECTION, __( 'Receipts', 'product-qrcode-barcode-generator' ), array( __CLASS__, 'render_receipt_section' ), self::SLUG );
+
+		$receipt_fields = array(
+			'receipt_shop_name'   => __( 'Shop name', 'product-qrcode-barcode-generator' ),
+			'receipt_address'     => __( 'Address', 'product-qrcode-barcode-generator' ),
+			'receipt_phone'       => __( 'Phone', 'product-qrcode-barcode-generator' ),
+			'receipt_gstin'       => __( 'GSTIN (optional)', 'product-qrcode-barcode-generator' ),
+			'receipt_footer'      => __( 'Footer text', 'product-qrcode-barcode-generator' ),
+			'receipt_show_seller' => __( 'Seller on receipts', 'product-qrcode-barcode-generator' ),
+			'receipt_paper'       => __( 'Default receipt paper', 'product-qrcode-barcode-generator' ),
+		);
+
+		foreach ( $receipt_fields as $key => $title ) {
+			add_settings_field( 'pqbg_' . $key, $title, array( __CLASS__, 'render_receipt_field' ), self::SLUG, self::RECEIPT_SECTION, array( 'label_for' => 'pqbg_' . $key, 'key' => $key ) );
+		}
+
+		add_settings_section( self::UPI_SECTION, __( 'UPI payment QR', 'product-qrcode-barcode-generator' ), array( __CLASS__, 'render_upi_section' ), self::SLUG );
+
+		add_settings_field( 'pqbg_upi_id', __( 'UPI ID', 'product-qrcode-barcode-generator' ), array( __CLASS__, 'render_upi_field' ), self::SLUG, self::UPI_SECTION, array( 'label_for' => 'pqbg_upi_id', 'key' => 'upi_id' ) );
+		add_settings_field( 'pqbg_upi_payee_name', __( 'Payee name', 'product-qrcode-barcode-generator' ), array( __CLASS__, 'render_upi_field' ), self::SLUG, self::UPI_SECTION, array( 'label_for' => 'pqbg_upi_payee_name', 'key' => 'upi_payee_name' ) );
+	}
+
+	/**
+	 * Receipts section intro (Phase 16).
+	 */
+	public static function render_receipt_section(): void {
+		echo '<p>' . esc_html__( 'Sellers can print or share a receipt for each in-store sale. This is a receipt, not a GST tax invoice. Cost and profit never appear on it.', 'product-qrcode-barcode-generator' ) . '</p>';
+	}
+
+	/**
+	 * One receipt field (Phase 16).
+	 *
+	 * @param array{key: string} $args Field arguments.
+	 */
+	public static function render_receipt_field( array $args ): void {
+		$key      = $args['key'];
+		$settings = Settings::get();
+		$name     = Plugin::SETTINGS_OPTION . '[' . $key . ']';
+		$id       = 'pqbg_' . $key;
+		$value    = is_string( $settings[ $key ] ?? null ) ? $settings[ $key ] : '';
+
+		switch ( $key ) {
+			case 'receipt_address':
+			case 'receipt_footer':
+				list( $max, $lines ) = Settings::RECEIPT_TEXTS[ $key ];
+				echo '<textarea class="regular-text" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" rows="' . esc_attr( (string) $lines ) . '" maxlength="' . esc_attr( (string) $max ) . '">' . esc_textarea( $value ) . '</textarea>';
+				/* translators: 1: maximum number of lines, 2: maximum number of characters. */
+				echo '<p class="description">' . esc_html( sprintf( __( 'Up to %1$d lines, %2$d characters.', 'product-qrcode-barcode-generator' ), $lines, $max ) ) . ( 'receipt_footer' === $key ? ' ' . esc_html__( 'For example: "Thank you for shopping with us." or "Prices include GST."', 'product-qrcode-barcode-generator' ) : '' ) . '</p>';
+				break;
+
+			case 'receipt_show_seller':
+				echo '<input type="hidden" name="' . esc_attr( $name ) . '" value="0" />';
+				echo '<label><input type="checkbox" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="1"' . checked( true === $settings['receipt_show_seller'], true, false ) . ' /> ';
+				echo esc_html__( 'Show the seller\'s first name on receipts', 'product-qrcode-barcode-generator' ) . '</label>';
+				break;
+
+			case 'receipt_paper':
+				echo '<select id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '">';
+				foreach ( Receipt::papers() as $paper => $label ) {
+					echo '<option value="' . esc_attr( $paper ) . '"' . selected( Receipt::default_paper(), $paper, false ) . '>' . esc_html( $label ) . '</option>';
+				}
+				echo '</select><p class="description">' . esc_html__( 'The layout a receipt opens with; the seller can switch on the receipt page. Choose 80 mm or 58 mm for a thermal receipt printer.', 'product-qrcode-barcode-generator' ) . '</p>';
+				break;
+
+			default:
+				$max = 'receipt_phone' === $key ? Settings::PHONE_MAX : ( 'receipt_gstin' === $key ? 15 : Settings::RECEIPT_TEXTS['receipt_shop_name'][0] );
+				echo '<input type="text" class="regular-text' . ( 'receipt_gstin' === $key ? ' code' : '' ) . '" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $value ) . '" maxlength="' . esc_attr( (string) $max ) . '"' . ( 'receipt_shop_name' === $key ? ' placeholder="' . esc_attr( html_entity_decode( (string) get_bloginfo( 'name' ), ENT_QUOTES, 'UTF-8' ) ) . '"' : '' ) . ( 'receipt_phone' === $key ? ' inputmode="tel"' : '' ) . ( 'receipt_gstin' === $key ? ' autocapitalize="characters" spellcheck="false"' : '' ) . ' />';
+
+				if ( 'receipt_shop_name' === $key ) {
+					echo '<p class="description">' . esc_html__( 'Leave empty to use the site title.', 'product-qrcode-barcode-generator' ) . '</p>';
+				} elseif ( 'receipt_gstin' === $key ) {
+					echo '<p class="description">' . esc_html__( 'Printed only when set. The last character is checked.', 'product-qrcode-barcode-generator' ) . '</p>';
+				}
+		}
+	}
+
+	/**
+	 * UPI section intro with the current state (Phase 16).
+	 */
+	public static function render_upi_section(): void {
+		echo '<p>' . esc_html__( 'When the seller chooses UPI, the sell screen shows a payment QR with the amount for the customer to scan, and the seller confirms the sale after checking the customer\'s payment success screen. The plugin cannot see whether a payment arrived. Leave both fields empty to turn this off.', 'product-qrcode-barcode-generator' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'A business (merchant) UPI ID is recommended: some UPI apps limit or warn about payments with an amount to personal UPI IDs.', 'product-qrcode-barcode-generator' ) . '</p>';
+
+		if ( ! UpiPayment::is_configured() ) {
+			return;
+		}
+
+		$reason = UpiPayment::inactive_reason();
+
+		echo '' === $reason
+			? '<div class="notice notice-success inline"><p>' . esc_html__( 'The UPI payment QR is on.', 'product-qrcode-barcode-generator' ) . '</p></div>'
+			: '<div class="notice notice-warning inline pqbg-upi-inactive"><p>' . esc_html__( 'The UPI payment QR is set up but not shown:', 'product-qrcode-barcode-generator' ) . ' ' . esc_html( $reason ) . '</p></div>';
+	}
+
+	/**
+	 * UPI ID or payee name input (Phase 16).
+	 *
+	 * @param array{key: string} $args Field arguments.
+	 */
+	public static function render_upi_field( array $args ): void {
+		$key   = $args['key'];
+		$value = 'upi_id' === $key ? UpiPayment::id() : UpiPayment::payee();
+
+		echo '<input type="text" class="regular-text' . ( 'upi_id' === $key ? ' code' : '' ) . '" id="' . esc_attr( 'pqbg_' . $key ) . '" name="' . esc_attr( Plugin::SETTINGS_OPTION . '[' . $key . ']' ) . '" value="' . esc_attr( $value ) . '" maxlength="' . ( 'upi_id' === $key ? '320' : '50' ) . '" autocomplete="off" spellcheck="false" />';
+		echo '<p class="description">' . ( 'upi_id' === $key
+			? esc_html__( 'For example: shopname@okaxis. Shown only in the QR and on the sell screen.', 'product-qrcode-barcode-generator' )
+			: esc_html__( 'The name the customer\'s UPI app shows: English letters, digits, spaces and . & \' - (2 to 50 characters).', 'product-qrcode-barcode-generator' ) ) . '</p>';
 	}
 
 	/**

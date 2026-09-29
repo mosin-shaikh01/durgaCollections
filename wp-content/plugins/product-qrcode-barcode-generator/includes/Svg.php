@@ -6,7 +6,8 @@
  * so the output is fully under our control:
  *   - only <svg>, <rect>, <path> and <text> elements
  *   - attribute values are integers or fixed constants
- *   - the only free text is a validated product code, escaped for XML
+ *   - the only free text is a validated product code or a fixed label (Phase 16:
+ *     "UPI payment QR"), escaped for XML
  *   - no XML prolog, DOCTYPE, ids, scripts, event handlers, styles or links,
  *     so the SVG can be inlined in HTML safely and more than once per page
  *
@@ -32,7 +33,7 @@ final class Svg {
 	 * @param int    $width        Width in modules.
 	 * @param int    $height       Height in modules.
 	 * @param int    $px_per_unit  Default pixels per module.
-	 * @param string $label        Accessible name (a validated product code).
+	 * @param string $label        Accessible name (a validated product code or a fixed label).
 	 * @param string $content      Inner markup built with this class.
 	 */
 	public static function document( int $width, int $height, int $px_per_unit, string $label, string $content ): string {

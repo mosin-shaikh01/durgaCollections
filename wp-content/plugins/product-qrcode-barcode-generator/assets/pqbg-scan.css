@@ -428,6 +428,47 @@
 	text-decoration: line-through;
 }
 
+/* Phase 16: receipt links and the UPI payment panel. */
+
+.pqbg-scan__button--receipt {
+	margin-top: 16px;
+	background: #111;
+}
+
+.pqbg-scan__button--back {
+	margin-top: 12px;
+	background: #fff;
+	border: 2px solid #111;
+	color: #111;
+}
+
+.pqbg-scan__line-receipt {
+	color: #0a58ca;
+	font-weight: 600;
+}
+
+.pqbg-scan__upi-amount {
+	margin: 0 0 4px;
+	font-size: 32px;
+	font-weight: 700;
+}
+
+.pqbg-scan__upi-qr {
+	margin: 12px 0;
+	text-align: center;
+}
+
+/* Large enough for a customer's phone to scan from the seller's screen. */
+.pqbg-scan__upi-qr svg {
+	width: 100%;
+	max-width: 280px;
+	height: auto;
+}
+
+.pqbg-scan__upi .pqbg-scan__facts {
+	margin-bottom: 12px;
+}
+
 /* 1.0.1: the seller guide link at the end of My sales. */
 
 .pqbg-scan__guide {

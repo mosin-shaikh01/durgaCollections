@@ -9,7 +9,11 @@
  *   logged out (any method)                          → 302 to the login page, back to the scan URL
  *   method other than GET/HEAD (or POST on a code)   → 405
  *   no pqbg_view_products                            → 403, identical for every code (no lookup)
- *   POST to /scan/{CODE}/ (sell, undo; Phase 7)      → SaleRequest::handle(); 400 unless the URL is canonical
+ *   /scan/receipt/{id}/ (Phase 16, GET/HEAD only)     → the sale's receipt when Receipt::can_see(), else an
+ *                                                      identical 404; 301 to the canonical URL (?paper=)
+ *   POST to /scan/{CODE}/ (sell, undo; Phase 7)      → UpiSale::handle() (Phase 16: the UPI payment step),
+ *                                                      which passes everything else to SaleRequest::handle();
+ *                                                      400 unless the URL is canonical
  *   /scan/{CODE}/?sale={id} (sale result page)       → SaleRequest::sale_page(), or 303 to the code URL
  *                                                      when the sale is not the user's to see
  *   /scan/my-sales/ (Phase 9A, GET/HEAD only)         → the seller's own sales, or 403 without
@@ -187,17 +191,27 @@ final class ScanRoute {
 	 * @return array{status: int, location?: string, view?: array<string, mixed>, headers?: array<string, string>}
 	 */
 	public static function decide( string $method, string $request_uri, ?string $code, ?string $box, array $post = array() ): array {
-		$is_mine   = ScanUrl::MY_SALES === $code;
-		$is_post   = 'POST' === $method && null !== $code && ! $is_mine;
-		$candidate = null === $code ? '' : ScanUrl::extract_code( rawurldecode( $code ) );
-		$valid     = '' !== $candidate && CodeGenerator::is_valid_format( $candidate );
+		$is_mine    = ScanUrl::MY_SALES === $code;
+		$is_receipt = ScanUrl::is_receipt_segment( $code );
+		$is_post    = 'POST' === $method && null !== $code && ! $is_mine && ! $is_receipt;
+		$candidate  = null === $code || $is_receipt ? '' : ScanUrl::extract_code( rawurldecode( $code ) );
+		$valid      = '' !== $candidate && CodeGenerator::is_valid_format( $candidate );
 
 		if ( ! is_user_logged_in() ) {
 			// Any method (Phase 12: a page cache must never get a cacheable page for a logged-out visitor).
 			// The login page returns to the canonical code URL, or to the entry page. Existence is never checked here.
+			if ( $is_mine ) {
+				$back = ScanUrl::my_sales_url();
+			} elseif ( $is_receipt ) {
+				$receipt = ScanUrl::receipt_id( (string) $code );
+				$back    = $receipt > 0 ? ScanUrl::receipt_url( $receipt ) : ScanUrl::site_url();
+			} else {
+				$back = ScanUrl::site_url( $valid ? $candidate : '' );
+			}
+
 			return array(
 				'status'   => 302,
-				'location' => wp_login_url( $is_mine ? ScanUrl::my_sales_url() : ScanUrl::site_url( $valid ? $candidate : '' ) ),
+				'location' => wp_login_url( $back ),
 			);
 		}
 
@@ -205,7 +219,7 @@ final class ScanRoute {
 			return array(
 				'status'  => 405,
 				'view'    => ScanScreen::method_not_allowed(),
-				'headers' => array( 'Allow' => null === $code || $is_mine ? 'GET, HEAD' : 'GET, HEAD, POST' ),
+				'headers' => array( 'Allow' => null === $code || $is_mine || $is_receipt ? 'GET, HEAD' : 'GET, HEAD, POST' ),
 			);
 		}
 
@@ -221,6 +235,10 @@ final class ScanRoute {
 
 		if ( $is_mine ) {
 			return self::my_sales( $path, $query );
+		}
+
+		if ( $is_receipt ) {
+			return self::receipt( (string) $code, $path, $query );
 		}
 
 		if ( null === $code ) {
@@ -274,7 +292,7 @@ final class ScanRoute {
 				);
 			}
 
-			return SaleRequest::handle( $candidate, $post );
+			return UpiSale::handle( $candidate, $post );
 		}
 
 		$sale_id = $is_path ? self::sale_query( $query ) : 0;
@@ -345,6 +363,55 @@ final class ScanRoute {
 	}
 
 	/**
+	 * A receipt (Phase 16): the canonical URL is /scan/receipt/{id}/, with ?paper= only
+	 * for a layout other than the default; anything else about the address is redirected
+	 * there (301; it depends only on the address, not on the user). A malformed ID, a
+	 * missing sale, a sale without a receipt and another seller's sale get the same 404.
+	 *
+	 * @param string $segment Raw code segment ("receipt/{id}").
+	 * @param string $path    Request path.
+	 * @param string $query   Query string.
+	 * @return array{status: int, location?: string, view?: array<string, mixed>}
+	 */
+	private static function receipt( string $segment, string $path, string $query ): array {
+		$id = ScanUrl::receipt_id( $segment );
+
+		if ( 0 === $id ) {
+			return array(
+				'status' => 404,
+				'view'   => ScanScreen::receipt_not_found(),
+			);
+		}
+
+		$args = array();
+		wp_parse_str( $query, $args );
+
+		$paper     = isset( $args[ ScanUrl::PAPER_ARG ] ) && is_string( $args[ ScanUrl::PAPER_ARG ] ) && in_array( $args[ ScanUrl::PAPER_ARG ], Receipt::PAPERS, true ) ? $args[ ScanUrl::PAPER_ARG ] : Receipt::default_paper();
+		$canonical = ScanUrl::receipt_url( $id, $paper );
+
+		if ( (string) wp_parse_url( $canonical, PHP_URL_PATH ) !== $path || (string) wp_parse_url( $canonical, PHP_URL_QUERY ) !== $query ) {
+			return array(
+				'status'   => 301,
+				'location' => $canonical,
+			);
+		}
+
+		$sale = SaleRepository::find( $id );
+
+		if ( ! Receipt::can_see( $sale ) ) {
+			return array(
+				'status' => 404,
+				'view'   => ScanScreen::receipt_not_found(),
+			);
+		}
+
+		return array(
+			'status' => 200,
+			'view'   => ScanScreen::receipt( $sale, $paper ),
+		);
+	}
+
+	/**
 	 * The sale ID when the query string is exactly "sale={digits}", else 0.
 	 *
 	 * @param string $query Query string.
@@ -381,6 +448,18 @@ final class ScanRoute {
 		$style = "style-src 'self'" . ( '' === $style_nonce ? '' : " 'nonce-" . $style_nonce . "'" );
 
 		return "default-src 'none'; {$style}; img-src 'self' https: data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+	}
+
+	/**
+	 * The receipt page's Content-Security-Policy (Phase 16): csp() plus exactly one
+	 * script, the element carrying this response's script nonce (the Print button,
+	 * assets/pqbg-receipt.js). Every other scan page keeps csp(), with no script.
+	 *
+	 * @param string $style_nonce  Nonce of the page's style element.
+	 * @param string $script_nonce Nonce of the page's script element.
+	 */
+	public static function receipt_csp( string $style_nonce, string $script_nonce ): string {
+		return self::csp( $style_nonce ) . "; script-src 'nonce-" . $script_nonce . "'";
 	}
 
 	/**
@@ -537,6 +616,11 @@ final class ScanRoute {
 
 		if ( isset( $response['view']['style_nonce'] ) && '' !== $response['view']['style_nonce'] ) {
 			$headers['Content-Security-Policy'] = self::csp( (string) $response['view']['style_nonce'] );
+		}
+
+		// Phase 16: only the receipt page has a script nonce.
+		if ( isset( $response['view']['script_nonce'] ) && '' !== $response['view']['script_nonce'] ) {
+			$headers['Content-Security-Policy'] = self::receipt_csp( (string) $response['view']['style_nonce'], (string) $response['view']['script_nonce'] );
 		}
 
 		foreach ( $headers as $name => $value ) {

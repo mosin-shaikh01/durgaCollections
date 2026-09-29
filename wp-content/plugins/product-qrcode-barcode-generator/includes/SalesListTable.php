@@ -130,6 +130,27 @@ final class SalesListTable extends \WP_List_Table {
 	}
 
 	/**
+	 * Row actions under the date (Phase 16): "Receipt" for completed and voided sales,
+	 * opening the front-end receipt page in a new tab.
+	 *
+	 * @param array<string, mixed> $item        Row.
+	 * @param string               $column_name Column.
+	 * @param string               $primary     Primary column.
+	 * @return string Escaped HTML.
+	 */
+	protected function handle_row_actions( $item, $column_name, $primary ) {
+		if ( $column_name !== $primary || ! Receipt::has_receipt( $item ) || ! ScanRoute::is_available() ) {
+			return '';
+		}
+
+		return $this->row_actions(
+			array(
+				'receipt' => '<a href="' . esc_url( ScanUrl::receipt_url( (int) $item['id'] ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Receipt', 'product-qrcode-barcode-generator' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'product-qrcode-barcode-generator' ) . '</span></a>',
+			)
+		);
+	}
+
+	/**
 	 * A cell.
 	 *
 	 * @param array<string, mixed> $item        Row.

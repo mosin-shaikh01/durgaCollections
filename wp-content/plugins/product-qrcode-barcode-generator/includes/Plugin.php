@@ -81,16 +81,27 @@ final class Plugin {
 	 * - barcodes_enabled: render Code 128 barcodes for hardware scanners (QR codes are always on).
 	 * - scan_base_url:    absolute base for scan URLs; '' means use home_url(). See Settings.
 	 * - payment_methods:  payment methods the sale form offers (Phase 9A). See PaymentMethods.
+	 * - receipt_*:        what receipts show and their default paper (Phase 16). See Receipt.
+	 * - upi_id, upi_payee_name: the UPI payment QR (Phase 16); '' = off. See UpiPayment.
 	 *
 	 * @return array<string, mixed>
 	 */
 	public static function default_settings(): array {
 		return array(
-			'settings_version' => 1,
-			'barcodes_enabled' => false,
-			'scan_base_url'    => '',
-			'payment_methods'  => PaymentMethods::DEFAULT_ENABLED,
-			'code_prefix'      => CodeGenerator::DEFAULT_PREFIX,
+			'settings_version'    => 1,
+			'barcodes_enabled'    => false,
+			'scan_base_url'       => '',
+			'payment_methods'     => PaymentMethods::DEFAULT_ENABLED,
+			'code_prefix'         => CodeGenerator::DEFAULT_PREFIX,
+			'receipt_shop_name'   => '',
+			'receipt_address'     => '',
+			'receipt_phone'       => '',
+			'receipt_gstin'       => '',
+			'receipt_footer'      => '',
+			'receipt_show_seller' => true,
+			'receipt_paper'       => Receipt::DEFAULT_PAPER,
+			'upi_id'              => '',
+			'upi_payee_name'      => '',
 		);
 	}
 

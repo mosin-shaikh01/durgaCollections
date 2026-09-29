@@ -39,6 +39,16 @@ final class ScanUrl {
 	const MY_SALES = 'my-sales';
 
 	/**
+	 * A sale's receipt, {home}/scan/receipt/{sale id}/ (Phase 16). Reached by the existing
+	 * scan rule (its code segment is "receipt/{id}") and checked before any code check;
+	 * it has no 3 groups of 4, so it can never be a product code either.
+	 */
+	const RECEIPT = 'receipt';
+
+	/** Query argument of a receipt's paper layout when it is not the default one. */
+	const PAPER_ARG = 'paper';
+
+	/**
 	 * The effective scan base URL (no trailing slash).
 	 */
 	public static function base(): string {
@@ -95,6 +105,36 @@ final class ScanUrl {
 		$url = home_url( '/' . self::PATH . '/' . self::MY_SALES . '/' );
 
 		return '' === $range || 'today' === $range ? $url : add_query_arg( 'range', rawurlencode( $range ), $url );
+	}
+
+	/**
+	 * A sale's receipt page on this site (Phase 16), with ?paper= only for a layout other than the default.
+	 *
+	 * @param int    $sale_id Sale ID.
+	 * @param string $paper   Key of Receipt::PAPERS, or '' for the default layout.
+	 */
+	public static function receipt_url( int $sale_id, string $paper = '' ): string {
+		$url = home_url( '/' . self::PATH . '/' . self::RECEIPT . '/' . max( 1, $sale_id ) . '/' );
+
+		return '' === $paper || Receipt::default_paper() === $paper || ! in_array( $paper, Receipt::PAPERS, true ) ? $url : add_query_arg( self::PAPER_ARG, rawurlencode( $paper ), $url );
+	}
+
+	/**
+	 * Whether a raw code segment is the receipt path ("receipt" or "receipt/…").
+	 *
+	 * @param string|null $segment Raw code segment from the rewrite rule.
+	 */
+	public static function is_receipt_segment( ?string $segment ): bool {
+		return null !== $segment && ( self::RECEIPT === $segment || str_starts_with( $segment, self::RECEIPT . '/' ) );
+	}
+
+	/**
+	 * The sale ID in a receipt segment "receipt/{id}", or 0 when malformed.
+	 *
+	 * @param string $segment Raw code segment.
+	 */
+	public static function receipt_id( string $segment ): int {
+		return 1 === preg_match( '#^' . self::RECEIPT . '/([1-9][0-9]{0,18})$#D', $segment, $m ) ? (int) $m[1] : 0;
 	}
 
 	/**

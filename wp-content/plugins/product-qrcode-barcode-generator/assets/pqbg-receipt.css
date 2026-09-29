@@ -1,0 +1,243 @@
+/*
+ * Receipt page (Phase 16). Black on white, no images. The receipt block has the
+ * printable width of the chosen paper: 72 mm on 80 mm rolls, 48 mm on 58 mm rolls,
+ * a 90 mm block at the top of an A4 page. The @page rule for the paper is in the
+ * page's nonce'd style element. The tools bar is hidden in print.
+ */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+.pqbg-receipt {
+	margin: 0;
+	background: #eee;
+	color: #000;
+	font: 14px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+	-webkit-text-size-adjust: 100%;
+}
+
+.pqbg-receipt__tools {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	padding: 8px 16px;
+	background: #111;
+	color: #fff;
+}
+
+.pqbg-receipt__back,
+.pqbg-receipt__paper-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 0 8px;
+	color: #fff;
+	font-weight: 600;
+}
+
+.pqbg-receipt__paper-link--current {
+	text-decoration: none;
+	outline: 2px solid #fff;
+	outline-offset: -6px;
+}
+
+.pqbg-receipt__button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: 0 16px;
+	border: 0;
+	border-radius: 6px;
+	background: #0a58ca;
+	color: #fff;
+	font: inherit;
+	font-weight: 700;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.pqbg-receipt__button--share {
+	background: #146c2e;
+}
+
+.pqbg-receipt__hint {
+	flex-basis: 100%;
+	margin: 0;
+	color: #ddd;
+	font-size: 13px;
+}
+
+.pqbg-receipt__paper {
+	position: relative;
+	width: 90mm;
+	max-width: calc(100% - 32px);
+	margin: 16px auto;
+	padding: 6mm;
+	overflow: hidden;
+	background: #fff;
+}
+
+.pqbg-receipt--paper-80 .pqbg-receipt__paper {
+	width: 80mm;
+	padding: 4mm;
+	font-size: 12px;
+}
+
+.pqbg-receipt--paper-58 .pqbg-receipt__paper {
+	width: 58mm;
+	padding: 5mm;
+	font-size: 11px;
+}
+
+.pqbg-receipt__shop {
+	text-align: center;
+}
+
+.pqbg-receipt__shop-name {
+	margin: 0 0 2px;
+	font-size: 1.4em;
+	line-height: 1.2;
+}
+
+.pqbg-receipt__line {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.pqbg-receipt__title {
+	margin: 10px 0 6px;
+	padding: 4px 0;
+	border-top: 1px dashed #000;
+	border-bottom: 1px dashed #000;
+	font-size: 1.1em;
+	text-align: center;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.pqbg-receipt__facts {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 2px 8px;
+	margin: 6px 0;
+}
+
+.pqbg-receipt__facts dt {
+	font-weight: 700;
+}
+
+.pqbg-receipt__facts dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.pqbg-receipt__items {
+	margin: 8px 0;
+	padding: 0;
+	list-style: none;
+}
+
+.pqbg-receipt__item {
+	display: flex;
+	flex-direction: column;
+	padding: 4px 0;
+	border-bottom: 1px dotted #000;
+}
+
+.pqbg-receipt__item-name {
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+
+.pqbg-receipt__item-amount {
+	text-align: right;
+}
+
+.pqbg-receipt__total {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	margin: 8px 0;
+	font-size: 1.4em;
+	font-weight: 700;
+}
+
+.pqbg-receipt__footer {
+	margin-top: 10px;
+	padding-top: 6px;
+	border-top: 1px dashed #000;
+	text-align: center;
+}
+
+/* VOID: a banner, a diagonal watermark and struck-through amounts. */
+
+.pqbg-receipt__void {
+	margin: 0 0 8px;
+	padding: 4px;
+	border: 3px solid #000;
+	font-size: 2em;
+	font-weight: 800;
+	text-align: center;
+	letter-spacing: 0.2em;
+}
+
+.pqbg-receipt__watermark {
+	position: absolute;
+	top: 40%;
+	left: 50%;
+	color: rgba(0, 0, 0, 0.12);
+	font-size: 4em;
+	font-weight: 800;
+	letter-spacing: 0.2em;
+	white-space: nowrap;
+	transform: translate(-50%, -50%) rotate(-30deg);
+	pointer-events: none;
+}
+
+.pqbg-receipt--void .pqbg-receipt__amount {
+	text-decoration: line-through;
+}
+
+.pqbg-receipt__void-note {
+	margin: 6px 0;
+	font-weight: 700;
+}
+
+.screen-reader-text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+}
+
+@media print {
+	.pqbg-receipt {
+		background: #fff;
+	}
+
+	.pqbg-receipt__tools {
+		display: none;
+	}
+
+	.pqbg-receipt__paper {
+		max-width: none;
+		margin: 0;
+	}
+
+	.pqbg-receipt--paper-a4 .pqbg-receipt__paper {
+		margin: 0 auto;
+	}
+
+	.pqbg-receipt__watermark {
+		color: rgba(0, 0, 0, 0.18);
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+}

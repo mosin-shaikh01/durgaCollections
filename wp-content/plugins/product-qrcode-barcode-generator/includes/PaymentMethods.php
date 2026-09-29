@@ -13,6 +13,9 @@
  *
  * Split or mixed payments are not supported: one sale has one method.
  *
+ * Phase 16: when the UPI payment QR is set up (UpiPayment::is_active()), choosing UPI
+ * shows the QR before the sale is confirmed (UpiSale). The stored method is still "upi".
+ *
  * @package ProductQrBarcode
  */
 

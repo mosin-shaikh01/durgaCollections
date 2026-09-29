@@ -25,6 +25,9 @@
  *   undo     ?array   the Undo form for that sale
  *   box_label string  label of the box; '' for the default
  *   mine     ?array   the seller's own sales (see my_sales(); Phase 9A)
+ *   upi      ?array   the UPI payment panel instead of the sale form (see upi_step(); Phase 16)
+ *   receipt  ?array   a receipt (see receipt(); Phase 16), rendered with its own template
+ *   script_nonce string CSP nonce of the receipt page's one script element; '' elsewhere
  *
  * @package ProductQrBarcode
  */
@@ -41,6 +44,9 @@ defined( 'ABSPATH' ) || exit;
 final class ScanScreen {
 
 	const STYLE_HANDLE = 'pqbg-scan';
+
+	/** Phase 16: the receipt page's stylesheet. */
+	const RECEIPT_STYLE_HANDLE = 'pqbg-receipt';
 
 	/** Parent statuses that mean "not published yet". */
 	const UNPUBLISHED = array( 'draft', 'pending', 'future', 'auto-draft' );
@@ -249,12 +255,80 @@ final class ScanScreen {
 					'stock'      => SaleRepository::STATUS_COMPLETED === $sale['status'] && null !== $sale['stock_after'] ? number_format_i18n( (int) $sale['stock_after'] ) : '',
 					'payment'    => PaymentMethods::label( $sale['payment_method'] ?? null ),
 					'time'       => wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), SaleService::created_ts( $sale ) ),
+					// Phase 16: completed and voided sales have a receipt.
+					'receipt'    => Receipt::has_receipt( $sale ) ? ScanUrl::receipt_url( (int) $sale['id'] ) : '',
 				),
 				'undo'        => $undo,
 				'style_nonce' => null === $undo ? '' : self::style_nonce(),
 				'box_label'   => __( 'Scan next item', 'product-qrcode-barcode-generator' ),
 			)
 		);
+	}
+
+	/**
+	 * The product screen with the UPI payment panel instead of the sale form (Phase 16,
+	 * built by UpiSale). If the item can no longer be sold, the product screen as it is
+	 * now, with its notices.
+	 *
+	 * @param string               $code    Code.
+	 * @param array<string, mixed> $prefill Quantity and payment method.
+	 * @param array<string, mixed> $panel   QR markup (from QrRenderer, or '' when it failed), amount, payee, form.
+	 * @return array<string, mixed>
+	 */
+	public static function upi_step( string $code, array $prefill, array $panel ): array {
+		$view = self::resolve( $code, $prefill );
+
+		if ( ! is_array( $view['sell'] ) ) {
+			return $view;
+		}
+
+		$view['sell'] = null;
+		$view['upi']  = $panel;
+		$view['box']  = false; // No code box: Enter or a scanner must not leave the payment by accident.
+
+		return $view;
+	}
+
+	/**
+	 * A receipt (Phase 16). The caller has checked Receipt::can_see().
+	 *
+	 * @param array<string, mixed> $sale  Sale row with a receipt.
+	 * @param string               $paper Key of Receipt::PAPERS.
+	 * @return array<string, mixed>
+	 */
+	public static function receipt( array $sale, string $paper ): array {
+		$data   = Receipt::data( $sale );
+		$papers = array();
+
+		foreach ( Receipt::papers() as $key => $label ) {
+			$papers[] = array( ScanUrl::receipt_url( (int) $sale['id'], $key ), $label, $key === $paper );
+		}
+
+		return self::view(
+			200,
+			array(),
+			array(
+				'box'          => false,
+				'receipt'      => array(
+					'data'     => $data,
+					'paper'    => $paper,
+					'papers'   => $papers,
+					'whatsapp' => $data['void'] ? '' : Receipt::whatsapp_url( Receipt::text( $data ) ),
+					'back'     => ScanUrl::site_url(),
+				),
+				'style_nonce'  => self::style_nonce(),
+				'script_nonce' => self::style_nonce(),
+			)
+		);
+	}
+
+	/**
+	 * "Receipt not found": the same answer for a missing sale, a sale without a receipt and another seller's sale.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function receipt_not_found(): array {
+		return self::view( 404, array( array( 'error', __( 'Receipt not found.', 'product-qrcode-barcode-generator' ) ) ) );
 	}
 
 	/**
@@ -389,14 +463,15 @@ final class ScanScreen {
 		foreach ( SalesQuery::rows( $filters, self::MY_SALES_LINES ) as $sale ) {
 			$code    = (string) ( $sale['code'] ?? '' );
 			$lines[] = array(
-				'time'   => SalePresenter::datetime( $sale['created_at_gmt'], $time ),
-				'item'   => SalePresenter::item( $sale ),
+				'time'    => SalePresenter::datetime( $sale['created_at_gmt'], $time ),
+				'item'    => SalePresenter::item( $sale ),
 				/* translators: 1: quantity, 2: unit price, 3: total. */
-				'amount' => sprintf( __( '%1$s × %2$s = %3$s', 'product-qrcode-barcode-generator' ), number_format_i18n( (int) $sale['quantity'] ), SalePresenter::money( $sale['unit_price'], (string) $sale['currency'] ), SalePresenter::money( $sale['line_total'], (string) $sale['currency'] ) ),
-				'method' => PaymentMethods::label( $sale['payment_method'] ),
-				'status' => (string) $sale['status'],
-				'label'  => SalePresenter::status( (string) $sale['status'] ),
-				'url'    => CodeGenerator::is_valid_format( $code ) ? SaleRequest::sale_url( $code, (int) $sale['id'] ) : '',
+				'amount'  => sprintf( __( '%1$s × %2$s = %3$s', 'product-qrcode-barcode-generator' ), number_format_i18n( (int) $sale['quantity'] ), SalePresenter::money( $sale['unit_price'], (string) $sale['currency'] ), SalePresenter::money( $sale['line_total'], (string) $sale['currency'] ) ),
+				'method'  => PaymentMethods::label( $sale['payment_method'] ),
+				'status'  => (string) $sale['status'],
+				'label'   => SalePresenter::status( (string) $sale['status'] ),
+				'url'     => CodeGenerator::is_valid_format( $code ) ? SaleRequest::sale_url( $code, (int) $sale['id'] ) : '',
+				'receipt' => ScanUrl::receipt_url( (int) $sale['id'] ), // Phase 16: completed and voided lines only, so every line has one.
 			);
 		}
 
@@ -478,8 +553,13 @@ final class ScanScreen {
 		$logout_url = wp_logout_url( $entry_url );
 		$sales_url  = Permissions::can_view_own_sales() ? ScanUrl::my_sales_url() : '';
 
+		// Phase 16: the receipt has its own standalone template and stylesheet.
+		if ( is_array( $view['receipt'] ?? null ) ) {
+			wp_register_style( self::RECEIPT_STYLE_HANDLE, PQBG_PLUGIN_URL . 'assets/pqbg-receipt.css', array(), PQBG_VERSION );
+		}
+
 		ob_start();
-		require PQBG_PLUGIN_DIR . 'templates/pqbg-scan.php';
+		require PQBG_PLUGIN_DIR . ( is_array( $view['receipt'] ?? null ) ? 'templates/pqbg-receipt.php' : 'templates/pqbg-scan.php' );
 		return (string) ob_get_clean();
 	}
 
@@ -637,15 +717,19 @@ final class ScanScreen {
 				'sale'        => null,
 				'undo'        => null,
 				'box_label'   => '',
-				'mine'        => null,
-				'style_nonce' => '',
+				'mine'         => null,
+				'style_nonce'  => '',
+				'upi'          => null,
+				'receipt'      => null,
+				'script_nonce' => '',
 			),
 			$extra
 		);
 	}
 
 	/**
-	 * A fresh CSP nonce for the page's one style element (Phase 11: the Undo expiry delay).
+	 * A fresh CSP nonce for the page's one style element (Phase 11: the Undo expiry delay;
+	 * Phase 16: the receipt's @page rules) or the receipt's one script element.
 	 * ScanRoute adds it to the Content-Security-Policy of that response only.
 	 */
 	private static function style_nonce(): string {

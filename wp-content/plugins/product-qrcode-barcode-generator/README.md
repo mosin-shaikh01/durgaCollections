@@ -183,6 +183,10 @@ It uses the WordPress Settings API:
 | Scan base URL | `scan_base_url` (string) | `''`, meaning use the site URL (`home_url()`). The effective URL and an example payload are shown on the page. |
 | Code prefix (Phase 15, not yet released) | `code_prefix` (string) | `DC`. See [Code prefix](#code-prefix). |
 | Payment methods offered (section "In-store sales", Phase 9A) | `payment_methods` (list of `cash`, `upi`, `card`, `other`) | `cash`, `upi`, `card`. At least one must stay enabled: unticking all of them is refused with "At least one payment method must stay enabled. The previous choice was kept." |
+| Shop name, Address, Phone, GSTIN (optional), Footer text (section "Receipts", Phase 16, not yet released) | `receipt_shop_name`, `receipt_address`, `receipt_phone`, `receipt_gstin`, `receipt_footer` (strings) | `''`. An empty shop name uses the site title. See [Receipts](#receipts-and-upi-payment-qr-phase-16). |
+| Seller on receipts (Phase 16) | `receipt_show_seller` (bool) | `true`: the seller's first name is shown. |
+| Default receipt paper (Phase 16) | `receipt_paper` (`a4`, `80`, `58`) | `a4`. |
+| UPI ID, Payee name (section "UPI payment QR", Phase 16) | `upi_id`, `upi_payee_name` (strings) | `''`: the UPI QR is off. See [UPI payment QR](#upi-payment-qr). |
 
 No new option was added, and no migration was needed: defaults are merged on read.
 
@@ -629,6 +633,8 @@ Phase 6. When staff scan a label's QR code with a phone camera, or type or scan 
 | `{home}/scan/{CODE}/` | The product screen for a code. **This is the label payload** (`ScanUrl::for_code()`), so its format is permanent. |
 | `{home}/scan/` | The entry page: a "Scan or type a code" box. |
 | `{home}/scan/?code=…` | What the box submits (GET). Redirects to `/scan/{CODE}/`. |
+| `{home}/scan/my-sales/` | The seller's own sales (Phase 9A). |
+| `{home}/scan/receipt/{sale id}/` | A sale's receipt (Phase 16), with `?paper=80` or `?paper=58` for a layout other than the default. See [Receipts](#receipts-and-upi-payment-qr-phase-16). |
 
 - **Rewrite rules:** two, `^scan/?$` and `^scan/(.+?)/?$`, added at the top so they take precedence over pages and posts.
   - **Everything below `/scan/` belongs to the plugin.** `/scan/a/b/` shows "Not a valid product code", not a theme 404.
@@ -649,7 +655,8 @@ The plugin answers on `parse_request`. That is before the main query, WordPress'
 | Logged out (any method, since Phase 12) | **302** to `wp_login_url()`. `redirect_to` is the canonical scan URL, or `/scan/` when the path is not a well-formed code. The code's existence is never checked. A logged-out visitor never gets a page, so a page cache has nothing to store (see [Page caches](#page-caches-and-optimisation-plugins)). |
 | Method other than GET or HEAD, except POST on a code URL | **405** with `Allow: GET, HEAD` (entry page) or `Allow: GET, HEAD, POST` (code URL). |
 | Logged in without `pqbg_view_products` (customers, subscribers) | **403**: one fixed page with no box and no product data. No lookup runs, so the response is byte-identical for existing, retired, unknown and invalid codes, and for the entry page. |
-| POST to `/scan/{CODE}/` (Phase 7: sell or undo) | Handled by `SaleRequest` (see [Mark as Sold](#mark-as-sold)). A POST to a non-canonical URL gets **400**; POSTs are never redirected. |
+| POST to `/scan/{CODE}/` (Phase 7: sell or undo) | Handled by `UpiSale` (Phase 16: the UPI payment step, see [UPI payment QR](#upi-payment-qr)), which passes everything else to `SaleRequest` unchanged (see [Mark as Sold](#mark-as-sold)). A POST to a non-canonical URL gets **400**; POSTs are never redirected. |
+| `/scan/receipt/{id}/` (Phase 16, GET and HEAD only; other methods **405** `Allow: GET, HEAD`) | **200** with the receipt when `Receipt::can_see()`; one identical **404** "Receipt not found." for a malformed ID, a missing sale, a pending or failed sale, and another seller's sale. A non-canonical address (the default paper in the query, an unknown paper, any other query) gets **301**. Logged out: **302** to the login page, back to the receipt. |
 | `/scan/{CODE}/?sale={id}` (Phase 7 sale page) | **200** with the sale, or **303** (never 301, so it is not cached) to the code URL when the sale does not exist, belongs to another code, or is not the user's to see. |
 | Path not canonical: lowercase code, spaces, missing trailing slash, any other query string, or raw `?pqbg_code=` | **301** to `{home}/scan/{CODE}/`. |
 | Entry box `?code=` | The input is trimmed, stripped of all whitespace and uppercased; a pasted URL gives the segment after `/scan/`. A well-formed code gets **302** to `/scan/{CODE}/`. Anything else gets **400** "Not a valid product code.", with the input (escaped) back in the box. |
@@ -1164,6 +1171,32 @@ The first CSV version took 31 s for the same export (OFFSET chunks alone 23.6 s)
 - The seller filter lists everyone who has ever sold; a deleted seller appears by the name snapshot.
 - The history page's time is mostly wp-admin itself on this machine (0.7–1.1 s for an empty page, depending on load).
 
+## Receipts and UPI payment QR (Phase 16)
+
+Phase 16, not yet released (planned for 1.1.0 together with the code prefix; the version is still 1.0.1). No schema change (`DB_VERSION` stays 4) and no new capability. Plan: `C:\xampp\backups\sharayu\phase16-plan.txt` (D1–D21).
+
+### Receipts
+
+- **Address:** `{home}/scan/receipt/{sale id}/`, built only by `ScanUrl::receipt_url()`, served by `ScanRoute` through the existing scan rule (`receipt` is a reserved segment like `my-sales` and can never be a product code). `?paper=80` or `?paper=58` selects a layout other than the default. GET and HEAD only; read-only.
+- **Which sales:** completed and voided (undone included). Pending and failed sales have none.
+- **Who** (`Receipt::can_see()` → `Permissions::can_view_sale()`): a seller their own sales, shop managers and administrators every sale. A missing sale, a sale without a receipt and another seller's sale get the same **404** "Receipt not found.", so sale IDs cannot be probed. Customers get the fixed 403; logged-out visitors the login page.
+- **Links:** "Receipt" on the sale result page, on each My sales line, as a row action in In-store sales and as a button on the sale detail screen (both open the front-end receipt in a new tab; hidden with Plain permalinks).
+- **Content** (`Receipt::data()`, from the sale row's snapshots and the Settings, never live product data): shop name (empty = site title), address, phone, GSTIN (only if set), the heading **"Receipt"**, receipt number = the sale ID (as "Sale #123" in the history), date and time, item and variant, quantity × unit price = total, total, paid by, the UPI reference for UPI sales, "Served by" the seller's first name (the first word of the `seller_name` snapshot; setting "Seller on receipts", on by default), footer text.
+- **Never:** cost, profit, stock, SKU, product code, user IDs, the void reason, customer data. `Receipt::data()` drops `unit_cost` before anything else.
+- **VOID:** a voided or undone sale's receipt has a VOID banner, a diagonal VOID watermark, struck-through amounts and "This sale was voided on …" ("undone on …"); no WhatsApp button.
+- **Paper:** A4 (a 90 mm block at the top of the page; the default), 80 mm (72 mm printable) or 58 mm (48 mm printable) thermal rolls; switched with links on the page; the default in Settings. The `@page` rule is in a nonce'd `<style>` element. Stylesheet `assets/pqbg-receipt.css`; template `templates/pqbg-receipt.php` (standalone like the scan page).
+- **Print:** a Print button (`assets/pqbg-receipt.js`, `window.print()`). The receipt response alone has `ScanRoute::receipt_csp()`: the scan CSP plus `script-src 'nonce-…'` for that one script element. Every other scan page keeps `csp()` with no script. The page also says to use the browser's Print / Share → Print.
+- **Share on WhatsApp:** `https://wa.me/?text=…` with the receipt as plain text (`Receipt::text()`, at most 1,500 characters) and **no phone number**, so WhatsApp asks which chat to use; the text has no link to the receipt; `rel="noopener noreferrer"`. Nothing about the customer reaches or is kept by the plugin.
+- **Not a tax invoice.** A GST tax invoice would need, among other things, a consecutive serial number per financial year (its own counter, not the sale ID), HSN codes, taxable value and CGST/SGST/IGST per line, place of supply and, for registered buyers, the buyer's details and GSTIN; cancellations by credit note. That is a possible later phase (see the plan, D16).
+
+### UPI payment QR
+
+- **Settings** (administrators): UPI ID (`UpiPayment::ID_PATTERN`, lowercased) and payee name (2–50 ASCII characters). Offered only when both are set, the store currency is **INR** and UPI is an enabled payment method (`UpiPayment::is_active()`); the Settings page says when it is set up but not shown, and why.
+- **Two steps** (`UpiSale`, in front of the unchanged `SaleRequest`): with UPI chosen, "Confirm sale" checks the nonce, the signed form token, the quantity, the price and the stock, **sells nothing**, and shows the "Pay by UPI" panel: the QR (`QrRenderer::render_upi()`, server-side SVG), the amount, payee, UPI ID, reference and "Check the customer's payment success screen before confirming." "Payment received – confirm sale" posts the same token (same `request_id`, so a double tap never sells twice) plus `upi_confirmed` and `upi_sig` (an HMAC over the user, code row, request ID, quantity and amount shown); a bad signature is refused. Cash, card and other stay one step; so does UPI while the QR is not active.
+- **Payload** (`UpiPayment::uri()`): `upi://pay?pa={UPI ID}&pn={payee}&am={price × quantity, 2 decimals}&cu=INR&tn={shop name (ASCII, ≤ 20 characters)} {reference}`; `pa` is written literally, `pn` and `tn` are `rawurlencode()`d; no `tr`, `mc` or `tid`. Reference = the first 8 characters of the sale's `request_id`, uppercased: the receipt shows the same reference the customer sees in their UPI app.
+- **Changes after the QR is shown:** a price change, too little stock, a sale online in the same instant, UPI disabled meanwhile or an expired form (30 minutes from opening the product page; the token is not re-issued at the QR step) are refused by the sale path as usual, and the screen adds "The customer may already have paid by UPI. Check their payment before you show a new QR, and refund or settle any difference yourself." If the UPI settings are cleared meanwhile, the confirm still records the sale as UPI.
+- **The plugin cannot see whether a payment arrived** (no gateway, no bank API): the seller's check of the success screen is the only confirmation. A business (merchant) UPI ID is recommended.
+
 ## In-store reports
 
 Phase 9B: **QR & Barcodes → In-store reports** (`admin.php?page=pqbg-reports`; under WooCommerce until Phase 10B), right after In-store sales, for `pqbg_view_all_sales` (Shop Manager, Administrator). Every view is a plain GET with its options in the URL (bookmarkable); nothing on these pages writes.
@@ -1500,7 +1533,7 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 | Option | Autoload | Purpose |
 |---|---|---|
 | `pqbg_db_version` | yes | integer schema version (currently `4`) |
-| `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`, `payment_methods`, `code_prefix` since Phase 15); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
+| `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`, `payment_methods`, `code_prefix` since Phase 15, the `receipt_*` keys, `upi_id` and `upi_payee_name` since Phase 16); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 | `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
 | `pqbg_svg_cache_index` | no | Phase 8 render cache index: `{transient key} => last used`, at most 2,000 entries. Not data; removed on every uninstall. |

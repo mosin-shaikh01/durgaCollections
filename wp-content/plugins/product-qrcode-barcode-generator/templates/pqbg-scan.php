@@ -8,8 +8,15 @@
  * seconds are left before the form hides itself (Phase 11; see pqbg-scan.css).
  *
  * Every value is escaped here. The only HTML taken from elsewhere is the
- * price (WooCommerce's price functions, passed through wp_kses_post()) and
- * the image tag (wp_get_attachment_image(), which escapes its attributes).
+ * price (WooCommerce's price functions, passed through wp_kses_post()), the
+ * image tag (wp_get_attachment_image(), which escapes its attributes) and the
+ * UPI payment QR (Phase 16: SVG written by QrRenderer/Svg, integers and escaped
+ * text only).
+ *
+ * Phase 16: the UPI panel replaces the sale form after "Confirm sale" with UPI
+ * (UpiSale); its form posts the same sale fields plus the UPI confirmation. The
+ * sale page and My sales link to each sale's receipt (a separate page with its own
+ * template, templates/pqbg-receipt.php).
  *
  * The sale and Undo forms are separate from the code box, so pressing Enter
  * in the box (or a scanner that types a code and Enter) only looks up a code
@@ -38,6 +45,7 @@ $pqbg_summary = $view['summary'];
 $pqbg_sell    = $view['sell'];
 $pqbg_sale    = $view['sale'];
 $pqbg_undo    = $view['undo'];
+$pqbg_upi     = $view['upi'];
 ?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -115,7 +123,7 @@ $pqbg_undo    = $view['undo'];
 					<?php else : ?>
 						<span class="pqbg-scan__line-item"><?php echo esc_html( $pqbg_line['item'] ); ?></span>
 					<?php endif; ?>
-					<span class="pqbg-scan__line-detail"><?php echo esc_html( $pqbg_line['amount'] . ' · ' . $pqbg_line['method'] . ' · ' . $pqbg_line['label'] ); ?></span>
+					<span class="pqbg-scan__line-detail"><?php echo esc_html( $pqbg_line['amount'] . ' · ' . $pqbg_line['method'] . ' · ' . $pqbg_line['label'] ); ?> · <a class="pqbg-scan__line-receipt" href="<?php echo esc_url( $pqbg_line['receipt'] ); ?>"><?php esc_html_e( 'Receipt', 'product-qrcode-barcode-generator' ); ?></a></span>
 				</li>
 			<?php endforeach; ?>
 		</ol>
@@ -200,6 +208,43 @@ $pqbg_undo    = $view['undo'];
 			</fieldset>
 			<button class="pqbg-scan__button pqbg-scan__button--sell" type="submit"><?php esc_html_e( 'Confirm sale', 'product-qrcode-barcode-generator' ); ?></button>
 		</form>
+	<?php elseif ( is_array( $pqbg_upi ) ) : ?>
+		<form class="pqbg-scan__sell pqbg-scan__upi" method="post" action="<?php echo esc_url( $pqbg_upi['action'] ); ?>">
+			<h2 class="pqbg-scan__sell-title"><?php esc_html_e( 'Pay by UPI', 'product-qrcode-barcode-generator' ); ?></h2>
+			<p class="pqbg-scan__upi-amount"><?php echo esc_html( $pqbg_upi['amount'] ); ?></p>
+			<p class="pqbg-scan__hint">
+				<?php
+				/* translators: %s: quantity. */
+				echo esc_html( sprintf( __( 'Quantity: %s', 'product-qrcode-barcode-generator' ), $pqbg_upi['quantity'] ) );
+				?>
+			</p>
+			<?php if ( '' !== $pqbg_upi['qr'] ) : ?>
+				<div class="pqbg-scan__upi-qr"><?php echo $pqbg_upi['qr']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG built by QrRenderer/Svg from integers and escaped text. ?></div>
+			<?php else : ?>
+				<p class="pqbg-scan__notice pqbg-scan__notice--warning" role="alert">
+					<?php
+					/* translators: %s: UPI ID. */
+					echo esc_html( sprintf( __( 'The payment QR could not be shown. Ask the customer to pay to %s.', 'product-qrcode-barcode-generator' ), $pqbg_upi['upi_id'] ) );
+					?>
+				</p>
+			<?php endif; ?>
+			<dl class="pqbg-scan__facts">
+				<dt><?php esc_html_e( 'Pay to', 'product-qrcode-barcode-generator' ); ?></dt>
+				<dd><?php echo esc_html( $pqbg_upi['payee'] ); ?></dd>
+				<dt><?php esc_html_e( 'UPI ID', 'product-qrcode-barcode-generator' ); ?></dt>
+				<dd><?php echo esc_html( $pqbg_upi['upi_id'] ); ?></dd>
+				<dt><?php esc_html_e( 'Reference', 'product-qrcode-barcode-generator' ); ?></dt>
+				<dd class="pqbg-scan__code"><?php echo esc_html( $pqbg_upi['reference'] ); ?></dd>
+			</dl>
+			<p class="pqbg-scan__notice pqbg-scan__notice--warning"><?php esc_html_e( 'Check the customer\'s payment success screen before confirming.', 'product-qrcode-barcode-generator' ); ?></p>
+			<input type="hidden" name="pqbg_action" value="sell">
+			<input type="hidden" name="_pqbg_nonce" value="<?php echo esc_attr( $pqbg_upi['nonce'] ); ?>">
+			<?php foreach ( $pqbg_upi['fields'] as $pqbg_name => $pqbg_value ) : ?>
+				<input type="hidden" name="<?php echo esc_attr( $pqbg_name ); ?>" value="<?php echo esc_attr( $pqbg_value ); ?>">
+			<?php endforeach; ?>
+			<button class="pqbg-scan__button pqbg-scan__button--sell" type="submit"><?php esc_html_e( 'Payment received – confirm sale', 'product-qrcode-barcode-generator' ); ?></button>
+			<p><a class="pqbg-scan__button pqbg-scan__button--link pqbg-scan__button--back" href="<?php echo esc_url( $pqbg_upi['back'] ); ?>"><?php esc_html_e( 'Back', 'product-qrcode-barcode-generator' ); ?></a></p>
+		</form>
 	<?php endif; ?>
 <?php elseif ( is_array( $pqbg_sale ) ) : ?>
 	<article class="pqbg-scan__product pqbg-scan__sale">
@@ -228,6 +273,9 @@ $pqbg_undo    = $view['undo'];
 			<dd class="pqbg-scan__code"><?php echo esc_html( $view['code'] ); ?></dd>
 		</dl>
 	</article>
+	<?php if ( '' !== ( $pqbg_sale['receipt'] ?? '' ) ) : ?>
+		<p><a class="pqbg-scan__button pqbg-scan__button--link pqbg-scan__button--receipt" href="<?php echo esc_url( $pqbg_sale['receipt'] ); ?>"><?php esc_html_e( 'Receipt', 'product-qrcode-barcode-generator' ); ?></a></p>
+	<?php endif; ?>
 	<?php if ( is_array( $pqbg_undo ) ) : ?>
 		<form class="pqbg-scan__undo" method="post" action="<?php echo esc_url( $pqbg_undo['action'] ); ?>">
 			<input type="hidden" name="pqbg_action" value="undo">

@@ -5,7 +5,8 @@
  *
  * Screens (one hidden-query page, all GET and read-only):
  *   admin.php?page=pqbg-sales&{filters}              list, filters, totals, CSV link
- *   admin.php?page=pqbg-sales&sale={id}              sale detail and timeline
+ *   admin.php?page=pqbg-sales&sale={id}              sale detail and timeline (Phase 16: a "Receipt"
+ *                                                    button to the front-end receipt page)
  *   admin.php?page=pqbg-sales&sale={id}&pqbg_view=void  void confirmation
  * Handler:
  *   POST admin-post.php?action=pqbg_void_sale        nonce pqbg_void_sale_{id}, pqbg_void_sale,
@@ -347,6 +348,11 @@ final class SalesAdmin {
 
 		if ( SaleRepository::STATUS_COMPLETED === $sale['status'] && Permissions::can_void_sale() ) {
 			echo '<a class="page-title-action" href="' . esc_url( AdminUrl::sale_void( $id ) ) . '">' . esc_html__( 'Void sale', 'product-qrcode-barcode-generator' ) . '</a> ';
+		}
+
+		// Phase 16: the front-end receipt page, in a new tab (it needs the scan route, so not with plain permalinks).
+		if ( Receipt::has_receipt( $sale ) && ScanRoute::is_available() ) {
+			echo '<a class="page-title-action" href="' . esc_url( ScanUrl::receipt_url( $id ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Receipt', 'product-qrcode-barcode-generator' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'product-qrcode-barcode-generator' ) . '</span></a> ';
 		}
 
 		echo '<a class="page-title-action" href="' . esc_url( AdminUrl::sales() ) . '">' . esc_html__( 'Back to In-store sales', 'product-qrcode-barcode-generator' ) . '</a>';

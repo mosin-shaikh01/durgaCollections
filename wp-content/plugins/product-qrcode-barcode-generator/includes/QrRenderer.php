@@ -1,10 +1,15 @@
 <?php
 /**
- * Renders a product code as a QR code (SVG). QR codes are always available.
+ * Renders QR codes (SVG). QR codes are always available.
  *
- * Payload: the scan URL from ScanUrl::for_code(), and nothing else.
+ * Two payloads, and nothing else:
+ *   render( $code )      the scan URL from ScanUrl::for_code(): product labels,
+ *                        the product panel, printing
+ *   render_upi( … )      the upi://pay URI from UpiPayment::uri() (Phase 16): shown
+ *                        on the sell screen for the customer to pay; never cached,
+ *                        stored or printed on labels
  * Error correction level M, a quiet zone of 4 modules, byte mode in
- * ISO-8859-1 (the URL is plain ASCII, so no ECI header is added, which
+ * ISO-8859-1 (both payloads are plain ASCII, so no ECI header is added, which
  * some older scanners misread).
  *
  * bacon/bacon-qr-code (scoped under ProductQrBarcode\Vendor\) only encodes
@@ -23,7 +28,7 @@ use WP_Error;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Product code to QR code SVG.
+ * Product code (or UPI payment) to QR code SVG.
  */
 final class QrRenderer {
 
@@ -46,12 +51,40 @@ final class QrRenderer {
 			return $url;
 		}
 
+		return self::svg( $url, $code );
+	}
+
+	/**
+	 * Renders the UPI payment QR for an amount (Phase 16). Only UpiPayment::uri() builds the payload.
+	 *
+	 * @param string $amount    Amount from UpiPayment::amount().
+	 * @param string $reference Reference from UpiPayment::reference().
+	 * @return string|WP_Error SVG markup.
+	 */
+	public function render_upi( string $amount, string $reference ) {
+		$uri = UpiPayment::uri( $amount, $reference );
+
+		if ( '' === $uri ) {
+			return new WP_Error( 'pqbg_upi_unavailable', __( 'The UPI payment QR is not available.', 'product-qrcode-barcode-generator' ) );
+		}
+
+		return self::svg( $uri, __( 'UPI payment QR', 'product-qrcode-barcode-generator' ) );
+	}
+
+	/**
+	 * Encodes an ASCII payload and writes the SVG.
+	 *
+	 * @param string $payload Payload (ASCII).
+	 * @param string $label   Accessible name of the image.
+	 * @return string|WP_Error SVG markup.
+	 */
+	private static function svg( string $payload, string $label ) {
 		if ( ! function_exists( 'iconv' ) ) {
 			return new WP_Error( 'pqbg_qr_unavailable', __( 'QR codes need the PHP iconv extension, which is not available on this server.', 'product-qrcode-barcode-generator' ) );
 		}
 
 		try {
-			$matrix = Encoder::encode( $url, ErrorCorrectionLevel::M(), Encoder::DEFAULT_BYTE_MODE_ENCODING )->getMatrix();
+			$matrix = Encoder::encode( $payload, ErrorCorrectionLevel::M(), Encoder::DEFAULT_BYTE_MODE_ENCODING )->getMatrix();
 		} catch ( \Throwable $e ) {
 			return self::failed( $e );
 		}
@@ -78,7 +111,7 @@ final class QrRenderer {
 
 		$total = $size + 2 * self::QUIET_ZONE;
 
-		return Svg::document( $total, $total, self::MODULE_PX, $code, Svg::runs( $runs, 1 ) );
+		return Svg::document( $total, $total, self::MODULE_PX, $label, Svg::runs( $runs, 1 ) );
 	}
 
 	/**

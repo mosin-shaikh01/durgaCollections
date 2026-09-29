@@ -8,6 +8,18 @@
  *   payment_methods   array   Payment methods the sale form offers (PaymentMethods keys, at least one).
  *   code_prefix       string  Prefix of NEW product codes (CodeGenerator::PREFIX_PATTERN), default DC.
  *                             Existing codes never change; every well-formed prefix keeps scanning.
+ *   receipt_shop_name string  Shop name on receipts (Phase 16); '' = the site title. One line.
+ *   receipt_address   string  Address on receipts, up to 4 lines.
+ *   receipt_phone     string  Phone on receipts: digits, spaces, + - ( ).
+ *   receipt_gstin     string  '' or a GSTIN (format and check character), uppercased.
+ *   receipt_footer    string  Footer text on receipts, up to 3 lines.
+ *   receipt_show_seller bool  Whether receipts show the seller's first name. On by default.
+ *   receipt_paper     string  Default receipt layout: a4, 80 or 58 (Receipt::PAPERS).
+ *   upi_id            string  '' or the shop's UPI ID (UpiPayment::ID_PATTERN), lowercased.
+ *   upi_payee_name    string  '' or the payee name UPI apps show (UpiPayment::PAYEE_PATTERN).
+ *
+ * An invalid value keeps the previous one and reports a settings error (as the scan
+ * base URL and the code prefix do).
  *
  * Only the scan base URL is stored, never a full scan URL. Codes live in
  * pqbg_codes, so changing the base URL never touches any code.
@@ -31,6 +43,19 @@ final class Settings {
 
 	/** Longer base URLs make the QR code denser and harder to scan from a small label. */
 	const MAX_URL_LENGTH = 100;
+
+	/** Receipt text settings (Phase 16): key => [ maximum characters, maximum lines ]. */
+	const RECEIPT_TEXTS = array(
+		'receipt_shop_name' => array( 80, 1 ),
+		'receipt_address'   => array( 200, 4 ),
+		'receipt_footer'    => array( 200, 3 ),
+	);
+
+	/** Longest receipt phone number. */
+	const PHONE_MAX = 30;
+
+	/** GSTIN: 2-digit state code, PAN, entity number, "Z", check character. */
+	const GSTIN_PATTERN = '/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/D';
 
 	/**
 	 * Stored settings merged over the defaults (unknown keys dropped).
@@ -125,6 +150,97 @@ final class Settings {
 			__( 'With barcodes on, a code prefix longer than %d characters makes the barcode too wide for the A4 label sheets. The QR code still prints.', 'product-qrcode-barcode-generator' ),
 			strlen( CodeGenerator::DEFAULT_PREFIX )
 		);
+	}
+
+	/**
+	 * Validates a receipt text setting (RECEIPT_TEXTS): tags removed, each line trimmed,
+	 * empty lines dropped, then the character and line limits. '' clears it.
+	 *
+	 * @param string $key   Key of RECEIPT_TEXTS.
+	 * @param mixed  $value Submitted value.
+	 * @return string|WP_Error
+	 */
+	public static function validate_receipt_text( string $key, $value ) {
+		if ( ! isset( self::RECEIPT_TEXTS[ $key ] ) ) {
+			return new WP_Error( 'pqbg_invalid_receipt_text', __( 'Unknown receipt setting.', 'product-qrcode-barcode-generator' ) );
+		}
+
+		list( $max, $max_lines ) = self::RECEIPT_TEXTS[ $key ];
+
+		$text  = is_string( $value ) ? sanitize_textarea_field( $value ) : '';
+		$lines = array_values( array_filter( array_map( 'trim', explode( "\n", str_replace( "\r", '', $text ) ) ), static fn( $line ) => '' !== $line ) );
+		$text  = implode( "\n", $lines );
+
+		if ( ! is_string( $value ) || count( $lines ) > $max_lines || mb_strlen( $text ) > $max ) {
+			return new WP_Error(
+				'pqbg_invalid_' . $key,
+				1 === $max_lines
+					/* translators: %d: maximum number of characters. */
+					? sprintf( __( 'The shop name can be at most %d characters on one line. The previous value was kept.', 'product-qrcode-barcode-generator' ), $max )
+					/* translators: 1: maximum number of lines, 2: maximum number of characters. */
+					: sprintf( __( 'Receipt address and footer text can be at most %1$d lines and %2$d characters. The previous value was kept.', 'product-qrcode-barcode-generator' ), $max_lines, $max )
+			);
+		}
+
+		return $text;
+	}
+
+	/**
+	 * Validates the receipt phone number: digits, spaces, + - ( ), at least one digit. '' clears it.
+	 *
+	 * @param mixed $value Submitted value.
+	 * @return string|WP_Error
+	 */
+	public static function validate_phone( $value ) {
+		$phone = is_string( $value ) ? trim( (string) preg_replace( '/ {2,}/', ' ', $value ) ) : null;
+
+		if ( '' === $phone ) {
+			return '';
+		}
+
+		if ( null === $phone || strlen( $phone ) > self::PHONE_MAX || 1 !== preg_match( '/^[0-9+()\- ]+$/D', $phone ) || 1 !== preg_match( '/[0-9]/', $phone ) ) {
+			/* translators: %d: maximum number of characters. */
+			return new WP_Error( 'pqbg_invalid_receipt_phone', sprintf( __( 'The phone number can contain digits, spaces and + - ( ), at most %d characters. The previous value was kept.', 'product-qrcode-barcode-generator' ), self::PHONE_MAX ) );
+		}
+
+		return $phone;
+	}
+
+	/**
+	 * Validates a GSTIN: spaces removed, uppercased, the format and the check character. '' clears it.
+	 *
+	 * @param mixed $value Submitted value.
+	 * @return string|WP_Error
+	 */
+	public static function validate_gstin( $value ) {
+		$gstin = is_string( $value ) ? strtoupper( (string) preg_replace( '/\s+/', '', $value ) ) : null;
+
+		if ( '' === $gstin ) {
+			return '';
+		}
+
+		if ( null === $gstin || 1 !== preg_match( self::GSTIN_PATTERN, $gstin ) || ! self::gstin_check_ok( $gstin ) ) {
+			return new WP_Error( 'pqbg_invalid_receipt_gstin', __( 'This is not a valid GSTIN (15 characters; the last one is a check character). The previous value was kept.', 'product-qrcode-barcode-generator' ) );
+		}
+
+		return $gstin;
+	}
+
+	/**
+	 * Whether a GSTIN's 15th character is its check character (base 36, weights 1 and 2 alternating).
+	 *
+	 * @param string $gstin 15 characters matching GSTIN_PATTERN.
+	 */
+	public static function gstin_check_ok( string $gstin ): bool {
+		$chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+		$sum   = 0;
+
+		for ( $i = 0; $i < 14; $i++ ) {
+			$product = (int) strpos( $chars, $gstin[ $i ] ) * ( 0 === $i % 2 ? 1 : 2 );
+			$sum    += intdiv( $product, 36 ) + $product % 36;
+		}
+
+		return $chars[ ( 36 - $sum % 36 ) % 36 ] === $gstin[14];
 	}
 
 	/**
@@ -288,6 +404,42 @@ final class Settings {
 			} else {
 				$output['code_prefix'] = $prefix;
 			}
+		}
+
+		// Receipts and the UPI payment QR (Phase 16): each value validated on its own; an invalid one keeps the previous value.
+		$validators = array(
+			'receipt_phone'  => array( __CLASS__, 'validate_phone' ),
+			'receipt_gstin'  => array( __CLASS__, 'validate_gstin' ),
+			'upi_id'         => array( UpiPayment::class, 'validate_id' ),
+			'upi_payee_name' => array( UpiPayment::class, 'validate_payee' ),
+		);
+
+		foreach ( array_keys( self::RECEIPT_TEXTS ) as $key ) {
+			$validators[ $key ] = static fn( $value ) => self::validate_receipt_text( $key, $value );
+		}
+
+		foreach ( $validators as $key => $validate ) {
+			if ( ! array_key_exists( $key, $input ) ) {
+				continue;
+			}
+
+			$valid = call_user_func( $validate, $input[ $key ] );
+
+			if ( is_wp_error( $valid ) ) {
+				if ( function_exists( 'add_settings_error' ) ) {
+					add_settings_error( Plugin::SETTINGS_OPTION, $valid->get_error_code(), $valid->get_error_message() );
+				}
+			} else {
+				$output[ $key ] = $valid;
+			}
+		}
+
+		if ( array_key_exists( 'receipt_show_seller', $input ) ) {
+			$output['receipt_show_seller'] = in_array( $input['receipt_show_seller'], array( true, 1, '1' ), true );
+		}
+
+		if ( array_key_exists( 'receipt_paper', $input ) && is_string( $input['receipt_paper'] ) && in_array( $input['receipt_paper'], Receipt::PAPERS, true ) ) {
+			$output['receipt_paper'] = $input['receipt_paper'];
 		}
 
 		// Checkboxes send nothing when unticked, so the form also sends a marker that the field was on it.

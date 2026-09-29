@@ -45,6 +45,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 12 was committed as two commits and pushed to `origin/main`, with the user's approval on the automated tests (manual checks in the pre-launch acceptance checklist; normal fast-forward, no force): first D12 as `ba18693` ("Set plugin author to Mosin Shaikh; remove shop name from plugin"), then Phase 12 as `1b583f9` ("Phase 12: theme compatibility (6 themes, cache safety, plain-permalink warnings)"), both 2026-09-28. Recorded at the start of Phase 13 (2026-09-28), after checking that `HEAD` = `origin/main` = `1b583f9` and the working tree was clean.
 - Phase 13 was committed as two commits and pushed to `origin/main`, with the owner's approval (normal pushes, no force): first Phase 13 as `8670a30` (`8670a30fa466d564b08aa52ff7cb581f0f9f128c`, "Phase 13: release 1.0.0 (licences, guides, packaging, fresh-install test, launch runbook)"; 33 files), then the packaging fix as `7da1fa8` (`7da1fa8b648f2152b5a141fd6160ec1604851e0d`, "Fix build/package.php: clean builds deadlocked reading committed files"; `build/package.php` only, +5 / -2). **Release 1.0.0:** the annotated tag `pqbg-v1.0.0` (tag object `a0036035f5dd7de2a06f576b786f9858ea4acc6a`, message "Product QR Code and Barcode Generator 1.0.0") points at `7da1fa8` and is pushed. The release zip was built cleanly from `7da1fa8` (no `--allow-dirty`): `C:\xampp\backups\sharayu\release\product-qrcode-barcode-generator-1.0.0.zip`, 1,383,034 bytes, 252 files + 32 folders, **SHA-256 `a774011ae6479fbf236d582755469176055109e1fc5851d5a6b665eee12eb8df`** (the `.sha256` file says "built from commit 7da1fa8"). Recorded at the start of the 1.0.1 work (2026-09-28) from the Phase 13 report and the local refs (`main` = `refs/remotes/origin/main` = `7da1fa8b…`, tag ref = `a0036035…`, the working tree clean at the start of the session), then confirmed with git after `git fetch`: `HEAD` = `origin/main` = remote `main` = `7da1fa8b…`; `pqbg-v1.0.0` = `a0036035…` locally and on the remote, peeled to `7da1fa8b…` on both.
 - Version 1.0.1 was committed as one commit ("Release 1.0.1: user manual PDF, Plugin guide button, seller guide links"), with the owner's approval on the automated tests (2,332 passed; the D10 upgrade check not run, owner's decision), tagged `pqbg-v1.0.1` (annotated, "Product QR Code and Barcode Generator 1.0.1") and pushed to `origin/main` (normal pushes, no force). The release zip was built from that commit into `C:\xampp\backups\sharayu\release\` (see the Version 1.0.1 section). The commit is `aec593f` (`aec593f3c7c6b258c55f4b0802020a58b1c750dd`); the tag `pqbg-v1.0.1` (tag object `deb6a044ab23131aa6c60a59cdd6a8b2c6dc040a`) points to it. Recorded at the start of Phase 15 planning (2026-09-29), after checking that `HEAD` = `origin/main` = `aec593f` and the working tree was clean.
+- Phase 15 (configurable code prefix) was committed as `d60f548` (`d60f54874d1361e34a07537961d9ae8b6549bc15`, "Phase 15: configurable code prefix (unreleased, pending 1.1.0)"; 25 files, added by name) and pushed to `origin/main` with the owner's approval (normal push `aec593f..d60f548`, no force), 2026-09-29. No tag and no version change (still 1.0.1); no tests or builds were run. After the push `HEAD` = `origin/main` = `d60f548` and the working tree was clean. Recorded afterwards on the owner's instruction (a commit cannot contain its own hash).
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -59,6 +60,7 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `d60f548` | Phase 15: configurable code prefix (unreleased, pending 1.1.0) |
 | `aec593f` | Release 1.0.1: user manual PDF, Plugin guide button, seller guide links (tagged `pqbg-v1.0.1`) |
 | `7da1fa8` | Fix build/package.php: clean builds deadlocked reading committed files (tagged `pqbg-v1.0.0`) |
 | `8670a30` | Phase 13: release 1.0.0 (licences, guides, packaging, fresh-install test, launch runbook) |
@@ -120,7 +122,9 @@ every other plugin stays ignored. For a future custom theme the pattern is:
 - [x] Permalinks set to `/%postname%/` (verified 2026-09-24)
 - [ ] **Optional, later (owner's decision A, 2026-09-27: plugin first):** decide on the theme approach (customize twentytwentyfive, a child theme, or a custom theme). All plugin phases are completed before any theme work; the theme phases are at the end of the roadmap.
 - [ ] The manual checks that must pass before launch are in **[`LAUNCH.md`](LAUNCH.md)** (the launch runbook; moved there from the Pre-launch acceptance checklist in Phase 13).
-- [ ] **1.1.0 pending: configurable prefix; owner to decide on tests and rebuilds before release.** Phase 15 is implemented in the working tree, not tested and not committed; at the next manual rebuild, mention custom prefixes (see the Phase 15 section).
+- [ ] **1.1.0 pending: configurable prefix; owner to decide on tests and rebuilds before release.** Phase 15 is committed as `d60f548` and pushed, not tested and not released; at the next manual rebuild, mention custom prefixes (see the Phase 15 section).
+- [ ] **1.1.0 pending: receipts + UPI payment QR (Phase 16).** Implemented in the working tree, not tested and not committed; at the next manual rebuild, add receipts and UPI to the user manual and the seller guide (see the Phase 16 section).
+- [ ] **Possible later phase (owner to decide):** a GST tax invoice (see the Phase 16 plan, D16: consecutive serial per financial year, HSN, tax breakdown, buyer details for B2B, credit notes).
 - [ ] **Deferred (owner to decide after launch):** a Hindi/Marathi seller guide (and translation of the staff screens; the .pot is ready). Recorded in Phase 13 at the owner's request.
 - [ ] **Deferred (only for a possible WordPress.org release; owner's decision, Phase 13):** two translatable messages are built from separately translated parts, which translators cannot reorder: the print setup screen's local-address notice ("QR codes currently point to a local address. Do not print labels until the production URL is set." followed by "You can still print test labels; they are marked "TEST – NOT FOR USE"."; `PrintAdmin`), and the "Variation #%d: " prefix in front of a cost-price error (`CostPrice`). Left as they are.
 - [ ] The user's label stock → possibly a new default print preset (A4 3 × 7 until then).
@@ -162,6 +166,11 @@ It lives in `wp-content/plugins/product-qrcode-barcode-generator/`. It was calle
 | **12** | **Theme compatibility (owner's decision B: any WooCommerce theme, classic and block, block and classic cart/checkout; no theme-specific code)** | **Done 2026-09-28. Approved on the automated tests; committed as `ba18693` (D12, author and shop name) and `1b583f9` (Phase 12), pushed.** Manual checks in the pre-launch acceptance checklist. |
 | **13** | **Plugin QA, documentation and packaging (version 1.0.0)** | **Done 2026-09-28. Approved; committed as `8670a30` and `7da1fa8` (packaging fix), tagged `pqbg-v1.0.0` on `7da1fa8` and pushed; release zip SHA-256 `a774011a…eb8df`** (see the Phase 13 section). Note from Phase 11 (owner's decision): **Revisit coding-standards cleanup if the plugin is ever published on WordPress.org.** (PHPCS findings recorded in the Phase 11 section; only the 3 missing translator comments were fixed.) |
 | **1.0.1** | **User manual (PDF) and help links (Plugin guide button, Plugins screen link, seller guide links)** | **Done 2026-09-29. Tested (2,332 passed, 0 failed, 0 skipped; the upgrade check not run, owner's decision); committed as "Release 1.0.1: user manual PDF, Plugin guide button, seller guide links", tagged `pqbg-v1.0.1` and pushed (see the "Version 1.0.1" section).** |
+| **15** | **Configurable code prefix** | **Committed `d60f548`, pushed; not tested, not released (1.1.0 pending).** |
+| **16** | **Receipts + UPI payment QR** (renumbered from 15 by the owner, D1, 2026-09-29) | **Implemented 2026-09-30 in the working tree; not tested, not committed (1.1.0 pending, with the prefix). Plan: `C:\xampp\backups\sharayu\phase16-plan.txt` (D1–D21 approved). See the Phase 16 section.** |
+| 17 | Basket: several different items in one sale, one total, one payment | Roadmap, not started |
+| 18 | Discounts (on top of the basket) | Roadmap, not started |
+| later | Partial returns | Roadmap, not started |
 | later | Theme work (optional, later; owner's decision A: plugin first) | Not started |
 
 > **Pre-rename records.**
@@ -1935,13 +1944,13 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 - **D10 upgrade check 1.0.0 → 1.0.1: not run (owner's decision, 2026-09-29).** No temporary site or database was created.
 - WordPress/WooCommerce caches left as they are (not test data): two `_site_transient_feed_*` transients and the WooCommerce option `ptk_patterns`.
 
-### Phase 15: Configurable code prefix (2026-09-29): IMPLEMENTED, NOT TESTED, NOT COMMITTED
+### Phase 15: Configurable code prefix (2026-09-29): COMMITTED (`d60f548`), NOT TESTED, NOT RELEASED
 
 **1.1.0 pending: configurable prefix; owner to decide on tests and rebuilds before release.** The version stays 1.0.1 (header, `PQBG_VERSION`, `readme.txt`, `CHANGELOG.md` untouched); no .pot, manual, seller guide or zip rebuild (owner's decision, 2026-09-29).
 
 **Plan:** `C:\xampp\backups\sharayu\prefix-plan.txt`. Owner's decisions: P1 prefix 2–4 characters, A–Z and 0–9, a letter first, no hyphen, lowercase uppercased, default `DC`, administrators only; P2 the format check accepts any 2–6 character prefix, separate from the Settings limit; P3 a barcode warning on Settings **and on the print setup screen**; P4 the seller guide and the manual left alone for now; P5 tests that hard-code `DC-` updated and new prefix tests added, **not run**; P6 version kept at 1.0.1; also the print template's fixed `substr( $code, 0, 8 )` split replaced by a split after the second hyphen.
 
-**Implemented (working tree):**
+**Implemented (committed as `d60f548`, pushed; no tag):**
 - `CodeGenerator`: `DEFAULT_PREFIX`, `PREFIX_PATTERN` (`/^[A-Z][A-Z0-9]{1,3}$/D`), `PREFIX_MIN`/`PREFIX_MAX`, `PREFIX_ANY` (2–6), `FORMAT_PATTERN` = `/^[A-Z][A-Z0-9]{1,5}(-[A-HJKMNP-Z2-9]{4}){3}$/D`, `is_valid_prefix()`, `example_code()`; `generate()` uses `Settings::get_code_prefix()`. The `PREFIX` constant is gone.
 - `Plugin::default_settings()` `code_prefix` = `DC` (no migration; `settings_version` still 1). `Settings`: `get_code_prefix()` (a bad stored value gives `DC`), `validate_code_prefix()`, `prefix_barcode_warning()`, `sanitize()` (error `pqbg_invalid_code_prefix`, previous value kept). `SettingsPage`: the "Code prefix" field with help text and the warning.
 - `ScanUrl::EXAMPLE_CODE` removed; `example()` uses the current prefix (Settings, Dashboard, Health check texts). The scan entry box placeholder comes from `ScanScreen` (`placeholder`).
@@ -1952,6 +1961,25 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 **Known before release:** `phase13-release`'s ".pot is up to date" check will fail until the .pot is regenerated (new strings). Suites to run first: phase3, phase4, phase5, phase6, phase8, phase10, phase13, phase15.
 
 **For the next manual rebuild:** mention custom prefixes in the user manual (2.3 Settings: the Code prefix field; 4 Product codes: "DC is the default prefix"; a Common problems row: old labels with another prefix still work) and consider "(the letters at the start may differ)" in the seller guide; the Settings screenshot will show the new field.
+
+### Phase 16: Receipts + UPI payment QR (2026-09-29 → 2026-09-30): IMPLEMENTED, NOT TESTED, NOT COMMITTED
+
+**1.1.0 pending (released later together with the Phase 15 prefix; owner's decision D20).** The version stays 1.0.1 (header, `PQBG_VERSION`, `readme.txt`, `CHANGELOG.md` untouched); no .pot, manual, seller guide or zip rebuild; no tests, builds or backups run (owner's rule); only `php -l` (8.5 and the 8.2 minimum) on the changed PHP files.
+
+**Plan:** `C:\xampp\backups\sharayu\phase16-plan.txt` (the first draft, numbered 15, is `phase15-plan.txt` in the session scratchpad only). Owner's decisions 2026-09-29: D1 renumbered (16 receipts + UPI, 17 basket, 18 discounts, later partial returns); D2–D21 approved as recommended, including A4 as the default layout, the seller's first name shown by default (switchable), the Print-button script allowed on the receipt page only and **nonce-based** (not `script-src 'self'`), the two-step UPI confirm, version 1.1.0. Anything not in the plan is approved only if it changes neither the schema nor stored data.
+
+**Implemented (working tree):**
+- New `Receipt` (access, content from the sale row's snapshots, never the cost; WhatsApp text and wa.me link), `UpiPayment` (settings, validation, reference, `upi://pay` URI, `is_active()`: both set + INR + UPI enabled), `UpiSale` (the two-step UPI sale in front of `SaleRequest`), `templates/pqbg-receipt.php`, `assets/pqbg-receipt.css`, `assets/pqbg-receipt.js`.
+- `ScanRoute`: `/scan/receipt/{id}/` (GET/HEAD; identical 404 for missing/failed/other seller's sale; 301 to the canonical address; login round trip), POSTs go through `UpiSale::handle()`, new `receipt_csp()` (the scan CSP + `script-src 'nonce-…'`) used only when a view has a script nonce. `csp()` and `security_headers()` are unchanged (the phase14 suite compares them with 1.0.0).
+- `ScanUrl` (`RECEIPT`, `PAPER_ARG`, `receipt_url()`, `is_receipt_segment()`, `receipt_id()`), `ScanScreen` (Receipt links on the sale page and My sales, `upi_step()`, `receipt()`, `receipt_not_found()`, the receipt template switch), `templates/pqbg-scan.php` and `assets/pqbg-scan.css` (UPI panel, Receipt links), `QrRenderer` (`render_upi()`, shared private `svg()`), `Settings` (new keys, validators incl. the GSTIN check character, `sanitize()`), `SettingsPage` (sections Receipts and UPI payment QR), `Plugin::default_settings()` (9 new keys, no migration, `settings_version` still 1), `SalesAdmin` / `SalesListTable` (Receipt button and row action), doc comments in `Svg` and `PaymentMethods`.
+- **Deviation from the plan (no schema or stored-data change, so within the owner's rule; approved by the owner 2026-09-30):** the sale path stays byte-identical. The phase11 suite checks `SaleRequest`, `SaleService`, `SaleRepository`, `StockLock` and `Schema` by hash, so the UPI step lives in the new `UpiSale` instead of `SaleRequest`. As a result the form token is **not re-issued** at the QR step: the 30-minute form lifetime counts from when the product page was opened, not from when the QR appeared (plan D11 said re-issue). An expired form after a successful payment is refused with the "may already have paid" note; the seller opens the item again and confirms without asking for a second payment.
+- No schema change (`DB_VERSION` 4), no new capability, no new hook, no new rewrite rule (`RULES_VERSION` unchanged).
+- Docs: plugin `README.md` (Settings table, scan URLs and request flow, the new "Receipts and UPI payment QR" section, options row), `tests/README.md` (phase16 row), `LAUNCH.md` (A8d receipts, A8e thermal printer, A8f UPI).
+- Tests (not run): new `tests/phase16-receipts.php`, added to `run.php`; `phase4-rendering` default-settings expectation updated for the 9 new keys.
+
+**Known before release:** `phase13-release`'s ".pot is up to date" check fails until the .pot is regenerated (already true for the prefix). Suites to run first: phase4, phase6, phase7, phase9a, phase10b, phase11, phase12, phase13, phase14, phase15, phase16.
+
+**For the next manual rebuild:** user manual (Settings → Receipts and UPI payment QR; selling with UPI in two steps and "check the success screen"; receipts, paper sizes, sharing on WhatsApp; Common problems: the QR amount after a price change, the UPI QR not showing → currency or settings) and the seller guide ("Taking a UPI payment", "Giving a receipt"; new screenshots).
 
 ### Instructions for the next Claude session
 
@@ -1992,6 +2020,11 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
   - Every suite honours `PQBG_STOP_FILE` (`pqbg_test_stop_point()`; `pqbg_section()` is a safe point; nothing stops during "cleanup"). New suites must keep their body in `try`/`finally` with every section inside it, and call `pqbg_test_stop_point()` in long loops.
   - For test runs only, the error logger `C:\xampp\tools\pqbg\errors\pqbg-error-capture.php` may be copied to `wp-content/mu-plugins/` with `PQBG_ERROR_CAPTURE=C:\xampp\tools\pqbg\errors`; remove it (and the `mu-plugins` folder, which did not exist before) afterwards. Target: zero events from plugin code.
   - PHPCS: `C:\xampp\tools\pqbg\phpcs\` (see `tests/README.md`).
+- **Receipts and UPI rules** (Phase 16):
+  - Receipt URLs only through `ScanUrl::receipt_url()`; access only through `Receipt::can_see()`; the same 404 for every receipt the user may not see. Receipt content only from the sale row's snapshots via `Receipt::data()`, which drops `unit_cost` first: never cost, profit, stock, SKU, code, user IDs or the void reason on a receipt or in the WhatsApp text. Call it "Receipt", never "Tax invoice".
+  - The receipt page is the only scan page with a script: one element with the response's nonce (`ScanRoute::receipt_csp()`). Keep `csp()` and `security_headers()` unchanged; `templates/pqbg-scan.php` stays script-free.
+  - The UPI step lives in `UpiSale`, in front of `SaleRequest`; it never writes and sells only through `SaleRequest::handle()`. The UPI QR payload only from `UpiPayment::uri()`, rendered only by `QrRenderer::render_upi()`; never cached, stored or printed on labels.
+
 - **Theme compatibility rules** (Phase 12):
   - No theme-specific code: never name a theme or branch on the active theme (`get_template()`, `wp_is_block_theme()` …); the Phase 12 suite has a scope check.
   - The scan pages stay standalone (no theme, `wp_head()`, script); the plugin outputs nothing on store pages or emails (the suite checks the front-end hook list).
@@ -2273,3 +2306,9 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 - **Owner decision: no further test runs unless the owner asks.** The D10 upgrade check was not run.
 - Committed as "Release 1.0.1: user manual PDF, Plugin guide button, seller guide links", the release zip built from the commit into `C:\xampp\backups\sharayu\release\`, tagged `pqbg-v1.0.1` (annotated) and pushed (normal pushes), on the owner's instruction.
 - **Phase 15 (configurable code prefix), planning:** `HEAD` = `origin/main` = `aec593f`, clean; recorded `aec593f` for 1.0.1. Plan (P1–P6): `C:\xampp\backups\sharayu\prefix-plan.txt`, approved with the warning also on the print setup screen. Implemented (see the Phase 15 section); tests updated and added but not run; version kept at 1.0.1; no .pot, manual or zip rebuild; no tests, builds or backups run (owner's rule); not committed.
+- **Phase 15, commit:** committed as `d60f548` ("Phase 15: configurable code prefix (unreleased, pending 1.1.0)", 25 files added by name) and pushed to `origin/main` (normal push, no force), on the owner's approval; no tag, no version change, no tests or builds. `HEAD` = `origin/main` = `d60f548`, clean.
+- **Roadmap recorded (owner):** receipts + UPI payment QR, basket, discounts, later partial returns; first numbered 15–17, then renumbered by the owner (D1) to 16 receipts + UPI, 17 basket, 18 discounts. **Phase 16 planning:** `HEAD` = `origin/main` = `d60f548`, only `progress.md` modified. Plan D1–D21 written; the copy to `C:\xampp\backups\sharayu\` was blocked by a transient permission-check error on the first try and made on the owner's second request as `phase16-plan.txt`.
+
+### 2026-09-30
+
+- **Phase 16 (receipts + UPI payment QR), implementation:** D1–D21 approved (the Print script nonce-based). Implemented in the working tree (see the Phase 16 section), including the one deviation: the UPI step in the new `UpiSale` so the sale path stays byte-identical, hence no token re-issue at the QR step. New suite `phase16-receipts.php` and the phase4 default-settings expectation written, not run. Only `php -l` (8.5 and 8.2). No tests, builds or backups; version kept at 1.0.1; not committed.
