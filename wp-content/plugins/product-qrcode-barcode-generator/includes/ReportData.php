@@ -108,7 +108,7 @@ final class ReportData {
 		if ( $costs ) {
 			$cols['profit']          = self::col( __( 'Gross profit', 'product-qrcode-barcode-generator' ), 'money', true, true );
 			$cols['margin']          = self::col( __( 'Margin', 'product-qrcode-barcode-generator' ), 'pct', true, true );
-			$cols['unknown']         = self::col( __( 'Sales with unknown cost', 'product-qrcode-barcode-generator' ), 'int', true, true );
+			$cols['unknown']         = self::col( __( 'Lines with unknown cost', 'product-qrcode-barcode-generator' ), 'int', true, true );
 			$cols['unknown_revenue'] = self::col( __( 'Revenue with unknown cost', 'product-qrcode-barcode-generator' ), 'money', true, true );
 		}
 
@@ -217,7 +217,7 @@ final class ReportData {
 			'columns'       => $cols,
 			'rows'          => $rows,
 			'total'         => array_merge( array( 'name' => __( 'Total (completed)', 'product-qrcode-barcode-generator' ) ), self::metric_row( $all, $cols, $total ) ),
-			'notes'         => array( __( 'Names are the snapshot taken at the latest sale. "(deleted)": the product no longer exists.', 'product-qrcode-barcode-generator' ) ),
+			'notes'         => array( __( 'Names are the snapshot taken at the latest sale. "(deleted)": the product no longer exists.', 'product-qrcode-barcode-generator' ), self::basket_count_rule() ),
 			'default_sort'  => 'revenue',
 			'default_order' => 'desc',
 		);
@@ -304,7 +304,7 @@ final class ReportData {
 			);
 		}
 
-		$notes = array( __( 'Current categories of each product (a variation counts under its product). A category includes its sub-categories, each product counted once there. A product in several categories counts in each, so category totals can add up to more than the total.', 'product-qrcode-barcode-generator' ) );
+		$notes = array( __( 'Current categories of each product (a variation counts under its product). A category includes its sub-categories, each product counted once there. A product in several categories counts in each, so category totals can add up to more than the total.', 'product-qrcode-barcode-generator' ), self::basket_count_rule() );
 
 		if ( $data['multi'] > 0 ) {
 			/* translators: %s: number of products. */
@@ -815,6 +815,13 @@ final class ReportData {
 		}
 
 		return SaleService::VOID_REASON_UNDO === $sale['void_reason'] ? __( 'Yes (undo)', 'product-qrcode-barcode-generator' ) : __( 'Not recorded', 'product-qrcode-barcode-generator' );
+	}
+
+	/**
+	 * The on-screen statement of what "Sales" counts per item or category (Phase 17).
+	 */
+	public static function basket_count_rule(): string {
+		return __( 'Sales = the number of sales that include the item. A sale of several items (a basket) counts once in the totals but once for each item here, so these rows can add up to more than the total. Items and amounts always add up.', 'product-qrcode-barcode-generator' );
 	}
 
 	/**

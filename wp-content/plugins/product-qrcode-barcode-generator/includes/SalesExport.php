@@ -147,6 +147,9 @@ final class SalesExport {
 			$columns[] = $money( __( 'Profit', 'product-qrcode-barcode-generator' ) );
 		}
 
+		// Phase 17 (D26): appended last, so no existing column moves.
+		$columns[] = __( 'Receipt no.', 'product-qrcode-barcode-generator' );
+
 		return $columns;
 	}
 
@@ -219,6 +222,8 @@ final class SalesExport {
 			$cells[] = $known ? $amount( $cost ) : '';
 			$cells[] = $known && SaleRepository::STATUS_COMPLETED === $status ? $amount( (float) $row['line_total'] - $cost ) : '';
 		}
+
+		$cells[] = (string) ( empty( $row['basket_id'] ) ? (int) $row['id'] : (int) $row['basket_id'] );
 
 		return $cells;
 	}

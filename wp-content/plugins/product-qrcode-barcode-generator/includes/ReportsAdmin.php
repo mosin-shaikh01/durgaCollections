@@ -1109,13 +1109,13 @@ final class ReportsAdmin {
 	}
 
 	/**
-	 * "Profit and margin leave out 12 sales (₹14,300.00) with an unknown cost."
+	 * "Profit and margin leave out 12 lines (₹14,300.00) with an unknown cost." (Phase 17: lines, since a sale may have several.)
 	 *
 	 * @param array<string, mixed> $m Metrics.
 	 */
 	public static function unknown_text( array $m ): string {
-		/* translators: 1: number of sales, 2: their revenue. */
-		return sprintf( _n( 'Profit and margin leave out %1$s sale (%2$s) with an unknown cost.', 'Profit and margin leave out %1$s sales (%2$s) with an unknown cost.', $m['unknown'], 'product-qrcode-barcode-generator' ), number_format_i18n( $m['unknown'] ), SalePresenter::money( $m['unknown_revenue'] ) );
+		/* translators: 1: number of sale lines, 2: their revenue. */
+		return sprintf( _n( 'Profit and margin leave out %1$s line (%2$s) with an unknown cost.', 'Profit and margin leave out %1$s lines (%2$s) with an unknown cost.', $m['unknown'], 'product-qrcode-barcode-generator' ), number_format_i18n( $m['unknown'] ), SalePresenter::money( $m['unknown_revenue'] ) );
 	}
 
 	/**

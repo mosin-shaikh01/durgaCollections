@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
 final class Install {
 
 	/** Current schema version. Must equal the highest key in migrations(). */
-	const DB_VERSION = 4;
+	const DB_VERSION = 5;
 
 	const DB_VERSION_OPTION = 'pqbg_db_version';
 	const LOCK_OPTION       = 'pqbg_install_lock';
@@ -43,6 +43,7 @@ final class Install {
 			2 => array( __CLASS__, 'migrate_2' ),
 			3 => array( __CLASS__, 'migrate_3' ),
 			4 => array( __CLASS__, 'migrate_4' ),
+			5 => array( __CLASS__, 'migrate_5' ),
 		);
 	}
 
@@ -234,6 +235,28 @@ final class Install {
 		$columns = $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
 
 		if ( ! in_array( 'void_restock', $columns, true ) ) {
+			return new WP_Error( 'pqbg_schema_failed', __( 'Product QR Code and Barcode Generator could not update its database tables.', 'product-qrcode-barcode-generator' ) . ' ' . $wpdb->last_error );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Schema version 5 (Phase 17, basket): adds pqbg_sales.basket_id and the
+	 * basket_status index. Additive only (dbDelta): existing rows get NULL (a single
+	 * sale, i.e. a basket of one) and keep every stored value; re-running changes nothing.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function migrate_5() {
+		global $wpdb;
+
+		Schema::create_or_update();
+
+		$table   = Schema::sales_table();
+		$columns = $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
+
+		if ( ! in_array( 'basket_id', $columns, true ) ) {
 			return new WP_Error( 'pqbg_schema_failed', __( 'Product QR Code and Barcode Generator could not update its database tables.', 'product-qrcode-barcode-generator' ) . ' ' . $wpdb->last_error );
 		}
 

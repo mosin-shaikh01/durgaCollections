@@ -1069,7 +1069,7 @@ try {
 	$ra = $csv_rows( substr( $ca, 3 ) );
 	$rs = $csv_rows( substr( $cs, 3 ) );
 	pqbg_t( 'UTF-8 with a byte order mark', "\xEF\xBB\xBF" === substr( $ca, 0, 3 ) && "\xEF\xBB\xBF" === substr( $cs, 0, 3 ) );
-	pqbg_t( 'administrator: 20 columns ending with Unit cost (₹), Cost (₹), Profit (₹); shop manager: 17, no cost column', 20 === count( $ra[0] ) && array( 'Unit cost (₹)', 'Cost (₹)', 'Profit (₹)' ) === array_slice( $ra[0], -3 ) && 17 === count( $rs[0] ) && ! preg_grep( '/cost|profit/i', $rs[0] ) );
+	pqbg_t( 'administrator: 21 columns, Unit cost (₹), Cost (₹), Profit (₹) then Receipt no. (Phase 17, appended last); shop manager: 18, no cost column', 21 === count( $ra[0] ) && array( 'Unit cost (₹)', 'Cost (₹)', 'Profit (₹)', 'Receipt no.' ) === array_slice( $ra[0], -4 ) && 18 === count( $rs[0] ) && 'Receipt no.' === end( $rs[0] ) && ! preg_grep( '/cost|profit/i', $rs[0] ) );
 	pqbg_t( 'the date column is in the site timezone', 'Date (Asia/Kolkata)' === $ra[0][0] );
 	pqbg_t( 'exactly the filtered rows, in the view\'s order (7)', 8 === count( $ra ) && array_map( 'strval', $set( 'r7', 'r6', 'r5', 'r4', 'r3', 'r2', 'r1' ) ) === array_column( array_slice( $ra, 1 ), 1 ) );
 	$byid = array_column( array_slice( $ra, 1 ), null, 1 );
@@ -1099,7 +1099,7 @@ try {
 	pqbg_t( 'HTTP: the "Export CSV" link of the current view downloads it (nonce, GET)', 200 === $h['code'] && str_contains( $csv_url_a, 'action=pqbg_sales_csv' ) && str_contains( $csv_url_a, '_wpnonce=' ) && str_contains( $csv_url_a, 'from=2025-03-10' ) && "\xEF\xBB\xBF" === substr( $h['body'], 0, 3 ) && 8 === count( $csv_rows( substr( $h['body'], 3 ) ) ) );
 	pqbg_t( 'HTTP: headers — text/csv UTF-8, attachment with the range in the name, nosniff, no-store', 'text/csv; charset=utf-8' === ( $h['headers']['content-type'] ?? '' ) && 'attachment; filename="in-store-sales-2025-03-10-to-2025-03-12.csv"' === ( $h['headers']['content-disposition'] ?? '' ) && 'nosniff' === ( $h['headers']['x-content-type-options'] ?? '' ) && str_contains( $h['headers']['cache-control'] ?? '', 'no-store' ) );
 	$h = $http( 'sm', 'GET', $csv_url_s );
-	pqbg_t( 'HTTP: shop manager gets the same rows without the cost columns', 200 === $h['code'] && 17 === count( $csv_rows( substr( $h['body'], 3 ) )[0] ) && ! str_contains( $h['body'], '450.00' ) && ! str_contains( $h['body'], '777.77' ) );
+	pqbg_t( 'HTTP: shop manager gets the same rows without the cost columns', 200 === $h['code'] && 18 === count( $csv_rows( substr( $h['body'], 3 ) )[0] ) && ! str_contains( $h['body'], '450.00' ) && ! str_contains( $h['body'], '777.77' ) );
 	pqbg_t( 'HTTP: a bad or missing nonce → 403', 403 === $http( 'admin', 'GET', add_query_arg( '_wpnonce', 'abc', $csv_url_a ) )['code'] && 403 === $http( 'admin', 'GET', remove_query_arg( '_wpnonce', $csv_url_a ) )['code'] );
 	pqbg_t( 'HTTP: seller and customer → 403 (even with a manager\'s link)', 403 === $http( 'seller', 'GET', $csv_url_a )['code'] && 403 === $http( 'customer', 'GET', $csv_url_a )['code'] );
 	$h = $http( 'anon', 'GET', $csv_url_a );

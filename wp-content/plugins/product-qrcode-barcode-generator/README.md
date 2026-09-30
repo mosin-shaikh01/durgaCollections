@@ -235,11 +235,15 @@ Phase 11. QR & Barcodes → Settings → **Health check** (`admin.php?page=pqbg-
 | Negative stock | error | stock below zero on an item with an active code, or on the parent product holding a variation's stock | count the item, correct the stock on the product screen |
 | Sales without a stock snapshot | warning | completed sales with `stock_after` NULL (the Phase 7 crash window after the atomic statement) | nothing: stock and sale agree, only the snapshot is missing |
 | Interrupted sales | warning | sales still `pending` after 15 minutes (a request that died before changing stock) | nothing: the next sale of the same stock holder marks them failed ("interrupted") automatically |
+| Interrupted basket sales | warning | Phase 17: basket lines still `held` after 15 minutes (a request that died after lowering the stock, before the basket was recorded as a sale): the stock is lower without a sale | nothing: the next sale, undo or void of the same stock holder puts the stock back and marks them failed ("interrupted") automatically (`SaleService::recover_held()`) |
+| Partly voided basket sales | warning | Phase 17: baskets with both completed and voided lines (an undo or void stopped part-way) | open the sale and use **Void whole sale** (it voids only the lines still completed) |
+| Database supports basket sales | error | Phase 17: a database server that cannot hold several named locks at once (MySQL before 5.7.5, MariaDB before 10.0.2); baskets are then turned off, single sales still work | move to MySQL 5.7.5+ or MariaDB 10.0.2+ |
 | Codes on missing or unsuitable items | error | active codes whose item was deleted, is not a product or variation, is no longer a simple product, is a variation whose parent is missing or no longer variable, or is an auto-draft | check the product; labels with these codes will not sell |
 | One active code per item | error | an item with more than one active code, or a code row that breaks the `active_product_id` rule (should be impossible: a UNIQUE key and a CHECK constraint prevent it) | keep a backup and investigate before changing anything |
 | Cost prices | warning | stored cost meta that `CostPrice::set()` would never write: not a valid amount, a second row for the same item, or on something that is not a product | re-enter the cost on the product screen or with Import cost prices |
 | Codes on trashed items | information | codes kept active on trashed items (the Phase 5 rule) | nothing |
 | Sales of deleted items | information | sales whose product or variation no longer exists (allowed: sales keep snapshots) | nothing |
+| Open baskets | information | Phase 17: sellers with an open basket (user meta `pqbg_basket_at`), and how many are older than 2 hours (they read as empty and are replaced by the next basket) | nothing |
 
 - **Never a cost value:** the cost check reports only the item and the reason.
 - **Dashboard:** administrators see "The health check found N problems" in Needs attention, counting errors and warnings only (information is left out); shop managers never see it.
@@ -634,7 +638,9 @@ Phase 6. When staff scan a label's QR code with a phone camera, or type or scan 
 | `{home}/scan/` | The entry page: a "Scan or type a code" box. |
 | `{home}/scan/?code=…` | What the box submits (GET). Redirects to `/scan/{CODE}/`. |
 | `{home}/scan/my-sales/` | The seller's own sales (Phase 9A). |
-| `{home}/scan/receipt/{sale id}/` | A sale's receipt (Phase 16), with `?paper=80` or `?paper=58` for a layout other than the default. See [Receipts](#receipts-and-upi-payment-qr-phase-16). |
+| `{home}/scan/receipt/{sale id}/` | A sale's receipt (Phase 16), with `?paper=80` or `?paper=58` for a layout other than the default. See [Receipts](#receipts-and-upi-payment-qr-phase-16). Since Phase 17 a basket has one receipt under its basket number; a basket line's receipt address answers 303 there. |
+| `{home}/scan/basket/` | The seller's open basket (Phase 17): GET shows it (`?added={CODE}` or `?msg=updated\|removed\|cleared` after a change), POST changes or sells it. See [Basket](#basket-phase-17). |
+| `{home}/scan/basket/{basket id}/` | A sold basket (Phase 17): its lines, the receipt link and Undo. |
 
 - **Rewrite rules:** two, `^scan/?$` and `^scan/(.+?)/?$`, added at the top so they take precedence over pages and posts.
   - **Everything below `/scan/` belongs to the plugin.** `/scan/a/b/` shows "Not a valid product code", not a theme 404.
@@ -655,9 +661,12 @@ The plugin answers on `parse_request`. That is before the main query, WordPress'
 | Logged out (any method, since Phase 12) | **302** to `wp_login_url()`. `redirect_to` is the canonical scan URL, or `/scan/` when the path is not a well-formed code. The code's existence is never checked. A logged-out visitor never gets a page, so a page cache has nothing to store (see [Page caches](#page-caches-and-optimisation-plugins)). |
 | Method other than GET or HEAD, except POST on a code URL | **405** with `Allow: GET, HEAD` (entry page) or `Allow: GET, HEAD, POST` (code URL). |
 | Logged in without `pqbg_view_products` (customers, subscribers) | **403**: one fixed page with no box and no product data. No lookup runs, so the response is byte-identical for existing, retired, unknown and invalid codes, and for the entry page. |
+| POST to `/scan/{CODE}/` with "Add to basket" (Phase 17: `pqbg_action=basket_add`, or the button's `pqbg_basket=1`) | `BasketRequest::add_from_product()`: adds the chosen quantity to the seller's basket, **303** to `/scan/basket/?added={CODE}`. |
+| `/scan/basket/` (Phase 17; GET, HEAD, POST) | GET: the open basket (needs `pqbg_sell`, else **403**); any other query string **301** to the canonical address. POST: `BasketRequest::handle()` (the scan box, quantity, remove, clear, confirm, undo), never redirected before it runs; a POST with a query string **400**. |
+| `/scan/basket/{id}/` (Phase 17, GET and HEAD only) | **200** with the sold basket for its seller, shop managers and administrators; **303** to the entry page for anyone else or an unknown ID. |
 | POST to `/scan/{CODE}/` (Phase 7: sell or undo) | Handled by `UpiSale` (Phase 16: the UPI payment step, see [UPI payment QR](#upi-payment-qr)), which passes everything else to `SaleRequest` unchanged (see [Mark as Sold](#mark-as-sold)). A POST to a non-canonical URL gets **400**; POSTs are never redirected. |
 | `/scan/receipt/{id}/` (Phase 16, GET and HEAD only; other methods **405** `Allow: GET, HEAD`) | **200** with the receipt when `Receipt::can_see()`; one identical **404** "Receipt not found." for a malformed ID, a missing sale, a pending or failed sale, and another seller's sale. A non-canonical address (the default paper in the query, an unknown paper, any other query) gets **301**. Logged out: **302** to the login page, back to the receipt. |
-| `/scan/{CODE}/?sale={id}` (Phase 7 sale page) | **200** with the sale, or **303** (never 301, so it is not cached) to the code URL when the sale does not exist, belongs to another code, or is not the user's to see. |
+| `/scan/{CODE}/?sale={id}` (Phase 7 sale page) | Phase 17: a basket line answers **303** to its basket's page. Otherwise **200** with the sale, or **303** (never 301, so it is not cached) to the code URL when the sale does not exist, belongs to another code, or is not the user's to see. |
 | Path not canonical: lowercase code, spaces, missing trailing slash, any other query string, or raw `?pqbg_code=` | **301** to `{home}/scan/{CODE}/`. |
 | Entry box `?code=` | The input is trimmed, stripped of all whitespace and uppercased; a pasted URL gives the segment after `/scan/`. A well-formed code gets **302** to `/scan/{CODE}/`. Anything else gets **400** "Not a valid product code.", with the input (escaped) back in the box. |
 | Otherwise | The status → screen matrix below. |
@@ -1116,6 +1125,8 @@ Phase 9A: how each in-store sale was paid, what the item cost, and who sold it; 
 
 ### Void
 
+Phase 17: a line of a basket is never voided on its own. Its detail lists every line of the sale ("Part of sale no. X") and offers **Void whole sale**, which voids every still-completed line with one reason (with restock: under all the basket's locks, every line checked first, then one statement per line; without restock: one statement). Per-line returns are a later phase.
+
 From the sale detail, **Void sale** (for `pqbg_void_sale`) opens a confirmation page: a **required reason** (at most 500 characters) and **Return N to stock** (ticked by default). The POST (`admin-post.php?action=pqbg_void_sale`, nonce `pqbg_void_sale_{id}`) calls `SaleService::void_sale()` (the stock holder's lock and the atomic statement, as in Phase 7), then answers 303 to the detail with a message. Any age. A second void is refused ("already voided"); a busy lock, or stock tracking turned off since the sale (untick "Return to stock" then), is refused with an explanation and nothing changes. Voided rows stay in the history with who, when and why.
 
 ### CSV export
@@ -1123,7 +1134,7 @@ From the sale detail, **Void sale** (for `pqbg_void_sale`) opens a confirmation 
 **Export CSV** exports the **current filtered view** (same filters and order): `admin-post.php?action=pqbg_sales_csv&_wpnonce=…&{filters}`, GET, `pqbg_view_all_sales`, no side effects.
 
 - UTF-8 **with a byte order mark** (Excel shows ₹ correctly); `text/csv; charset=utf-8`, attachment `in-store-sales-{from}[-to-{to}].csv`, `nosniff`, `no-store`.
-- Columns: date (site timezone, `Y-m-d H:i:s`), sale #, status, product, attributes, SKU, code, quantity, unit price, total, currency, paid by, seller, voided at/by, void reason, failure; for `pqbg_view_costs` also unit cost, cost, profit. Amounts are plain decimals.
+- Columns: date (site timezone, `Y-m-d H:i:s`), sale #, status, product, attributes, SKU, code, quantity, unit price, total, currency, paid by, seller, voided at/by, void reason, failure; for `pqbg_view_costs` also unit cost, cost, profit; then (Phase 17) **receipt no.**, the sale as the customer sees it (a basket's number, or the sale # of a single sale), appended last so no earlier column moves. One row per line. Amounts are plain decimals.
 - **Formula injection:** a text cell starting with `=`, `+`, `-`, `@`, a tab, a carriage return or (Phase 11) a line feed, or whose first character after spaces (including no-break and ideographic spaces) is one of `= + - @` or their full-width forms (`＝ ＋ － ＠`), gets a leading apostrophe; plain numbers we generate (such as a negative profit `-60.00`) stay numbers. The same rule is used by every CSV (`SalesExport::put()`), and the cost-price importer removes exactly that apostrophe again (`SalesExport::formula_risk()`).
 - **Numbers:** amounts are plain decimals with a `.` and the store's decimals, no thousands separator (neither Western nor Indian grouping), no currency sign and never `-0.00`, so Excel reads them as numbers. The screens use WooCommerce's own price format.
 - **Streamed:** IDs are read by keyset paging (5,000 at a time, continuing after the last sort value and ID) and rows fetched 1,000 at a time by primary key, written and flushed; memory stays flat and a sale recorded during the export never shifts a page.
@@ -1134,7 +1145,8 @@ From the sale detail, **Void sale** (for `pqbg_void_sale`) opens a confirmation 
 
 - **Only the logged-in user's own sales:** the seller comes from the session, never from the request.
 - Tabs Today / Yesterday / Last 7 days; lines newest first (time, item, "qty × price = total", paid by, status; each links to its sale page), completed and voided (failed attempts changed no stock and are not listed); at most 300 lines, the summary always covers the whole range.
-- **Summary (completed sales):** per payment method (every method offered, even without sales) and a total, plus the number of voided sales.
+- **Summary (completed sales):** per payment method (every method offered, even without sales) and a total, plus the number of voided sales. Since Phase 17 "sales" are transactions: a basket counts once.
+- **Baskets (Phase 17):** one entry per basket ("Sale of 5 items", the total, paid by, status, one Receipt link, a link to the basket's page) with its lines listed under it.
 - Never shows cost or profit.
 - The route reuses the scan rewrite rule: `my-sales` is compared as the raw path segment, and even uppercased (`MY-SALES`) it has no 3 groups of 4, so it can never be a product code, whatever the prefix. `ScanUrl::my_sales_url()` builds the URL. No new rewrite rule.
 
@@ -1197,6 +1209,64 @@ Phase 16, not yet released (planned for 1.1.0 together with the code prefix; the
 - **Changes after the QR is shown:** a price change, too little stock, a sale online in the same instant, UPI disabled meanwhile or an expired form (30 minutes from opening the product page; the token is not re-issued at the QR step) are refused by the sale path as usual, and the screen adds "The customer may already have paid by UPI. Check their payment before you show a new QR, and refund or settle any difference yourself." If the UPI settings are cleared meanwhile, the confirm still records the sale as UPI.
 - **The plugin cannot see whether a payment arrived** (no gateway, no bank API): the seller's check of the success screen is the only confirmation. A business (merchant) UPI ID is recommended.
 
+## Basket (Phase 17)
+
+Phase 17, not yet released (planned for 1.1.0 with the code prefix and receipts; the version is still 1.0.1). Several different items sold as **one sale**, all or nothing. Plan: `C:\xampp\backups\sharayu\phase17-plan.txt` (D1–D30, approved 2026-09-30). Schema version 5; no new capability, hook, rewrite rule or setting. Single-item selling is unchanged.
+
+### Flow (no JavaScript)
+
+- **Product screen:** with the basket empty, the sale form has a second button, **Add to basket** (`formnovalidate`, so the payment choice is not needed). While a basket is open the form only adds (quantity + **Add to basket**), shows "Basket: N items · ₹X · View basket" and offers no "Confirm sale" or payment choice, so one item cannot be paid for separately by mistake. The scan page header links to the basket while it is open.
+- **Basket screen** (`/scan/basket/`): a **Scan to add** box (POST, autofocus): a hardware scanner (code + Enter), a typed code or a pasted scan URL adds 1, and the same item again adds 1 more; the phone camera opens the product screen as usual, where the quantity is chosen. Each line shows its current price and total, a quantity field with **Update** and **Remove**; "Price changed since added (was ₹X)" when it did; lines that cannot be sold now are marked in red with the reason and block Confirm until removed. Then the item count and total, **Paid by** and **Confirm sale – ₹X**, and **Clear basket** (with a Yes/No step). Every change answers 303, so a reload never repeats it.
+- **UPI:** the Phase 16 two steps for the basket total (the QR for the total, the reference from the basket's request ID, "Payment received – confirm sale"; the scan box is hidden meanwhile). The step 2 signature covers the user, the request ID, the basket revision and the amount.
+- **After the sale:** `/scan/basket/{id}/` with the lines, the total, **Receipt** and **Undo whole sale** (10 minutes, the same CSS countdown as a single sale).
+- At most **30 different items** per basket (`BasketStore::MAX_LINES`); quantities as for a single sale (up to the stock).
+
+### Open basket
+
+User meta `pqbg_basket` (revision, request ID, time of the last change, lines of code + quantity + price when added) and `pqbg_basket_at` (the time alone, for the Health check), one per seller (`BasketStore`). Nothing else is stored: names, prices and stock are read fresh. **Stock is not reserved.** Every change runs under a per-seller named lock and sets a new revision and request ID; quantity, remove, clear and confirm need the revision the seller saw ("The basket changed on another screen"), adding does not. The basket reads as empty **2 hours** after its last change (GET never writes; the next change overwrites it), and once its request ID has a completed sale. No cron; uninstall removes both keys; WordPress removes them with the user.
+
+### Confirm: all or nothing (`BasketService::confirm()`)
+
+1. Permission, the signed confirm token (request ID, revision, issue time, the lines and prices shown), the database check below, no open transaction.
+2. **Idempotency first:** a row with the request ID returns that basket's result, even for an expired form or a changed basket (a double tap never sells twice). While a line may still be running, the duplicate waits for all the basket's locks (the Phase 7 race fix, generalised); a pending or held line seen under them belongs to a process that died and is recovered first.
+3. Payment method; every line resolved (`SaleService::check_item()`).
+4. **The `StockLock` of every distinct stock holder, in ascending ID order** (single sales, undo and void take one lock, so there is no deadlock).
+5. Under the locks: stale pending and held rows of each holder recovered; fresh reads; every line checked (sellable, the price as shown, the quantities per holder within the stock read under the lock: two variations on their parent's stock are added together). **Any failure writes nothing** and names the line ("Line 2, Cotton kurti – M: Only 1 in stock.").
+6. The journal: the first line `pending` with the basket's request ID and `basket_id` = its own ID, then the other lines (`basket_id` = that ID, fresh request IDs); every line carries the same payment method, seller name and currency and its own cost snapshot.
+7. Each line `pending` → **`held`** in the statement that lowers its stock (`SaleService::change_stock()`, the Phase 7 single-statement guarantee per line), then a fresh stock read: negative means an online order won.
+8. **All held lines → `completed` in one statement** (`SaleRepository::complete_basket()`), so reports see all of the basket or none of it.
+9. Stock snapshots, locks released, the low-stock notification per holder after the locks.
+
+**Rollback (D13):** when a line fails at step 7 or 8, the failing line is compensated with its reason (`sold_online` or `error`), every other held line with `basket_rollback`, pending lines are marked failed. The failed rows stay in the journal (the audit rule since Phase 7); no sale is recorded; the seller sees "Nothing was sold. "Silk saree" just sold online. Stock was not changed." and the basket, unchanged, with a new request ID for another try. **Online orders still win.**
+
+**Crash recovery:** a `held` line (stock lowered, no sale) of a dead process is put back and marked failed (`interrupted`) by the next sale, basket, undo or void of its stock holder (`SaleService::recover_held()`, under the holder's lock); meanwhile the Health check lists it. Pending lines are recovered as before (`recover_stale()`).
+
+**Database requirement (D16):** several named locks at once need **MySQL 5.7.5+ or MariaDB 10.0.2+** (before that a second `GET_LOCK` silently released the first). `BasketService::db_supported()` checks `SELECT VERSION()` once per request; on an older server "Add to basket" is not offered, the basket is refused with an explanation and the Health check shows an error. Single sales are unaffected.
+
+### Undo and void
+
+- **Undo whole sale** (`BasketService::undo()`): the seller's own basket, within 10 minutes of the sale, once. Every line is checked under all the basket's locks (own, completed, in time, the holder still tracks stock) before anything changes; then each line is put back (stock and row in one statement each, `void_reason` `undo`, `void_restock` 1).
+- **Void whole sale** (`BasketService::void()`, `pqbg_void_sale`, from In-store sales): see [Void](#void).
+- The single-sale undo and void refuse a basket line (`pqbg_in_basket`).
+- Only a database error in the middle of a restock can leave a basket partly voided: the seller is told, the Health check lists it, and a manager's Void whole sale finishes it.
+
+### Receipt
+
+One receipt per basket, `/scan/receipt/{basket id}/` (a line's address answers 303 there): every line, the total, paid by, the UPI reference (the basket's request ID) and the seller. Its **receipt number is the basket number** (the first line's sale ID), the same sequence as single sales' receipt numbers. A fully voided basket is VOID as before; lines voided on their own (only after a partial failure) are marked "voided" and the total is what still stands, with the original total noted. The WhatsApp text lists the first lines that fit in 1,500 characters and then "…and N more items", always with the total. Never cost (Phase 16 rule).
+
+### Counting (D23–D26)
+
+- **Sales = transactions:** `COUNT(DISTINCT COALESCE(basket_id, id))`; a single sale (every row before schema v5) is its own transaction. **Items** = sum of quantities; **revenue, cost, profit, refunds, net** = sums over the lines, so every amount reconciles exactly as before. "Average sale" is revenue ÷ transactions (a true average basket value).
+- Per product and per category, "Sales" counts the sales that contain the item, so those rows can add up to more than the total (stated on those reports; the categories total counts each sale once). Items and amounts always add up.
+- "Unknown cost" is counted in **lines** (history totals, reports).
+- End of day and cash in drawer: sales and refund counts per transaction; amounts unchanged, so "Cash expected in drawer" = cash revenue − cash refunds as before. A basket voided later is refunded in full on the day of the void.
+- In-store sales keeps one row per line, with a **Receipt no.** column (a basket's number links to all its lines) and the CSV's last column.
+- The performance signal (more than 300 sales a day) still counts **rows**: it measures database load.
+
+### Classes
+
+`BasketStore` (the open basket), `BasketService` (confirm, outcome, undo, void, the ordered locks, the database check), `BasketRequest` (the POSTs, the confirm token, the UPI steps), views in `ScanScreen` (`basket()`, `basket_upi()`, `basket_sale()`), `templates/pqbg-scan.php` (with the UPI panel moved to `templates/pqbg-scan-upi.php`, shared). `SaleRequest`, `StockLock` and `UpiSale` are unchanged.
+
 ## In-store reports
 
 Phase 9B: **QR & Barcodes → In-store reports** (`admin.php?page=pqbg-reports`; under WooCommerce until Phase 10B), right after In-store sales, for `pqbg_view_all_sales` (Shop Manager, Administrator). Every view is a plain GET with its options in the URL (bookmarkable); nothing on these pages writes.
@@ -1204,7 +1274,7 @@ Phase 9B: **QR & Barcodes → In-store reports** (`admin.php?page=pqbg-reports`;
 ### Counting rules (stated on every screen)
 
 - **In-store (scan) sales only.** Online orders are in WooCommerce → Analytics.
-- A "sale" is one row of `pqbg_sales`: one scanned item with its quantity. Sales = rows, items = sum of quantities, revenue = sum of `line_total`, average sale = revenue ÷ sales.
+- A "sale" is one transaction (Phase 17): a single scanned item with its quantity, or a basket of several lines, which counts once (`COALESCE(basket_id, id)`). Items = sum of quantities, revenue = sum of `line_total`, average sale = revenue ÷ sales. Per product and per category, sales count the sales containing the item. See [Basket](#basket-phase-17).
 - **Revenue, items and sales count completed sales only.** Voided and failed sales are never in revenue; they appear in Voids & failed, End of day, the Summary alert and the sellers' void columns.
 - **Amounts are the sale's snapshots** (`line_total`, `unit_price`, `quantity`, `unit_cost`), never current prices (Stock and Dead stock excepted: they are about current stock).
 - **Profit** = `line_total − quantity × unit_cost`, only where the cost was known at the moment of sale. **Margin** = profit ÷ revenue *of the sales with a known cost*. Sales with an unknown cost are left out of cost, profit and margin (never counted as zero) and always disclosed ("N sales, ₹X with unknown cost").
@@ -1454,7 +1524,7 @@ See [Permalinks](#permalinks) under Scan page: any structure except Plain; Plain
 | WordPress | 6.7 | 7.1.2 |
 | PHP | 8.2 (raised from 8.1 in Phase 4) | 8.5.6 |
 | WooCommerce | 9.0 | 11.1.2 (HPOS on) |
-| Database | MariaDB 10.2+ / MySQL 5.7+ | MariaDB 10.4.32 |
+| Database | MariaDB 10.2+ / MySQL 5.7+ (basket sales: MySQL 5.7.5+, see [Basket](#basket-phase-17)) | MariaDB 10.4.32 |
 
 WooCommerce must be active. The `Requires Plugins: woocommerce` header makes WordPress enforce this at activation.
 If WooCommerce is later deactivated, or is older than the minimum, this plugin does nothing except show an admin notice to users who can manage plugins (no menu, no scan route, no product hooks); the scan URLs are then ordinary WordPress addresses. Every requirement branch is tested with given versions (`Requirements::errors_for()`), and WooCommerce 8.9 in a separate process (Phase 11).
@@ -1513,13 +1583,14 @@ Main columns:
 - `currency` char(3)
 - snapshots: `product_name`, `sku`, `attributes_json`
 - `stock_before`, `stock_after`
-- `source` (default `scan`), `status`: `pending`, `completed`, `voided` or `failed`
+- `source` (default `scan`), `status`: `pending`, `completed`, `voided`, `failed` or (Phase 17) `held` (a basket line whose stock was lowered while its basket is not final; never a sale)
 - void fields (`void_reason`, `voided_by`, `voided_at_gmt`), `note`, `created_at_gmt`
 - **schema v2 (Phase 7):** `stock_holder_id` (the product whose stock the sale changed: the parent when a variation uses parent-level stock; undo restores exactly this one) and `failure_code` (`sold_online`, `error`, `interrupted`)
 - **schema v3 (Phase 9A):** `payment_method` varchar(20) (`cash`, `upi`, `card`, `other`; NULL = not recorded), `unit_cost` decimal(26,8) (the effective cost price at the moment of sale; NULL = unknown), `seller_name` varchar(250) (the seller's display name at the moment of sale). All three are NULL on older rows and are written in the pending row.
+- **schema v5 (Phase 17):** `basket_id` bigint(20) unsigned: on every line of a basket, the basket's first line's ID (its own ID on that line); NULL for a single sale, which is every row recorded before v5. The transaction is `COALESCE(basket_id, id)`; `failure_code` gains `basket_rollback`.
 - **schema v4 (Phase 9B):** `void_restock` tinyint(1): whether a void returned the quantity to stock (1: a void with "Return to stock", or an undo; 0: a void without). NULL for sales that were never voided and for voids recorded before v4 (shown as "Not recorded", or "Yes (undo)" for an old undo).
 
-Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`, `status_created`, `created_at_gmt`, `order_id`, (v2) `holder_status (stock_holder_id,status)` and (v3) `method_created (payment_method,created_at_gmt)`. Schema v4 added no index (a covering index for the reports was measured and rejected; see [In-store reports](#in-store-reports)).
+Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`, `status_created`, `created_at_gmt`, `order_id`, (v2) `holder_status (stock_holder_id,status)` and (v3) `method_created (payment_method,created_at_gmt)`. Schema v4 added no index (a covering index for the reports was measured and rejected; see [In-store reports](#in-store-reports)). Schema v5 added `basket_status (basket_id,status)`.
 
 **Rules (Phase 7):**
 
@@ -1532,7 +1603,7 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 
 | Option | Autoload | Purpose |
 |---|---|---|
-| `pqbg_db_version` | yes | integer schema version (currently `4`) |
+| `pqbg_db_version` | yes | integer schema version (currently `5`) |
 | `pqbg_settings` | no | settings array (`settings_version`, `barcodes_enabled`, `scan_base_url`, `payment_methods`, `code_prefix` since Phase 15, the `receipt_*` keys, `upi_id` and `upi_payee_name` since Phase 16); read via `Plugin::settings()` / `Settings::get()` (defaults merged with `wp_parse_args`, unknown keys dropped). See [Settings](#settings). |
 | `pqbg_install_lock` | no | short-lived install/migration lock; exists only while an install is running |
 | `pqbg_rewrite_version` | yes | `{plugin version}:{rules version}` of the scan rules last flushed (Phase 6). Holds no data; removed on deactivation and uninstall. |
@@ -1544,6 +1615,8 @@ Indexes: `request_id` (unique), `code_id`, `product_variation`, `seller_created`
 | `pqbg_bulk_log` | no | Phase 10: the bulk tools' audit log, the last 200 entries (time, user, tool, counts; file name and SHA-256 for imports; never a cost). Removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`. |
 
 User meta `pqbg_print_prefs` (Phase 8) holds each user's last-used print options; it is removed only with `PQBG_UNINSTALL_DELETE_ALL_DATA`.
+
+User meta `pqbg_basket` and `pqbg_basket_at` (Phase 17) hold each seller's open basket (codes, quantities, the price when added, a revision and a request ID) and the time of its last change; runtime state, removed on every uninstall. See [Basket](#basket-phase-17).
 
 User meta `pqbg_cost_import` (Phase 10) holds a user's current cost-import preview (parsed rows, compressed, with a token; 1-hour expiry; it contains costs, so it exists only for users with `pqbg_view_costs`). Expired ones are deleted whenever the QR & Barcodes page loads, and all of them on every uninstall.
 
@@ -1572,6 +1645,7 @@ Migrations never drop tables or delete rows.
 | 2 | `migrate_2` (Phase 7): adds `pqbg_sales.stock_holder_id`, `pqbg_sales.failure_code` and the `holder_status` index. Additive (dbDelta): existing rows keep their values and get NULL; re-running changes nothing. |
 | 3 | `migrate_3` (Phase 9A): adds `pqbg_sales.payment_method`, `pqbg_sales.unit_cost`, `pqbg_sales.seller_name` and the `method_created` index. Additive (dbDelta): existing rows keep their values and get NULL ("Not recorded" / unknown cost); re-running changes nothing. `install()` then syncs roles, which grants the new `pqbg_view_costs` to administrators. |
 | 4 | `migrate_4` (Phase 9B): adds `pqbg_sales.void_restock`. Additive (dbDelta): existing rows get NULL ("not recorded"); re-running changes nothing. |
+| 5 | `migrate_5` (Phase 17): adds `pqbg_sales.basket_id` and the `basket_status` index. Additive (dbDelta): existing rows get NULL (a single sale, a basket of one) and keep every stored value; re-running changes nothing. |
 
 **The install lock** is an atomic `INSERT IGNORE` row in the options table. `add_option()` is not used because it runs `INSERT … ON DUPLICATE KEY UPDATE` and is therefore not atomic.
 The lock expires after 5 minutes, so a crashed request cannot block upgrades permanently.
@@ -1624,7 +1698,7 @@ Deactivation is non-destructive. Tables, codes, sales, settings, the role and ca
 
 ## Uninstall
 
-**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only runtime state: the transient install lock, the `pqbg_rewrite_version` flag, the render cache of QR/barcode images (Phase 8; the cache is not data), every user's cost-import preview (`pqbg_cost_import` user meta) and the code-generation run state (`pqbg_bulk_run`) (Phase 10; codes already created stay), the Dashboard timing samples (`pqbg_perf_samples`) and every user's one-time "code could not be assigned" notice (the `pqbg_save_failure_{user ID}` transients) (Phase 11). Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
+**By default, all data is preserved.** Deleting the plugin from the Plugins screen removes only runtime state: the transient install lock, the `pqbg_rewrite_version` flag, the render cache of QR/barcode images (Phase 8; the cache is not data), every user's cost-import preview (`pqbg_cost_import` user meta) and the code-generation run state (`pqbg_bulk_run`) (Phase 10; codes already created stay), the Dashboard timing samples (`pqbg_perf_samples`) and every user's one-time "code could not be assigned" notice (the `pqbg_save_failure_{user ID}` transients) (Phase 11), and every seller's open basket (`pqbg_basket` and `pqbg_basket_at` user meta, Phase 17; sold baskets are sales rows and stay). Tables, sales history, product codes, options, the Store Seller role and capabilities remain, and reinstalling picks them up again.
 
 To permanently delete all plugin data, add this to `wp-config.php` **before** deleting the plugin:
 

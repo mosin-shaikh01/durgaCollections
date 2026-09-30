@@ -10,6 +10,7 @@
  *   status      completed | voided | failed, '' = any
  *   statuses    optional list of statuses (My sales: completed and voided only)
  *   search      product name or SKU (substring), or an exact product code
+ *   sale_no     Phase 17: one sale's lines (its basket number, or a single sale's ID), 0 = any
  *
  * Date ranges are whole days in the SITE timezone (wp_timezone()), converted to
  * UTC for created_at_gmt:
@@ -17,6 +18,9 @@
  *   custom (from/to as Y-m-d, both inclusive)
  *
  * Totals count COMPLETED rows only; voided and failed rows are only counted.
+ * Phase 17 (D23): "count" is the number of sales (transactions: a basket counts once,
+ * COALESCE(basket_id, id)); items, amounts and "lines" (rows) are sums over the lines, so
+ * every amount still reconciles. count() stays a row count (it pages the list).
  * Cost and profit use the unit_cost snapshot; rows with an unknown cost (NULL)
  * are left out of cost and profit and reported separately, never as zero.
  *
@@ -60,6 +64,9 @@ final class SalesQuery {
 
 	/** IDs per keyset page of the CSV export (see each_chunk()). */
 	const ID_PAGE = 5000;
+
+	/** Phase 17: the transaction a row belongs to (its basket, or the row itself for a single sale). */
+	const TRANSACTION = 'COALESCE(s.basket_id, s.id)';
 
 	/**
 	 * A site-timezone date range as UTC bounds.
@@ -149,6 +156,7 @@ final class SalesQuery {
 		$seller = $get( 'seller' );
 		$sort   = $get( 'orderby' );
 		$paged  = $get( 'paged' );
+		$number = $get( 'sale_no' );
 
 		return array(
 			'range'   => $range,
@@ -158,6 +166,7 @@ final class SalesQuery {
 			'method'  => self::METHOD_NONE === $method || array_key_exists( $method, PaymentMethods::all() ) ? $method : '',
 			'status'  => in_array( $status, self::STATUSES, true ) ? $status : '',
 			'search'  => mb_substr( $get( 's' ), 0, 100 ),
+			'sale_no' => ctype_digit( $number ) && strlen( $number ) < 20 ? (int) $number : 0,
 			'orderby' => array_key_exists( $sort, self::SORTS ) ? $sort : 'date',
 			'order'   => 'asc' === strtolower( $get( 'order' ) ) ? 'asc' : 'desc',
 			'paged'   => ctype_digit( $paged ) && (int) $paged > 0 && strlen( $paged ) < 7 ? (int) $paged : 1,
@@ -178,7 +187,7 @@ final class SalesQuery {
 			$args['to']   = $f['range']['to'];
 		}
 
-		foreach ( array( 'seller', 'method', 'status', 'search' ) as $key ) {
+		foreach ( array( 'seller', 'method', 'status', 'search', 'sale_no' ) as $key ) {
 			if ( ! empty( $f[ $key ] ) ) {
 				$args[ 'search' === $key ? 's' : $key ] = (string) $f[ $key ];
 			}
@@ -266,7 +275,7 @@ final class SalesQuery {
 		// totals, the others only their counts (measured faster than two queries on 50,000 rows).
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- fixed identifier; where() is prepared.
 		$rows = (array) $wpdb->get_results(
-			"SELECT s.status AS status, s.payment_method AS method, COUNT(*) AS count, SUM(s.quantity) AS items, SUM(s.line_total) AS revenue,
+			'SELECT s.status AS status, s.payment_method AS method, COUNT(DISTINCT ' . self::TRANSACTION . ") AS count, COUNT(*) AS line_count, SUM(s.quantity) AS items, SUM(s.line_total) AS revenue,
 				SUM(CASE WHEN s.unit_cost IS NOT NULL THEN s.quantity * s.unit_cost END) AS cost,
 				SUM(CASE WHEN s.unit_cost IS NOT NULL THEN s.line_total END) AS known_revenue,
 				SUM(s.unit_cost IS NOT NULL) AS known,
@@ -286,7 +295,7 @@ final class SalesQuery {
 			$total                              = self::total( $row );
 			$methods[ (string) $row['method'] ] = $total;
 
-			foreach ( array( 'count', 'items', 'known', 'unknown' ) as $key ) {
+			foreach ( array( 'count', 'lines', 'items', 'known', 'unknown' ) as $key ) {
 				$all[ $key ] += $total[ $key ];
 			}
 
@@ -411,6 +420,10 @@ final class SalesQuery {
 			$parts[] = $wpdb->prepare( 's.status = %s', $f['status'] );
 		}
 
+		if ( ! empty( $f['sale_no'] ) ) {
+			$parts[] = $wpdb->prepare( '(s.basket_id = %d OR s.id = %d)', $f['sale_no'], $f['sale_no'] );
+		}
+
 		if ( ! empty( $f['statuses'] ) ) {
 			$parts[] = 's.status IN (' . implode( ',', array_map( static fn( $s ) => $wpdb->prepare( '%s', $s ), (array) $f['statuses'] ) ) . ')';
 		}
@@ -445,12 +458,13 @@ final class SalesQuery {
 
 		return array(
 			'count'           => (int) $row['count'],
+			'lines'           => (int) $row['line_count'],
 			'items'           => (int) $row['items'],
 			'revenue'         => self::money( (string) $row['revenue'] ),
 			'cost'            => $cost,
 			'profit'          => self::money( (string) ( (float) $known_revenue - (float) $cost ) ),
 			'known'           => (int) $row['known'],
-			'unknown'         => (int) $row['count'] - (int) $row['known'],
+			'unknown'         => (int) $row['line_count'] - (int) $row['known'],
 			'unknown_revenue' => null === $row['unknown_revenue'] ? '0' : self::money( $row['unknown_revenue'] ),
 		);
 	}
@@ -463,6 +477,7 @@ final class SalesQuery {
 	private static function zero(): array {
 		return array(
 			'count'           => 0,
+			'lines'           => 0,
 			'items'           => 0,
 			'revenue'         => '0',
 			'cost'            => '0',

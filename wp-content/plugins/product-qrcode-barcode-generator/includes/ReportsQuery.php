@@ -4,8 +4,13 @@
  * dashboard (Phase 9B).
  *
  * Counting rules (the same as SalesQuery::totals(), shown on every report):
- *   - a sale is one row (one scanned item with a quantity); revenue, items and
- *     sales count status = completed only; voided and failed rows are only counted;
+ *   - a sale is one transaction (Phase 17, D23): a basket of several lines counts once
+ *     (COALESCE(basket_id, id)), a single sale is its own transaction; revenue, items and
+ *     sales count status = completed only; voided and failed sales are only counted;
+ *   - items, amounts, cost and "lines" are sums over the lines (rows), so every amount
+ *     reconciles whatever the count means; "unknown" counts LINES with an unknown cost;
+ *   - per product and per category, "sales" counts the sales that contain the product,
+ *     so those rows do not add up to the number of sales (a basket counts in each);
  *   - amounts are the sale's snapshots (line_total, quantity, unit_cost);
  *   - profit = line_total − quantity × unit_cost where unit_cost is known; rows
  *     with an unknown cost are left out of cost, profit and margin and reported
@@ -42,12 +47,12 @@ final class ReportsQuery {
 	const EPOCH = "TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', s.created_at_gmt)";
 
 	/** Aggregates of a group of rows. */
-	const AGG = 'COUNT(*) AS count, SUM(s.quantity) AS items, SUM(s.line_total) AS revenue,
+	const AGG = 'COUNT(DISTINCT COALESCE(s.basket_id, s.id)) AS count, COUNT(*) AS lines, SUM(s.quantity) AS items, SUM(s.line_total) AS revenue,
 		SUM(CASE WHEN s.unit_cost IS NOT NULL THEN s.quantity * s.unit_cost END) AS cost,
 		SUM(CASE WHEN s.unit_cost IS NOT NULL THEN s.line_total END) AS known_revenue,
 		SUM(s.unit_cost IS NOT NULL) AS known,
 		SUM(CASE WHEN s.unit_cost IS NULL THEN s.line_total END) AS unknown_revenue,
-		SUM(s.void_reason = \'undo\') AS undone';
+		COUNT(DISTINCT CASE WHEN s.void_reason = \'undo\' THEN COALESCE(s.basket_id, s.id) END) AS undone';
 
 	/** Dimensions a grouped query may use: name => SQL expression. */
 	const DIMS = array(
@@ -101,6 +106,7 @@ final class ReportsQuery {
 	 */
 	public static function metrics( ?array $row, bool $costs ): array {
 		$count   = (int) ( $row['count'] ?? 0 );
+		$lines   = (int) ( $row['lines'] ?? $count );
 		$revenue = self::money( (string) ( $row['revenue'] ?? '0' ) );
 		$known   = (int) ( $row['known'] ?? 0 );
 		$out     = array(
@@ -108,7 +114,7 @@ final class ReportsQuery {
 			'items'           => (int) ( $row['items'] ?? 0 ),
 			'revenue'         => $revenue,
 			'average'         => $count > 0 ? self::money( (string) ( (float) $revenue / $count ) ) : null,
-			'unknown'         => $count - $known,
+			'unknown'         => $lines - $known,
 			'unknown_revenue' => self::money( (string) ( $row['unknown_revenue'] ?? '0' ) ),
 			'undone'          => (int) ( $row['undone'] ?? 0 ),
 		);
@@ -137,6 +143,7 @@ final class ReportsQuery {
 	public static function add( array $rows ): array {
 		$sum = array(
 			'count'           => 0,
+			'lines'           => 0,
 			'items'           => 0,
 			'known'           => 0,
 			'undone'          => 0,
@@ -154,8 +161,8 @@ final class ReportsQuery {
 		);
 
 		foreach ( $rows as $row ) {
-			foreach ( array( 'count', 'items', 'known', 'undone' ) as $key ) {
-				$sum[ $key ] += (int) ( $row[ $key ] ?? 0 );
+			foreach ( array( 'count', 'lines', 'items', 'known', 'undone' ) as $key ) {
+				$sum[ $key ] += (int) ( $row[ $key ] ?? ( 'lines' === $key ? ( $row['count'] ?? 0 ) : 0 ) );
 			}
 
 			foreach ( $amounts as $key => $value ) {
@@ -410,9 +417,12 @@ final class ReportsQuery {
 			);
 		}
 
+		// Phase 17: the total counts each sale once, even a basket of products in several categories.
+		$all = self::grouped( $f, array(), array(), true );
+
 		return array(
 			'rows'  => $rows,
-			'total' => self::metrics( self::add( $raw ), $costs ),
+			'total' => self::metrics( $all[0] ?? null, $costs ),
 			'multi' => $multi,
 		);
 	}
@@ -523,7 +533,8 @@ final class ReportsQuery {
 			$out['sellers'][ $id ]['revenue'][ $m ]      = self::money( (string) ( (float) $out['sellers'][ $id ]['revenue'][ $m ] + (float) $row['revenue'] ) );
 		}
 
-		// Earlier sales voided during the period (the refunds).
+		// Earlier sales voided during the period (the refunds). Phase 17: amounts per line, counts per sale.
+		$counted = array();
 		$earlier = (array) $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$sales} s WHERE s.status = %s AND s.voided_at_gmt >= %s AND s.voided_at_gmt < %s AND s.created_at_gmt < %s ORDER BY s.voided_at_gmt, s.id", SaleRepository::STATUS_VOIDED, $f['start'], $f['end'], $f['start'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
 
 		foreach ( $earlier as $row ) {
@@ -532,8 +543,11 @@ final class ReportsQuery {
 			$by    = (int) $row['voided_by'];
 			$total = (string) $row['line_total'];
 			$seller( $id );
+			$number                                = empty( $row['basket_id'] ) ? (int) $row['id'] : (int) $row['basket_id'];
+			$first                                 = ! isset( $counted[ $number ] );
+			$counted[ $number ]                    = true;
 			$out['methods'][ $m ]['refunds']       = self::money( (string) ( (float) $out['methods'][ $m ]['refunds'] + (float) $total ) );
-			$out['methods'][ $m ]['refund_count'] += 1;
+			$out['methods'][ $m ]['refund_count'] += $first ? 1 : 0;
 			$out['sellers'][ $id ]['refunds'][ $m ] = self::money( (string) ( (float) $out['sellers'][ $id ]['refunds'][ $m ] + (float) $total ) );
 
 			if ( ! isset( $out['refunds_by'][ $by ] ) ) {
@@ -544,7 +558,7 @@ final class ReportsQuery {
 				);
 			}
 
-			$out['refunds_by'][ $by ]['count']++;
+			$out['refunds_by'][ $by ]['count'] += $first ? 1 : 0;
 			$out['refunds_by'][ $by ]['methods'][ $m ] = self::money( (string) ( (float) $out['refunds_by'][ $by ]['methods'][ $m ] + (float) $total ) );
 		}
 
@@ -590,9 +604,11 @@ final class ReportsQuery {
 		$rows  = (array) $wpdb->get_results( 'SELECT s.* FROM ' . $sales . ' s WHERE ' . SalesQuery::where( $f ) . $wpdb->prepare( ' AND s.status IN (%s, %s)', SaleRepository::STATUS_VOIDED, SaleRepository::STATUS_FAILED ) . ' ORDER BY s.created_at_gmt DESC, s.id DESC', ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed identifier; where() is prepared.
 		$per   = array();
 		$fails = array();
+		$seen  = array(); // Phase 17: a basket counts once per seller and status.
 
 		foreach ( $rows as $row ) {
-			$id = (int) $row['seller_id'];
+			$id     = (int) $row['seller_id'];
+			$number = empty( $row['basket_id'] ) ? (int) $row['id'] : (int) $row['basket_id'];
 
 			if ( ! isset( $per[ $id ] ) ) {
 				$per[ $id ] = array(
@@ -604,12 +620,20 @@ final class ReportsQuery {
 				);
 			}
 
+			$key = $row['status'] . ':' . $number;
+
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+
+			$seen[ $key ] = true;
+
 			if ( SaleRepository::STATUS_VOIDED === $row['status'] ) {
 				$per[ $id ]['voided']++;
 				$per[ $id ]['undone'] += SaleService::VOID_REASON_UNDO === $row['void_reason'] ? 1 : 0;
 			} else {
 				$per[ $id ]['failed']++;
-				$code           = (string) $row['failure_code'];
+				$code           = self::failure_of( $rows, $row, $number );
 				$fails[ $code ] = ( $fails[ $code ] ?? 0 ) + 1;
 			}
 		}
@@ -619,6 +643,28 @@ final class ReportsQuery {
 			'sellers'  => array_values( $per ),
 			'failures' => $fails,
 		);
+	}
+
+	/**
+	 * A failed sale's failure code: for a basket, the code of the line that failed (the
+	 * other lines say basket_rollback).
+	 *
+	 * @param array<int, array<string, mixed>> $rows   The listed rows.
+	 * @param array<string, mixed>             $row    One of them.
+	 * @param int                              $number Its sale number.
+	 */
+	private static function failure_of( array $rows, array $row, int $number ): string {
+		if ( empty( $row['basket_id'] ) ) {
+			return (string) $row['failure_code'];
+		}
+
+		foreach ( $rows as $other ) {
+			if ( (int) $other['basket_id'] === $number && SaleRepository::STATUS_FAILED === $other['status'] && SaleRepository::FAILURE_BASKET !== $other['failure_code'] ) {
+				return (string) $other['failure_code'];
+			}
+		}
+
+		return (string) $row['failure_code'];
 	}
 
 	/**

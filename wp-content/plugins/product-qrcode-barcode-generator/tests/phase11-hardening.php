@@ -423,9 +423,9 @@ try {
 	$base = HealthCheck::run();
 	$bc   = $counts( $base );
 	// Phase 12 (false by design): the permalinks check (error) after schema.
-	pqbg_t( 'health check: all ten checks run, with the documented severities (Phase 12: permalinks)', array( 'schema', 'permalinks', 'negative_stock', 'stock_after_null', 'stale_pending', 'code_items', 'active_codes', 'cost_meta', 'code_items_trash', 'sales_no_item' ) === array_keys( $base ) && 'error' === $base['negative_stock']['severity'] && 'warning' === $base['stock_after_null']['severity'] && 'warning' === $base['stale_pending']['severity'] && 'error' === $base['code_items']['severity'] && 'error' === $base['active_codes']['severity'] && 'warning' === $base['cost_meta']['severity'] && 'info' === $base['code_items_trash']['severity'] && 'info' === $base['sales_no_item']['severity'] && 'error' === $base['schema']['severity'] && 'error' === $base['permalinks']['severity'] && 0 === $base['permalinks']['count'] );
+	pqbg_t( 'health check: all fourteen checks run, with the documented severities (Phase 12: permalinks; Phase 17: stale_held, partly_voided, basket_db, open_baskets)', array( 'schema', 'permalinks', 'negative_stock', 'stock_after_null', 'stale_pending', 'stale_held', 'partly_voided', 'basket_db', 'code_items', 'active_codes', 'cost_meta', 'code_items_trash', 'sales_no_item', 'open_baskets' ) === array_keys( $base ) && 'warning' === $base['stale_held']['severity'] && 'warning' === $base['partly_voided']['severity'] && 'error' === $base['basket_db']['severity'] && 'info' === $base['open_baskets']['severity'] && 'error' === $base['negative_stock']['severity'] && 'warning' === $base['stock_after_null']['severity'] && 'warning' === $base['stale_pending']['severity'] && 'error' === $base['code_items']['severity'] && 'error' === $base['active_codes']['severity'] && 'warning' === $base['cost_meta']['severity'] && 'info' === $base['code_items_trash']['severity'] && 'info' === $base['sales_no_item']['severity'] && 'error' === $base['schema']['severity'] && 'error' === $base['permalinks']['severity'] && 0 === $base['permalinks']['count'] );
 	pqbg_t( 'health check: the clean control finds nothing among this suite\'s fixtures', array() === $rows_of( $base, 'negative_stock', 'item', $P1 ) && array() === $rows_of( $base, 'code_items', 'item', $P2 ) && 0 === $bc['schema'] && 0 === $bc['active_codes'], wp_json_encode( $bc ) );
-	pqbg_t( 'health check: the Dashboard set leaves the information checks out', array( 'schema', 'permalinks', 'negative_stock', 'stock_after_null', 'stale_pending', 'code_items', 'active_codes', 'cost_meta' ) === array_keys( HealthCheck::run( false ) ) );
+	pqbg_t( 'health check: the Dashboard set leaves the information checks out', array( 'schema', 'permalinks', 'negative_stock', 'stock_after_null', 'stale_pending', 'stale_held', 'partly_voided', 'basket_db', 'code_items', 'active_codes', 'cost_meta' ) === array_keys( HealthCheck::run( false ) ) );
 
 	// ------------------------------------------------------------------ plants
 	pqbg_section( 'health check: planted problems (D3)' );
@@ -1106,15 +1106,17 @@ try {
 
 	// ------------------------------------------------------------------ scope
 	pqbg_section( 'scope: the sale path, the schema and the new classes' );
+	// Phase 17 (basket, schema v5) changed SaleService, SaleRepository and Schema; SaleRequest and StockLock
+	// are still the Phase 10B files. Update these only with a reviewed change to the sale path.
 	$hashes = array(
-		'SaleService.php'    => 'ddc815561468a2915e04bd414b2f4e15',
-		'SaleRepository.php' => '650d8f6c62fa198a08c4bf1962cb5160',
+		'SaleService.php'    => '3c96dae12f3b30c7c45975b18a9c8954',
+		'SaleRepository.php' => 'c8e3b7750d3021c7b60ca6d4942ea136',
 		'SaleRequest.php'    => 'd8915b0196661e08a9bc3af2b26ee535',
 		'StockLock.php'      => '519d24355bf2a42982b5806a456d37cb',
-		'Schema.php'         => '25a2deb97f206246460b2da78e39559c',
+		'Schema.php'         => 'b8d5a0e4083d8cb528d9c12d6c4768d1',
 	);
 	$changed_files = array_keys( array_filter( $hashes, static fn( $h, $f ) => $lf_md5( PQBG_PLUGIN_DIR . 'includes/' . $f ) !== $h, ARRAY_FILTER_USE_BOTH ) );
-	pqbg_t( 'the sale path (SaleService, SaleRepository, SaleRequest, StockLock) and Schema are byte-identical to Phase 10B; DB_VERSION is still 4', array() === $changed_files && 4 === Install::DB_VERSION, implode( ', ', $changed_files ) );
+	pqbg_t( 'the sale path (SaleService, SaleRepository, SaleRequest, StockLock) and Schema are byte-identical to Phase 17; DB_VERSION is 5', array() === $changed_files && 5 === Install::DB_VERSION, implode( ', ', $changed_files ) );
 	$src = array();
 	foreach ( array( 'HealthCheck.php', 'HealthCheckAdmin.php', 'PerfSignal.php' ) as $f ) {
 		// The code only: comments may name other classes (e.g. where a check's rule comes from).

@@ -55,6 +55,13 @@ final class Schema {
 	 * Schema version 4 (Phase 9B) added void_restock: whether a void returned the
 	 * quantity to stock (1) or not (0); NULL for voids recorded before version 4 and
 	 * for rows that were never voided.
+	 *
+	 * Schema version 5 (Phase 17, basket) added basket_id and the basket_status index:
+	 * every line of a basket (several items sold together) carries the ID of the
+	 * basket's first line (its own ID on that line); NULL for a single sale, which is
+	 * every row recorded before version 5. The transaction (one sale as the customer
+	 * sees it) is COALESCE(basket_id, id). Status "held" (no schema change): a basket
+	 * line whose stock was lowered while its basket is not yet final (BasketService).
 	 */
 	public static function sales_table(): string {
 		global $wpdb;
@@ -133,6 +140,7 @@ payment_method varchar(20) NULL DEFAULT NULL,
 unit_cost decimal(26,8) NULL DEFAULT NULL,
 seller_name varchar(250) NULL DEFAULT NULL,
 void_restock tinyint(1) NULL DEFAULT NULL,
+basket_id bigint(20) unsigned NULL DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY request_id (request_id),
 KEY code_id (code_id),
@@ -142,7 +150,8 @@ KEY status_created (status,created_at_gmt),
 KEY created_at_gmt (created_at_gmt),
 KEY order_id (order_id),
 KEY holder_status (stock_holder_id,status),
-KEY method_created (payment_method,created_at_gmt)
+KEY method_created (payment_method,created_at_gmt),
+KEY basket_status (basket_id,status)
 ) {$collate};",
 		);
 	}

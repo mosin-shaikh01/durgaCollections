@@ -16,6 +16,12 @@
  *                                                      400 unless the URL is canonical
  *   /scan/{CODE}/?sale={id} (sale result page)       → SaleRequest::sale_page(), or 303 to the code URL
  *                                                      when the sale is not the user's to see
+ *   /scan/basket/ (Phase 17)                          → the seller's open basket (GET; 301 to the canonical
+ *                                                      URL, ?added= or ?msg= after a change), POST →
+ *                                                      BasketRequest::handle(); 403 without pqbg_sell
+ *   /scan/basket/{id}/ (Phase 17, GET/HEAD only)      → a sold basket when the user may see it, else 303 to
+ *                                                      the entry page
+ *   POST to /scan/{CODE}/ with "Add to basket"       → BasketRequest::add_from_product() (Phase 17)
  *   /scan/my-sales/ (Phase 9A, GET/HEAD only)         → the seller's own sales, or 403 without
  *                                                      pqbg_view_own_sales; 301 to the canonical URL
  *   non-canonical path or query string               → 301 to the canonical URL
@@ -193,8 +199,9 @@ final class ScanRoute {
 	public static function decide( string $method, string $request_uri, ?string $code, ?string $box, array $post = array() ): array {
 		$is_mine    = ScanUrl::MY_SALES === $code;
 		$is_receipt = ScanUrl::is_receipt_segment( $code );
-		$is_post    = 'POST' === $method && null !== $code && ! $is_mine && ! $is_receipt;
-		$candidate  = null === $code || $is_receipt ? '' : ScanUrl::extract_code( rawurldecode( $code ) );
+		$is_basket  = ScanUrl::is_basket_segment( $code );
+		$is_post    = 'POST' === $method && null !== $code && ! $is_mine && ! $is_receipt && ( ! $is_basket || ScanUrl::BASKET === $code );
+		$candidate  = null === $code || $is_receipt || $is_basket ? '' : ScanUrl::extract_code( rawurldecode( $code ) );
 		$valid      = '' !== $candidate && CodeGenerator::is_valid_format( $candidate );
 
 		if ( ! is_user_logged_in() ) {
@@ -205,6 +212,9 @@ final class ScanRoute {
 			} elseif ( $is_receipt ) {
 				$receipt = ScanUrl::receipt_id( (string) $code );
 				$back    = $receipt > 0 ? ScanUrl::receipt_url( $receipt ) : ScanUrl::site_url();
+			} elseif ( $is_basket ) {
+				$basket = ScanUrl::basket_id( (string) $code );
+				$back   = 0 === $basket ? ScanUrl::basket_url() : ( $basket > 0 ? ScanUrl::basket_sale_url( $basket ) : ScanUrl::site_url() );
 			} else {
 				$back = ScanUrl::site_url( $valid ? $candidate : '' );
 			}
@@ -219,7 +229,7 @@ final class ScanRoute {
 			return array(
 				'status'  => 405,
 				'view'    => ScanScreen::method_not_allowed(),
-				'headers' => array( 'Allow' => null === $code || $is_mine || $is_receipt ? 'GET, HEAD' : 'GET, HEAD, POST' ),
+				'headers' => array( 'Allow' => null === $code || $is_mine || $is_receipt || ( $is_basket && ScanUrl::BASKET !== $code ) ? 'GET, HEAD' : 'GET, HEAD, POST' ),
 			);
 		}
 
@@ -239,6 +249,10 @@ final class ScanRoute {
 
 		if ( $is_receipt ) {
 			return self::receipt( (string) $code, $path, $query );
+		}
+
+		if ( $is_basket ) {
+			return self::basket( (string) $code, $is_post, $path, $query, $post );
 		}
 
 		if ( null === $code ) {
@@ -292,12 +306,27 @@ final class ScanRoute {
 				);
 			}
 
+			// Phase 17: "Add to basket" on the sale form.
+			if ( BasketRequest::is_add( $post ) ) {
+				return BasketRequest::add_from_product( $candidate, $post );
+			}
+
 			return UpiSale::handle( $candidate, $post );
 		}
 
 		$sale_id = $is_path ? self::sale_query( $query ) : 0;
 
 		if ( $sale_id > 0 ) {
+			$row = SaleRepository::find( $sale_id );
+
+			// Phase 17: a basket line's page is its basket's page.
+			if ( null !== $row && ! empty( $row['basket_id'] ) ) {
+				return array(
+					'status'   => 303,
+					'location' => ScanUrl::basket_sale_url( (int) $row['basket_id'] ),
+				);
+			}
+
 			$view = SaleRequest::sale_page( $candidate, $sale_id );
 
 			// 303, never 301: whether the page may be seen depends on the user, so it must not be cached.
@@ -405,9 +434,130 @@ final class ScanRoute {
 			);
 		}
 
+		// Phase 17 (D21): one receipt per basket, under the basket's number (303: only for users who may see it).
+		if ( BasketService::number( $sale ) !== $id ) {
+			return array(
+				'status'   => 303,
+				'location' => ScanUrl::receipt_url( BasketService::number( $sale ), $paper ),
+			);
+		}
+
 		return array(
 			'status' => 200,
 			'view'   => ScanScreen::receipt( $sale, $paper ),
+		);
+	}
+
+	/**
+	 * The basket pages (Phase 17). /scan/basket/: the open basket (GET) or its changes
+	 * (POST); the canonical GET address has no query string, or exactly one of
+	 * added={CODE} and msg={updated|removed|cleared} after a change. /scan/basket/{id}/:
+	 * a sold basket, for its seller and managers; anyone else gets a 303 to the entry page.
+	 *
+	 * @param string               $segment Raw code segment ("basket" or "basket/{id}").
+	 * @param bool                 $is_post Whether this is a POST (only to "basket").
+	 * @param string               $path    Request path.
+	 * @param string               $query   Query string.
+	 * @param array<string, mixed> $post    Unslashed POST fields.
+	 * @return array{status: int, location?: string, view?: array<string, mixed>, headers?: array<string, string>}
+	 */
+	private static function basket( string $segment, bool $is_post, string $path, string $query, array $post ): array {
+		$id = ScanUrl::basket_id( $segment );
+
+		if ( $id < 0 ) {
+			return array(
+				'status' => 404,
+				'view'   => ScanScreen::with_error( ScanScreen::entry(), 404, __( 'Sale not found.', 'product-qrcode-barcode-generator' ) ),
+			);
+		}
+
+		if ( $id > 0 ) {
+			$canonical = ScanUrl::basket_sale_url( $id );
+
+			if ( (string) wp_parse_url( $canonical, PHP_URL_PATH ) !== $path || '' !== $query ) {
+				return array(
+					'status'   => 301,
+					'location' => $canonical,
+				);
+			}
+
+			$lines = BasketService::lines( $id );
+
+			// 303, never 301: whether the page may be seen depends on the user.
+			if ( array() === $lines || ! Permissions::can_view_sale( (int) $lines[0]['seller_id'] ) ) {
+				return array(
+					'status'   => 303,
+					'location' => ScanUrl::site_url(),
+				);
+			}
+
+			return array(
+				'status' => 200,
+				'view'   => ScanScreen::basket_sale( $lines ),
+			);
+		}
+
+		$canonical = ScanUrl::basket_url();
+		$is_path   = (string) wp_parse_url( $canonical, PHP_URL_PATH ) === $path;
+
+		if ( $is_post ) {
+			// A POST is never redirected: the browser would turn it into a GET and drop it.
+			if ( ! $is_path || '' !== $query ) {
+				return array(
+					'status' => 400,
+					'view'   => ScanScreen::with_error( ScanScreen::entry(), 400, __( 'This request could not be understood.', 'product-qrcode-barcode-generator' ) ),
+				);
+			}
+
+			return BasketRequest::handle( $post );
+		}
+
+		$args = array();
+		wp_parse_str( $query, $args );
+
+		$added = isset( $args['added'] ) && is_string( $args['added'] ) && CodeGenerator::is_valid_format( $args['added'] ) ? $args['added'] : '';
+		$msg   = isset( $args['msg'] ) && is_string( $args['msg'] ) && in_array( $args['msg'], array( 'updated', 'removed', 'cleared' ), true ) ? $args['msg'] : '';
+		$want  = '' !== $added ? ScanUrl::basket_url( array( 'added' => $added ) ) : ( '' !== $msg ? ScanUrl::basket_url( array( 'msg' => $msg ) ) : $canonical );
+
+		if ( ! $is_path || (string) wp_parse_url( $want, PHP_URL_QUERY ) !== $query ) {
+			return array(
+				'status'   => 301,
+				'location' => $canonical,
+			);
+		}
+
+		if ( ! Permissions::can_sell() ) {
+			return array(
+				'status' => 403,
+				'view'   => ScanScreen::sell_forbidden(),
+			);
+		}
+
+		$notices = array();
+
+		if ( '' !== $added ) {
+			$quantity = 0;
+
+			foreach ( BasketStore::get( get_current_user_id() )['lines'] as $line ) {
+				$quantity = $line['code'] === $added ? $line['quantity'] : $quantity;
+			}
+
+			if ( $quantity > 0 ) {
+				/* translators: 1: item, 2: its quantity in the basket now. */
+				$notices[] = array( 'success', sprintf( __( 'Added: %1$s (now %2$s in the basket).', 'product-qrcode-barcode-generator' ), ScanScreen::code_name( $added ), number_format_i18n( $quantity ) ) );
+			}
+		} elseif ( '' !== $msg ) {
+			$texts     = array(
+				'updated' => __( 'Quantity changed.', 'product-qrcode-barcode-generator' ),
+				'removed' => __( 'Item removed from the basket.', 'product-qrcode-barcode-generator' ),
+				'cleared' => __( 'The basket was cleared.', 'product-qrcode-barcode-generator' ),
+			);
+			$notices[] = array( 'success', $texts[ $msg ] );
+		}
+
+		return array(
+			'status' => 200,
+			'view'   => ScanScreen::basket( get_current_user_id(), array(), array( 'notices' => $notices ) ),
 		);
 	}
 

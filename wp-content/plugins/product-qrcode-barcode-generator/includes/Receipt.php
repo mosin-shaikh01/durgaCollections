@@ -20,6 +20,11 @@
  * Number: the sale ID ("Sale #123" in the In-store sales history). Seller: the first
  * word of the seller_name snapshot, unless the setting turns it off.
  *
+ * Phase 17 (D21): one receipt per basket, listing every line. Its number is the basket
+ * number (the first line's sale ID), so receipt numbers stay one sequence; a single
+ * sale keeps its own ID. Lines voided on their own (only after a partly failed undo or
+ * void) are marked, and the total is what still stands, with the original total noted.
+ *
  * Share on WhatsApp: https://wa.me/?text=… with no phone number (WhatsApp asks which
  * chat), so nothing about the customer reaches the plugin; the text never contains a
  * link to the receipt. Not offered for a voided sale.
@@ -123,22 +128,45 @@ final class Receipt {
 	 * @return array<string, mixed>
 	 */
 	public static function data( array $sale ): array {
+		$rows = array();
+
+		// Phase 17: every line of the sale's basket (a single sale is a basket of one); the first line leads.
+		foreach ( BasketService::transaction_of( $sale ) as $row ) {
+			unset( $row['unit_cost'] ); // Never on a receipt.
+
+			if ( self::has_receipt( $row ) ) {
+				$rows[] = $row;
+			}
+		}
+
 		unset( $sale['unit_cost'] ); // Never on a receipt.
 
+		$sale     = array() === $rows ? $sale : $rows[0];
+		$rows     = array() === $rows ? array( $sale ) : $rows;
 		$settings = Settings::get();
 		$currency = (string) $sale['currency'];
-		$void     = SaleRepository::STATUS_VOIDED === $sale['status'];
+		$voided   = array_filter( $rows, static fn( $r ) => SaleRepository::STATUS_VOIDED === $r['status'] );
+		$void     = count( $voided ) === count( $rows );
 		$method   = isset( $sale['payment_method'] ) ? (string) $sale['payment_method'] : '';
-		$lines    = array(
-			array(
-				'name'       => (string) $sale['product_name'],
-				'attributes' => SalePresenter::attributes( $sale ),
-				'quantity'   => number_format_i18n( (int) $sale['quantity'] ),
-				'unit'       => SalePresenter::money( (string) $sale['unit_price'], $currency ),
-				'total'      => SalePresenter::money( (string) $sale['line_total'], $currency ),
-			),
-		);
+		$lines    = array();
+		$standing = 0.0;
+		$original = 0.0;
 
+		foreach ( $rows as $row ) {
+			$line_void = SaleRepository::STATUS_VOIDED === $row['status'];
+			$original += (float) $row['line_total'];
+			$standing += $line_void ? 0.0 : (float) $row['line_total'];
+			$lines[]   = array(
+				'name'       => (string) $row['product_name'],
+				'attributes' => SalePresenter::attributes( $row ),
+				'quantity'   => number_format_i18n( (int) $row['quantity'] ),
+				'unit'       => SalePresenter::money( (string) $row['unit_price'], $currency ),
+				'total'      => SalePresenter::money( (string) $row['line_total'], $currency ),
+				'void'       => $line_void && ! $void,
+			);
+		}
+
+		$partly    = ! $void && array() !== $voided;
 		$void_note = '';
 
 		if ( $void ) {
@@ -148,11 +176,14 @@ final class Receipt {
 				? sprintf( __( 'This sale was undone on %s.', 'product-qrcode-barcode-generator' ), $when )
 				/* translators: %s: date and time. */
 				: sprintf( __( 'This sale was voided on %s.', 'product-qrcode-barcode-generator' ), $when );
+		} elseif ( $partly ) {
+			/* translators: %s: the sale's original total. */
+			$void_note = sprintf( __( 'Some items of this sale were voided. Original total: %s.', 'product-qrcode-barcode-generator' ), SalePresenter::money( (string) $original, $currency ) );
 		}
 
 		return array(
-			'id'        => (int) $sale['id'],
-			'number'    => (string) (int) $sale['id'],
+			'id'        => BasketService::number( $sale ),
+			'number'    => (string) BasketService::number( $sale ),
 			'shop'      => self::shop_name(),
 			'address'   => self::lines_of( $settings['receipt_address'] ),
 			'phone'     => is_string( $settings['receipt_phone'] ) ? $settings['receipt_phone'] : '',
@@ -160,7 +191,7 @@ final class Receipt {
 			'footer'    => self::lines_of( $settings['receipt_footer'] ),
 			'date'      => SalePresenter::datetime( (string) $sale['created_at_gmt'] ),
 			'lines'     => $lines,
-			'total'     => SalePresenter::money( (string) $sale['line_total'], $currency ),
+			'total'     => SalePresenter::money( (string) ( $void ? $original : $standing ), $currency ),
 			'payment'   => PaymentMethods::label( '' === $method ? null : $method ),
 			'reference' => PaymentMethods::UPI === $method ? UpiPayment::reference( (string) $sale['request_id'] ) : '',
 			'seller'    => self::seller_first_name( $sale ),
@@ -175,6 +206,25 @@ final class Receipt {
 	 * @param array<string, mixed> $data From data().
 	 */
 	public static function text( array $data ): string {
+		// Phase 17: a long basket keeps its first lines and says how many more there are.
+		for ( $shown = count( $data['lines'] ); $shown >= 0; $shown-- ) {
+			$text = self::text_with( $data, $shown );
+
+			if ( mb_strlen( $text ) <= self::TEXT_MAX ) {
+				return $text;
+			}
+		}
+
+		return mb_substr( self::text_with( $data, 0 ), 0, self::TEXT_MAX );
+	}
+
+	/**
+	 * The share text with the first $shown lines.
+	 *
+	 * @param array<string, mixed> $data  From data().
+	 * @param int                  $shown Lines to list.
+	 */
+	private static function text_with( array $data, int $shown ): string {
 		$out = array( '*' . $data['shop'] . '*' );
 
 		foreach ( $data['address'] as $line ) {
@@ -202,10 +252,16 @@ final class Receipt {
 		$out[] = $data['date'];
 		$out[] = '';
 
-		foreach ( $data['lines'] as $line ) {
-			$out[] = '' === $line['attributes'] ? $line['name'] : $line['name'] . ' – ' . $line['attributes'];
+		foreach ( array_slice( $data['lines'], 0, $shown ) as $line ) {
+			$out[] = ( '' === $line['attributes'] ? $line['name'] : $line['name'] . ' – ' . $line['attributes'] ) . ( ! empty( $line['void'] ) ? ' (' . __( 'voided', 'product-qrcode-barcode-generator' ) . ')' : '' );
 			/* translators: 1: quantity, 2: unit price, 3: total. */
 			$out[] = sprintf( __( '%1$s × %2$s = %3$s', 'product-qrcode-barcode-generator' ), $line['quantity'], $line['unit'], $line['total'] );
+		}
+
+		if ( $shown < count( $data['lines'] ) ) {
+			$more = count( $data['lines'] ) - $shown;
+			/* translators: %s: number of further items. */
+			$out[] = sprintf( _n( '…and %s more item', '…and %s more items', $more, 'product-qrcode-barcode-generator' ), number_format_i18n( $more ) );
 		}
 
 		$out[] = '';
@@ -232,7 +288,7 @@ final class Receipt {
 			}
 		}
 
-		return mb_substr( implode( "\n", $out ), 0, self::TEXT_MAX );
+		return implode( "\n", $out );
 	}
 
 	/**

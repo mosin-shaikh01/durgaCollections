@@ -28,6 +28,8 @@
  *   upi      ?array   the UPI payment panel instead of the sale form (see upi_step(); Phase 16)
  *   receipt  ?array   a receipt (see receipt(); Phase 16), rendered with its own template
  *   script_nonce string CSP nonce of the receipt page's one script element; '' elsewhere
+ *   basket   ?array   the seller's open basket (see basket(); Phase 17)
+ *   basket_sale ?array a sold basket (see basket_sale(); Phase 17)
  *
  * @package ProductQrBarcode
  */
@@ -157,7 +159,8 @@ final class ScanScreen {
 				if ( null === $stock || $stock <= 0 ) {
 					$notices[] = array( 'warning', __( 'Out of stock – cannot be sold.', 'product-qrcode-barcode-generator' ) );
 				} else {
-					$sell = self::sell_form( $code, $row, $item['product'], (int) $stock, $prefill );
+					$sell           = self::sell_form( $code, $row, $item['product'], (int) $stock, $prefill );
+					$sell['basket'] = self::basket_bar( get_current_user_id() ); // Phase 17 (D3).
 				}
 			}
 		}
@@ -301,7 +304,7 @@ final class ScanScreen {
 		$papers = array();
 
 		foreach ( Receipt::papers() as $key => $label ) {
-			$papers[] = array( ScanUrl::receipt_url( (int) $sale['id'], $key ), $label, $key === $paper );
+			$papers[] = array( ScanUrl::receipt_url( (int) $data['id'], $key ), $label, $key === $paper );
 		}
 
 		return self::view(
@@ -323,12 +326,323 @@ final class ScanScreen {
 	}
 
 	/**
+	 * The seller's open basket (Phase 17, D4): every line with current prices and stock,
+	 * the "Scan to add" box, the quantity / remove / clear forms and, when every line can
+	 * be sold, the confirm form (payment method and a signed token, BasketRequest).
+	 *
+	 * @param int                  $user_id Seller.
+	 * @param array<string, mixed> $prefill Payment method to keep.
+	 * @param array<string, mixed> $extra   notices (list), value (scan box), clear_confirm (bool).
+	 * @return array<string, mixed>
+	 */
+	public static function basket( int $user_id, array $prefill = array(), array $extra = array() ): array {
+		$basket  = BasketStore::get( $user_id );
+		$items   = array();
+		$stock   = array();
+		$need    = array();
+		$entries = array();
+		$tokens  = array();
+		$total   = 0.0;
+		$bad     = 0;
+
+		foreach ( $basket['lines'] as $i => $line ) {
+			$item        = SaleService::check_item( CodeRepository::find_by_code( $line['code'] ) );
+			$items[ $i ] = $item;
+
+			if ( ! is_wp_error( $item ) ) {
+				$holder_id = $item['holder']->get_id();
+
+				if ( ! isset( $stock[ $holder_id ] ) ) {
+					$read                = SaleRepository::read_stock( $holder_id );
+					$stock[ $holder_id ] = null === $read ? 0 : (int) $read;
+				}
+
+				$need[ $holder_id ] = ( $need[ $holder_id ] ?? 0 ) + $line['quantity'];
+			}
+		}
+
+		foreach ( $basket['lines'] as $i => $line ) {
+			$item     = $items[ $i ];
+			$quantity = $line['quantity'];
+			$problem  = is_wp_error( $item ) ? $item->get_error_message() : '';
+			$price    = is_wp_error( $item ) ? '' : SaleService::normalize_price( $item['product']->get_price() );
+			$max      = $quantity;
+			$note     = '';
+
+			if ( ! is_wp_error( $item ) ) {
+				$holder_id = $item['holder']->get_id();
+				$max       = max( $quantity, $stock[ $holder_id ] - ( $need[ $holder_id ] - $quantity ) );
+
+				if ( $stock[ $holder_id ] <= 0 ) {
+					$problem = __( 'Out of stock – cannot be sold.', 'product-qrcode-barcode-generator' );
+				} elseif ( $need[ $holder_id ] > $stock[ $holder_id ] ) {
+					/* translators: %s: stock quantity. */
+					$problem = sprintf( __( 'Only %s in stock.', 'product-qrcode-barcode-generator' ), number_format_i18n( $stock[ $holder_id ] ) );
+				}
+
+				if ( '' !== $line['price'] && SaleService::normalize_price( $line['price'] ) !== $price ) {
+					/* translators: %s: the price when the item was added. */
+					$note = sprintf( __( 'Price changed since added (was %s).', 'product-qrcode-barcode-generator' ), self::plain_price( $line['price'] ) );
+				}
+			}
+
+			$line_total = '' === $price ? '0' : SaleService::line_total( $price, $quantity );
+			$entries[]  = array(
+				'code'     => $line['code'],
+				'name'     => self::code_name( $line['code'] ),
+				'quantity' => $quantity,
+				'max'      => $max,
+				'unit'     => '' === $price ? '–' : self::plain_price( $price ),
+				'total'    => '' === $price ? '–' : self::plain_price( $line_total ),
+				'problem'  => $problem,
+				'note'     => $note,
+				'url'      => ScanUrl::site_url( $line['code'] ),
+			);
+
+			if ( '' === $problem ) {
+				$total   += (float) $line_total;
+				$tokens[] = array(
+					'code'     => $line['code'],
+					'quantity' => $quantity,
+					'price'    => $price,
+				);
+			} else {
+				++$bad;
+			}
+		}
+
+		$confirm = null;
+
+		if ( array() !== $entries && 0 === $bad && BasketService::db_supported() ) {
+			$methods = array_intersect_key( PaymentMethods::all(), array_flip( PaymentMethods::enabled() ) );
+			$chosen  = isset( $prefill['payment_method'] ) && PaymentMethods::is_enabled( (string) $prefill['payment_method'] ) ? (string) $prefill['payment_method'] : '';
+			$confirm = array(
+				'action'  => ScanUrl::basket_url(),
+				'nonce'   => wp_create_nonce( Permissions::nonce_action( 'basket_confirm' ) ),
+				'fields'  => BasketRequest::issue_token( $user_id, $basket['request_id'], $basket['rev'], $tokens ),
+				'methods' => $methods,
+				'method'  => 1 === count( $methods ) ? (string) key( $methods ) : $chosen,
+			);
+		}
+
+		$notices = isset( $extra['notices'] ) && is_array( $extra['notices'] ) ? $extra['notices'] : array();
+
+		if ( ! BasketService::db_supported() ) {
+			$notices[] = array( 'error', BasketService::unsupported()->get_error_message() );
+		} elseif ( $bad > 0 ) {
+			$notices[] = array( 'warning', __( 'Remove the items marked in red before confirming.', 'product-qrcode-barcode-generator' ) );
+		}
+
+		return self::view(
+			200,
+			$notices,
+			array(
+				'box'    => false,
+				'basket' => array(
+					'lines'         => $entries,
+					'items'         => (int) array_sum( array_column( $basket['lines'], 'quantity' ) ),
+					'total'         => self::plain_price( (string) $total ),
+					'rev'           => (string) $basket['rev'],
+					'action'        => ScanUrl::basket_url(),
+					'scan_nonce'    => wp_create_nonce( Permissions::nonce_action( 'basket_scan' ) ),
+					'edit_nonce'    => wp_create_nonce( Permissions::nonce_action( 'basket_edit' ) ),
+					'value'         => isset( $extra['value'] ) ? (string) $extra['value'] : '',
+					'confirm'       => $confirm,
+					'clear_confirm' => ! empty( $extra['clear_confirm'] ) && array() !== $entries,
+					'scan'          => BasketService::db_supported(),
+				),
+			)
+		);
+	}
+
+	/**
+	 * The basket with the UPI payment panel instead of the confirm form (Phase 17, D5).
+	 * If the basket can no longer be confirmed, the basket as it is now.
+	 *
+	 * @param int                  $user_id Seller.
+	 * @param array<string, mixed> $panel   QR markup, amount, payee, reference, form.
+	 * @return array<string, mixed>
+	 */
+	public static function basket_upi( int $user_id, array $panel ): array {
+		$view = self::basket( $user_id, array( 'payment_method' => PaymentMethods::UPI ) );
+
+		if ( ! is_array( $view['basket']['confirm'] ) ) {
+			return $view;
+		}
+
+		$view['basket']['confirm'] = null;
+		$view['basket']['scan']    = false; // No scan box: Enter or a scanner must not leave the payment by accident.
+		$view['upi']               = $panel;
+
+		return $view;
+	}
+
+	/**
+	 * A sold basket (Phase 17): its lines from the rows' snapshots, the receipt link and
+	 * the Undo form within 10 minutes (D19).
+	 *
+	 * @param array<int, array<string, string>> $lines The basket's lines.
+	 * @return array<string, mixed>
+	 */
+	public static function basket_sale( array $lines ): array {
+		$lead     = $lines[0];
+		$id       = BasketService::number( $lead );
+		$statuses = array_values( array_unique( array_column( $lines, 'status' ) ) );
+		$args     = array( 'currency' => $lead['currency'] );
+		$entries  = array();
+		$total    = 0.0;
+
+		if ( array( SaleRepository::STATUS_COMPLETED ) === $statuses ) {
+			$notice = array( 'success', __( 'Sold.', 'product-qrcode-barcode-generator' ) );
+		} elseif ( array( SaleRepository::STATUS_VOIDED ) === $statuses ) {
+			$when   = wp_date( get_option( 'time_format' ), (int) strtotime( $lead['voided_at_gmt'] . ' UTC' ) );
+			$notice = array(
+				'info',
+				SaleService::VOID_REASON_UNDO === $lead['void_reason']
+					/* translators: %s: time. */
+					? sprintf( __( 'This sale was undone at %s. Stock was restored.', 'product-qrcode-barcode-generator' ), $when )
+					/* translators: %s: time. */
+					: sprintf( __( 'This sale was voided at %s.', 'product-qrcode-barcode-generator' ), $when ),
+			);
+		} elseif ( array() === array_diff( $statuses, array( SaleRepository::STATUS_COMPLETED, SaleRepository::STATUS_VOIDED ) ) ) {
+			$notice = array( 'warning', __( 'This sale was only partly voided. Ask a manager to finish it.', 'product-qrcode-barcode-generator' ) );
+		} else {
+			$notice = array( 'error', __( 'The sale could not be completed. Stock was not changed.', 'product-qrcode-barcode-generator' ) );
+		}
+
+		foreach ( $lines as $line ) {
+			$total    += (float) $line['line_total'];
+			$entries[] = array(
+				'name'   => SalePresenter::item( $line ),
+				/* translators: 1: quantity, 2: unit price, 3: total. */
+				'amount' => sprintf( __( '%1$s × %2$s = %3$s', 'product-qrcode-barcode-generator' ), number_format_i18n( (int) $line['quantity'] ), self::plain_price( $line['unit_price'], $args ), self::plain_price( $line['line_total'], $args ) ),
+				'status' => (string) $line['status'],
+				'label'  => 1 === count( $statuses ) ? '' : SalePresenter::status( (string) $line['status'] ),
+			);
+		}
+
+		$undo = null;
+
+		if ( BasketService::can_undo( $lines, get_current_user_id() ) ) {
+			$undo = array(
+				'action'    => ScanUrl::basket_url(),
+				'nonce'     => wp_create_nonce( Permissions::nonce_action( 'basket_undo_' . $id ) ),
+				'basket_id' => (string) $id,
+				'until'     => wp_date( get_option( 'time_format' ), BasketService::undo_until( $lines ) ),
+				'remaining' => max( 0, BasketService::undo_until( $lines ) - time() ),
+			);
+		}
+
+		$receipt = array() !== array_intersect( $statuses, array( SaleRepository::STATUS_COMPLETED, SaleRepository::STATUS_VOIDED ) );
+
+		return self::view(
+			200,
+			array( $notice ),
+			array(
+				'basket_sale' => array(
+					'number'  => (string) $id,
+					'lines'   => $entries,
+					/* translators: %s: number of items. */
+					'items'   => sprintf( _n( '%s item', '%s items', (int) array_sum( array_column( $lines, 'quantity' ) ), 'product-qrcode-barcode-generator' ), number_format_i18n( (int) array_sum( array_column( $lines, 'quantity' ) ) ) ),
+					'total'   => self::plain_price( (string) $total, $args ),
+					'payment' => PaymentMethods::label( $lead['payment_method'] ?? null ),
+					'time'    => wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), SaleService::created_ts( $lead ) ),
+					'receipt' => $receipt ? ScanUrl::receipt_url( $id ) : '',
+				),
+				'undo'        => $undo,
+				'style_nonce' => null === $undo ? '' : self::style_nonce(),
+				'box_label'   => __( 'Scan next item', 'product-qrcode-barcode-generator' ),
+			)
+		);
+	}
+
+	/**
+	 * The item behind a code as "Name – attributes", or the code itself when it is unknown.
+	 *
+	 * @param string $code Code.
+	 */
+	public static function code_name( string $code ): string {
+		$row     = CodeRepository::find_by_code( $code );
+		$product = null === $row ? null : wc_get_product( (int) $row['product_id'] );
+
+		if ( ! $product instanceof WC_Product ) {
+			return $code;
+		}
+
+		$parent = $product->is_type( 'variation' ) ? wc_get_product( $product->get_parent_id() ) : null;
+
+		return self::display_name( $product, $parent instanceof WC_Product ? $parent : null );
+	}
+
+	/**
+	 * The stock holder of a code's item (0 when unknown).
+	 *
+	 * @param string $code Code.
+	 */
+	public static function holder_of( string $code ): int {
+		$row     = CodeRepository::find_by_code( $code );
+		$product = null === $row ? null : wc_get_product( (int) $row['product_id'] );
+
+		return $product instanceof WC_Product ? (int) $product->get_stock_managed_by_id() : 0;
+	}
+
+	/**
+	 * The page for users without pqbg_sell on a selling page (the basket).
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function sell_forbidden(): array {
+		return self::view( 403, array( array( 'error', __( 'You do not have permission to sell.', 'product-qrcode-barcode-generator' ) ) ), array( 'box' => false ) );
+	}
+
+	/**
 	 * "Receipt not found": the same answer for a missing sale, a sale without a receipt and another seller's sale.
 	 *
 	 * @return array<string, mixed>
 	 */
 	public static function receipt_not_found(): array {
 		return self::view( 404, array( array( 'error', __( 'Receipt not found.', 'product-qrcode-barcode-generator' ) ) ) );
+	}
+
+	/**
+	 * The product screen's basket state (Phase 17, D3): whether "Add to basket" is offered
+	 * and, while a basket is open, its summary and link (the form then only adds to it).
+	 *
+	 * @param int $user_id Seller.
+	 * @return array{ok: bool, open: bool, text: string, url: string}
+	 */
+	private static function basket_bar( int $user_id ): array {
+		$out = array(
+			'ok'   => BasketService::db_supported(),
+			'open' => false,
+			'text' => '',
+			'url'  => ScanUrl::basket_url(),
+		);
+
+		if ( ! $out['ok'] ) {
+			return $out;
+		}
+
+		$lines = BasketStore::get( $user_id )['lines'];
+
+		if ( array() === $lines ) {
+			return $out;
+		}
+
+		$total = 0.0;
+
+		foreach ( $lines as $line ) {
+			$item   = SaleService::check_item( CodeRepository::find_by_code( $line['code'] ) );
+			$total += is_wp_error( $item ) ? 0.0 : (float) SaleService::line_total( SaleService::normalize_price( $item['product']->get_price() ), $line['quantity'] );
+		}
+
+		$items = (int) array_sum( array_column( $lines, 'quantity' ) );
+
+		$out['open'] = true;
+		/* translators: 1: number of items, 2: total. */
+		$out['text'] = sprintf( __( 'Basket: %1$s · %2$s', 'product-qrcode-barcode-generator' ), sprintf( /* translators: %s: number of items. */ _n( '%s item', '%s items', $items, 'product-qrcode-barcode-generator' ), number_format_i18n( $items ) ), self::plain_price( (string) $total ) );
+
+		return $out;
 	}
 
 	/**
@@ -460,18 +774,67 @@ final class ScanScreen {
 		$time    = '7d' === $range ? 'M j, ' . get_option( 'time_format' ) : get_option( 'time_format' );
 		$lines   = array();
 
+		$baskets = array(); // Phase 17 (D25): basket number => position in $lines.
+
 		foreach ( SalesQuery::rows( $filters, self::MY_SALES_LINES ) as $sale ) {
-			$code    = (string) ( $sale['code'] ?? '' );
+			$code   = (string) ( $sale['code'] ?? '' );
+			/* translators: 1: quantity, 2: unit price, 3: total. */
+			$amount = sprintf( __( '%1$s × %2$s = %3$s', 'product-qrcode-barcode-generator' ), number_format_i18n( (int) $sale['quantity'] ), SalePresenter::money( $sale['unit_price'], (string) $sale['currency'] ), SalePresenter::money( $sale['line_total'], (string) $sale['currency'] ) );
+
+			if ( ! empty( $sale['basket_id'] ) ) {
+				$number = (int) $sale['basket_id'];
+
+				if ( ! isset( $baskets[ $number ] ) ) {
+					$baskets[ $number ] = count( $lines );
+					$lines[]            = array(
+						'time'     => SalePresenter::datetime( $sale['created_at_gmt'], $time ),
+						'method'   => PaymentMethods::label( $sale['payment_method'] ),
+						'url'      => ScanUrl::basket_sale_url( $number ),
+						'receipt'  => ScanUrl::receipt_url( $number ),
+						'parts'    => array(),
+						'sum'      => 0.0,
+						'qty'      => 0,
+						'currency' => (string) $sale['currency'],
+						'statuses' => array(),
+					);
+				}
+
+				$at                           = $baskets[ $number ];
+				$lines[ $at ]['parts'][]      = array( SalePresenter::item( $sale ), $amount );
+				$lines[ $at ]['sum']         += (float) $sale['line_total'];
+				$lines[ $at ]['qty']         += (int) $sale['quantity'];
+				$lines[ $at ]['statuses'][]   = (string) $sale['status'];
+				continue;
+			}
+
 			$lines[] = array(
 				'time'    => SalePresenter::datetime( $sale['created_at_gmt'], $time ),
 				'item'    => SalePresenter::item( $sale ),
-				/* translators: 1: quantity, 2: unit price, 3: total. */
-				'amount'  => sprintf( __( '%1$s × %2$s = %3$s', 'product-qrcode-barcode-generator' ), number_format_i18n( (int) $sale['quantity'] ), SalePresenter::money( $sale['unit_price'], (string) $sale['currency'] ), SalePresenter::money( $sale['line_total'], (string) $sale['currency'] ) ),
+				'amount'  => $amount,
 				'method'  => PaymentMethods::label( $sale['payment_method'] ),
 				'status'  => (string) $sale['status'],
 				'label'   => SalePresenter::status( (string) $sale['status'] ),
 				'url'     => CodeGenerator::is_valid_format( $code ) ? SaleRequest::sale_url( $code, (int) $sale['id'] ) : '',
 				'receipt' => ScanUrl::receipt_url( (int) $sale['id'] ), // Phase 16: completed and voided lines only, so every line has one.
+				'parts'   => array(),
+			);
+		}
+
+		foreach ( $baskets as $at ) {
+			$statuses = array_values( array_unique( $lines[ $at ]['statuses'] ) );
+			$status   = 1 === count( $statuses ) ? $statuses[0] : SaleRepository::STATUS_VOIDED;
+
+			$lines[ $at ] = array(
+				'time'    => $lines[ $at ]['time'],
+				/* translators: %s: number of items. */
+				'item'    => sprintf( _n( 'Sale of %s item', 'Sale of %s items', $lines[ $at ]['qty'], 'product-qrcode-barcode-generator' ), number_format_i18n( $lines[ $at ]['qty'] ) ),
+				'amount'  => SalePresenter::money( (string) $lines[ $at ]['sum'], $lines[ $at ]['currency'] ),
+				'method'  => $lines[ $at ]['method'],
+				'status'  => $status,
+				'label'   => 1 === count( $statuses ) ? SalePresenter::status( $status ) : __( 'Partly voided', 'product-qrcode-barcode-generator' ),
+				'url'     => $lines[ $at ]['url'],
+				'receipt' => $lines[ $at ]['receipt'],
+				'parts'   => array_reverse( $lines[ $at ]['parts'] ), // Rows come newest first; list the lines in the order they were added.
 			);
 		}
 
@@ -552,6 +915,12 @@ final class ScanScreen {
 		$entry_url  = ScanUrl::site_url();
 		$logout_url = wp_logout_url( $entry_url );
 		$sales_url  = Permissions::can_view_own_sales() ? ScanUrl::my_sales_url() : '';
+		$basket_url = '';
+
+		// Phase 17: a header link to the open basket on every other scan page.
+		if ( ! is_array( $view['basket'] ?? null ) && ! is_array( $view['receipt'] ?? null ) && Permissions::can_sell() && BasketService::db_supported() && array() !== BasketStore::get( get_current_user_id() )['lines'] ) {
+			$basket_url = ScanUrl::basket_url();
+		}
 
 		// Phase 16: the receipt has its own standalone template and stylesheet.
 		if ( is_array( $view['receipt'] ?? null ) ) {
@@ -722,6 +1091,8 @@ final class ScanScreen {
 				'upi'          => null,
 				'receipt'      => null,
 				'script_nonce' => '',
+				'basket'       => null,
+				'basket_sale'  => null,
 			),
 			$extra
 		);

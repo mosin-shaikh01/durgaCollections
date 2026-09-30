@@ -46,6 +46,7 @@ Branch `main`, tracking `origin/main`.
 - Phase 13 was committed as two commits and pushed to `origin/main`, with the owner's approval (normal pushes, no force): first Phase 13 as `8670a30` (`8670a30fa466d564b08aa52ff7cb581f0f9f128c`, "Phase 13: release 1.0.0 (licences, guides, packaging, fresh-install test, launch runbook)"; 33 files), then the packaging fix as `7da1fa8` (`7da1fa8b648f2152b5a141fd6160ec1604851e0d`, "Fix build/package.php: clean builds deadlocked reading committed files"; `build/package.php` only, +5 / -2). **Release 1.0.0:** the annotated tag `pqbg-v1.0.0` (tag object `a0036035f5dd7de2a06f576b786f9858ea4acc6a`, message "Product QR Code and Barcode Generator 1.0.0") points at `7da1fa8` and is pushed. The release zip was built cleanly from `7da1fa8` (no `--allow-dirty`): `C:\xampp\backups\sharayu\release\product-qrcode-barcode-generator-1.0.0.zip`, 1,383,034 bytes, 252 files + 32 folders, **SHA-256 `a774011ae6479fbf236d582755469176055109e1fc5851d5a6b665eee12eb8df`** (the `.sha256` file says "built from commit 7da1fa8"). Recorded at the start of the 1.0.1 work (2026-09-28) from the Phase 13 report and the local refs (`main` = `refs/remotes/origin/main` = `7da1fa8b…`, tag ref = `a0036035…`, the working tree clean at the start of the session), then confirmed with git after `git fetch`: `HEAD` = `origin/main` = remote `main` = `7da1fa8b…`; `pqbg-v1.0.0` = `a0036035…` locally and on the remote, peeled to `7da1fa8b…` on both.
 - Version 1.0.1 was committed as one commit ("Release 1.0.1: user manual PDF, Plugin guide button, seller guide links"), with the owner's approval on the automated tests (2,332 passed; the D10 upgrade check not run, owner's decision), tagged `pqbg-v1.0.1` (annotated, "Product QR Code and Barcode Generator 1.0.1") and pushed to `origin/main` (normal pushes, no force). The release zip was built from that commit into `C:\xampp\backups\sharayu\release\` (see the Version 1.0.1 section). The commit is `aec593f` (`aec593f3c7c6b258c55f4b0802020a58b1c750dd`); the tag `pqbg-v1.0.1` (tag object `deb6a044ab23131aa6c60a59cdd6a8b2c6dc040a`) points to it. Recorded at the start of Phase 15 planning (2026-09-29), after checking that `HEAD` = `origin/main` = `aec593f` and the working tree was clean.
 - Phase 15 (configurable code prefix) was committed as `d60f548` (`d60f54874d1361e34a07537961d9ae8b6549bc15`, "Phase 15: configurable code prefix (unreleased, pending 1.1.0)"; 25 files, added by name) and pushed to `origin/main` with the owner's approval (normal push `aec593f..d60f548`, no force), 2026-09-29. No tag and no version change (still 1.0.1); no tests or builds were run. After the push `HEAD` = `origin/main` = `d60f548` and the working tree was clean. Recorded afterwards on the owner's instruction (a commit cannot contain its own hash).
+- Phase 16 (receipts + UPI payment QR) was committed as `664f1a7` (`664f1a7870f68db216c0995449908d1ca50040b4`, "Phase 16: receipts and UPI payment QR (unreleased, pending 1.1.0)"; 26 files, 2026-09-30 00:12 +0530) and pushed to `origin/main`. No tag and no version change (still 1.0.1); no tests or builds were run. Recorded at the start of Phase 17 planning (2026-09-30), after checking that `HEAD` = `origin/main` = remote `main` (`git ls-remote`) = `664f1a7` and the working tree was clean.
 
 Tracked files — project code only; WordPress core, `wp-config.php`,
 uploads and archives are excluded by `.gitignore`:
@@ -60,6 +61,7 @@ wp-content/plugins/product-qrcode-barcode-generator/
 
 | Commit | Message |
 |---|---|
+| `664f1a7` | Phase 16: receipts and UPI payment QR (unreleased, pending 1.1.0) |
 | `d60f548` | Phase 15: configurable code prefix (unreleased, pending 1.1.0) |
 | `aec593f` | Release 1.0.1: user manual PDF, Plugin guide button, seller guide links (tagged `pqbg-v1.0.1`) |
 | `7da1fa8` | Fix build/package.php: clean builds deadlocked reading committed files (tagged `pqbg-v1.0.0`) |
@@ -123,7 +125,8 @@ every other plugin stays ignored. For a future custom theme the pattern is:
 - [ ] **Optional, later (owner's decision A, 2026-09-27: plugin first):** decide on the theme approach (customize twentytwentyfive, a child theme, or a custom theme). All plugin phases are completed before any theme work; the theme phases are at the end of the roadmap.
 - [ ] The manual checks that must pass before launch are in **[`LAUNCH.md`](LAUNCH.md)** (the launch runbook; moved there from the Pre-launch acceptance checklist in Phase 13).
 - [ ] **1.1.0 pending: configurable prefix; owner to decide on tests and rebuilds before release.** Phase 15 is committed as `d60f548` and pushed, not tested and not released; at the next manual rebuild, mention custom prefixes (see the Phase 15 section).
-- [ ] **1.1.0 pending: receipts + UPI payment QR (Phase 16).** Implemented in the working tree, not tested and not committed; at the next manual rebuild, add receipts and UPI to the user manual and the seller guide (see the Phase 16 section).
+- [ ] **1.1.0 pending: receipts + UPI payment QR (Phase 16).** Committed as `664f1a7` and pushed, not tested and not released; at the next manual rebuild, add receipts and UPI to the user manual and the seller guide (see the Phase 16 section).
+- [ ] **1.1.0 pending: basket (Phase 17).** Implemented in the working tree, not tested and not committed; schema version 5 (the dev database migrates on the next page load). At the next manual rebuild, add selling several items, undo/void of a whole sale and what "Sales" counts to the user manual and the seller guide (see the Phase 17 section).
 - [ ] **Possible later phase (owner to decide):** a GST tax invoice (see the Phase 16 plan, D16: consecutive serial per financial year, HSN, tax breakdown, buyer details for B2B, credit notes).
 - [ ] **Deferred (owner to decide after launch):** a Hindi/Marathi seller guide (and translation of the staff screens; the .pot is ready). Recorded in Phase 13 at the owner's request.
 - [ ] **Deferred (only for a possible WordPress.org release; owner's decision, Phase 13):** two translatable messages are built from separately translated parts, which translators cannot reorder: the print setup screen's local-address notice ("QR codes currently point to a local address. Do not print labels until the production URL is set." followed by "You can still print test labels; they are marked "TEST – NOT FOR USE"."; `PrintAdmin`), and the "Variation #%d: " prefix in front of a cost-price error (`CostPrice`). Left as they are.
@@ -1962,7 +1965,7 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 
 **For the next manual rebuild:** mention custom prefixes in the user manual (2.3 Settings: the Code prefix field; 4 Product codes: "DC is the default prefix"; a Common problems row: old labels with another prefix still work) and consider "(the letters at the start may differ)" in the seller guide; the Settings screenshot will show the new field.
 
-### Phase 16: Receipts + UPI payment QR (2026-09-29 → 2026-09-30): IMPLEMENTED, NOT TESTED, NOT COMMITTED
+### Phase 16: Receipts + UPI payment QR (2026-09-29 → 2026-09-30): COMMITTED (`664f1a7`), NOT TESTED, NOT RELEASED
 
 **1.1.0 pending (released later together with the Phase 15 prefix; owner's decision D20).** The version stays 1.0.1 (header, `PQBG_VERSION`, `readme.txt`, `CHANGELOG.md` untouched); no .pot, manual, seller guide or zip rebuild; no tests, builds or backups run (owner's rule); only `php -l` (8.5 and the 8.2 minimum) on the changed PHP files.
 
@@ -1980,6 +1983,29 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 **Known before release:** `phase13-release`'s ".pot is up to date" check fails until the .pot is regenerated (already true for the prefix). Suites to run first: phase4, phase6, phase7, phase9a, phase10b, phase11, phase12, phase13, phase14, phase15, phase16.
 
 **For the next manual rebuild:** user manual (Settings → Receipts and UPI payment QR; selling with UPI in two steps and "check the success screen"; receipts, paper sizes, sharing on WhatsApp; Common problems: the QR amount after a price change, the UPI QR not showing → currency or settings) and the seller guide ("Taking a UPI payment", "Giving a receipt"; new screenshots).
+
+### Phase 17: Basket, several items in one sale (2026-09-30): IMPLEMENTED, NOT TESTED, NOT COMMITTED
+
+**1.1.0 pending (with the Phase 15 prefix and Phase 16 receipts/UPI).** The version stays 1.0.1 (owner: "Don't change the version number"); no .pot, manual, seller guide or zip rebuild; no tests, suites, builds or backups (owner's rule); only `php -l` (8.5 and the 8.2 minimum) on every changed PHP file.
+
+**Plan:** `C:\xampp\backups\sharayu\phase17-plan.txt`. Owner's decisions 2026-09-30: D1–D30 approved as recommended, including D1 single sales unchanged; D3 "Confirm sale" hidden on the product screen while a basket is open (a link to the basket instead); D7 at most 30 lines; D9–D10 2-hour expiry, no cron; D13 failed attempts stay in the journal. Added to `LAUNCH.md` on the owner's instruction: the live database check (B1b).
+
+**Implemented (working tree):**
+- **Schema v5** (`Install::migrate_5`, `DB_VERSION` 5): `pqbg_sales.basket_id` (NULL = a single sale, every existing row) and the `basket_status` index; dbDelta only, no row touched. New row status `held` (no schema change) and failure code `basket_rollback`.
+- New `BasketStore` (the open basket in user meta `pqbg_basket` / `pqbg_basket_at`, per-seller named lock, revision + request ID renewed on every change, 2-hour expiry read-only, 30 lines), `BasketService` (confirm all or nothing under every holder's `StockLock` in ascending order; pending → held per line in the stock statement; one statement held → completed; rollback naming the line; idempotent outcome waiting for the basket's locks; whole-basket undo and void; the MySQL 5.7.5 / MariaDB 10.0.2 gate), `BasketRequest` (the POSTs, the signed confirm token, the UPI two steps for the basket total), `templates/pqbg-scan-upi.php` (the Phase 16 UPI panel moved into a partial shared with the basket).
+- `SaleRepository`: `STATUS_HELD`, `FAILURE_BASKET`, `set_basket_id()`, `basket_lines()`, `held_rows()`, `complete_basket()`, `void_basket()`, `basket_id` in `formats()`. `SaleService`: `recover_held()` (called in `sell_locked()` next to `recover_stale()` and in `restore()`), `put_back()`, basket lines refused by `undo()`/`void_sale()` (`pqbg_in_basket`); `change_stock`, `forget`, `notify`, `void_fields`, `attributes`, `seller_name`, `in_transaction`, `log` made public (`@internal`, bodies unchanged). `SaleRequest`, `StockLock`, `UpiSale` unchanged.
+- Scan pages: `ScanUrl` (`BASKET`, `basket_url()`, `basket_sale_url()`, `is_basket_segment()`, `basket_id()`), `ScanRoute` (`/scan/basket/` GET/POST, `/scan/basket/{id}/`, "Add to basket" before `UpiSale`, a basket line's sale page → 303 to its basket, a basket line's receipt → 303 to the basket's receipt; `csp()`/`security_headers()` and the rewrite rules unchanged), `ScanScreen` (`basket()`, `basket_upi()`, `basket_sale()`, the basket bar on the product screen, the header link, `code_name()`, `holder_of()`, `sell_forbidden()`, My sales grouped per basket), `templates/pqbg-scan.php`, `assets/pqbg-scan.css`. Still no JavaScript on scan pages.
+- Receipt: one per basket (`Receipt::data()` from every line; number = basket number; partial-void marks; WhatsApp text "…and N more items"), `templates/pqbg-receipt.php`, `assets/pqbg-receipt.css`.
+- Reports and history: sales = transactions (`COUNT(DISTINCT COALESCE(basket_id, id))`) in `ReportsQuery::AGG` and `SalesQuery::totals()`, with `lines` for the unknown-cost count; the categories total counts each sale once; end-of-day and voids counts per transaction; notes on the product and category reports (`ReportData::basket_count_rule()`); "Lines with unknown cost". In-store sales: a **Receipt no.** column and filter (`sale_no`), the basket on the sale detail, **Void whole sale** (screen and handler through `BasketService::void()`); the sales CSV's new last column "Receipt no.". `SalePresenter`: the "In progress" label for held.
+- Health check: `stale_held` (warning), `partly_voided` (warning), `basket_db` (error), `open_baskets` (information). `uninstall.php` removes the basket user meta.
+- Docs: plugin `README.md` (new "Basket (Phase 17)" section; URLs, request flow, Health check, void, CSV, My sales, counting rules, requirements, database, options, migrations, uninstall), `tests/README.md` (phase17 row), `LAUNCH.md` (B1b database version, A8g basket acceptance).
+- Tests (not run): new `tests/phase17-basket.php`, added to `run.php`; `phase11-hardening` (the Health check key lists, the sale-path hashes for SaleService, SaleRepository and Schema, DB_VERSION 5); `phase9a-sales-history` (CSV column counts 21/18, "Receipt no." last).
+
+**Wording differences from the plan (no behaviour change):** the new history/CSV column is called **"Receipt no."** (the plan said "Sale no."), because the list already has a "Sale #" column (the line's ID); the value is the basket number, which is the receipt number. When two variations share their parent's stock and together exceed it, the error names the first line of that stock.
+
+**Known before release:** `phase13-release`'s ".pot is up to date" fails until the .pot is regenerated (already true since Phase 15). Suites recommended first (owner decides): phase17, phase7, phase11, phase9a, phase9b (with the 50,000-sale stress), phase16, phase6, phase14, phase10b, phase2, phase13; phase12 optional.
+
+**For the next manual rebuild:** user manual (selling several items; the basket screen; undo and void of a whole sale; "Sales" counts transactions; the Receipt no. column) and seller guide ("Selling several items in one sale", screenshots).
 
 ### Instructions for the next Claude session
 
@@ -2080,12 +2106,17 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 - **Phone testing:** never change Settings → General → WordPress Address for phone tests; use the `wp-config.php` snippet from the plugin README instead.
 - **Don't toggle `woocommerce_coming_soon` with `update_option()` from the CLI.** WooCommerce then re-saves the Cart page as user 0 and re-serializes its content (see the Phase 7 post-review notes).
 - **Selling rules** (Phase 7):
-  - Sell only through `SaleService::sell()`, undo through `SaleService::undo()`, and void through `SaleService::void_sale()`.
+  - Sell only through `SaleService::sell()` or (Phase 17) `BasketService::confirm()`, undo through `SaleService::undo()` or `BasketService::undo()`, and void through `SaleService::void_sale()` or `BasketService::void()`. `BasketService` changes stock only through `SaleService::change_stock()` / `put_back()`. A basket line is never undone or voided on its own until the partial-returns phase.
   - Only `SaleRepository` writes `pqbg_sales`, and rows are never deleted.
   - Never wrap the sale code in a DB transaction.
   - Never change stock except through `wc_update_product_stock()` inside `SaleService::change_stock()`.
   - If WooCommerce is upgraded, run the Phase 7 suite: its COMPATIBILITY checks fail loudly if `woocommerce_update_product_stock_query` stops firing or its SQL changes shape.
-- `DB_VERSION` is **4** (Phase 9B: `void_restock`; Phase 10 needed no schema change). The next schema change is migration 5.
+- `DB_VERSION` is **5** (Phase 17: `basket_id`; Phase 9B: `void_restock`). The next schema change is migration 6.
+- **Basket rules** (Phase 17):
+  - The open basket lives only in user meta `pqbg_basket` / `pqbg_basket_at`, written only by `BasketStore` under its per-seller lock. Never reserve stock for it.
+  - Reports count sales as transactions (`COALESCE(basket_id, id)`); amounts are always sums over lines. Never add up per-product or per-category counts into a number of sales.
+  - A `held` row is never a sale; only `SaleRepository::complete_basket()` turns a basket's held lines into completed, in one statement. Recovery (`SaleService::recover_held()`) runs only under the holder's lock.
+  - Baskets need MySQL 5.7.5+ / MariaDB 10.0.2+ (`BasketService::db_supported()`); keep single sales working without it.
 - **The scan URL format `{base}/scan/{CODE}/` is permanent** (labels will be printed with it). Never change `ScanUrl::for_code()` or the two rewrite rules without a migration plan for printed labels. Bump `ScanRoute::RULES_VERSION` whenever `ScanUrl::rewrite_rules()` changes, so the rules are flushed once.
 - **Scan page rules:**
   - access is checked before any lookup: logged out → login redirect, no `pqbg_view_products` → a fixed 403
@@ -2312,3 +2343,6 @@ EXPLAIN (50,000 rows): the period scan (status × method × seller) → table sc
 ### 2026-09-30
 
 - **Phase 16 (receipts + UPI payment QR), implementation:** D1–D21 approved (the Print script nonce-based). Implemented in the working tree (see the Phase 16 section), including the one deviation: the UPI step in the new `UpiSale` so the sale path stays byte-identical, hence no token re-issue at the QR step. New suite `phase16-receipts.php` and the phase4 default-settings expectation written, not run. Only `php -l` (8.5 and 8.2). No tests, builds or backups; version kept at 1.0.1; not committed.
+- **Phase 16, commit:** committed as `664f1a7` ("Phase 16: receipts and UPI payment QR (unreleased, pending 1.1.0)", 26 files) and pushed to `origin/main`; no tag, no version change, no tests or builds.
+- **Phase 17 (basket), planning:** `HEAD` = `origin/main` = remote `main` = `664f1a7`, clean; recorded `664f1a7` for Phase 16. Plan D1–D30 written to `C:\xampp\backups\sharayu\phase17-plan.txt`; nothing implemented.
+- **Phase 17, implementation:** D1–D30 approved as recommended. Implemented in the working tree (see the Phase 17 section): schema v5, `BasketStore`, `BasketService`, `BasketRequest`, the basket scan pages, one receipt per basket, transaction counts in reports, whole-basket undo/void, four Health check items; `LAUNCH.md` B1b and A8g. New suite `phase17-basket.php`; phase11 and phase9a expectations updated; none run. Only `php -l` (8.5 and 8.2). No tests, builds or backups; version kept at 1.0.1; not committed.

@@ -138,7 +138,13 @@ final class HealthCheckAdmin {
 		);
 		$parts   = array();
 
-		if ( isset( $row['reason'] ) && 'version' === $row['reason'] ) {
+		if ( isset( $row['reason'] ) && 'basket_db' === $row['reason'] ) {
+			/* translators: %s: database server version. */
+			$parts[] = sprintf( __( 'This database server (%s) cannot hold several locks at once. Basket sales are turned off; single sales still work. MySQL 5.7.5+ or MariaDB 10.0.2+ is needed for baskets.', 'product-qrcode-barcode-generator' ), $row['version'] );
+		} elseif ( isset( $row['reason'] ) && 'open_baskets' === $row['reason'] ) {
+			/* translators: 1: open baskets, 2: expired ones. */
+			$parts[] = sprintf( __( '%1$s sellers have an open basket; %2$s of them are older than 2 hours (they count as empty and are replaced by the next basket).', 'product-qrcode-barcode-generator' ), number_format_i18n( $row['open'] ), number_format_i18n( $row['expired'] ) );
+		} elseif ( isset( $row['reason'] ) && 'version' === $row['reason'] ) {
 			/* translators: 1: stored version, 2: expected version. */
 			$parts[] = sprintf( __( 'Stored schema version %1$d, expected %2$d.', 'product-qrcode-barcode-generator' ), $row['stored'], $row['code'] );
 		} elseif ( isset( $row['reason'], $row['n'] ) && 'duplicate' === $row['reason'] ) {
@@ -180,11 +186,15 @@ final class HealthCheckAdmin {
 			'negative_stock'   => array( __( 'Negative stock', 'product-qrcode-barcode-generator' ), __( 'Items with a product code (or the parent product that holds their stock) with stock below zero. Count the item and correct its stock on the product screen.', 'product-qrcode-barcode-generator' ) ),
 			'stock_after_null' => array( __( 'Sales without a stock snapshot', 'product-qrcode-barcode-generator' ), __( 'Completed sales whose "stock after" was not recorded because the request stopped right after changing the stock. The stock and the sale agree; only the snapshot is missing. Nothing to repair.', 'product-qrcode-barcode-generator' ) ),
 			'stale_pending'    => array( __( 'Interrupted sales', 'product-qrcode-barcode-generator' ), __( 'Sales still "in progress" after 15 minutes: the request stopped before changing the stock, so no stock changed. The next sale of the same item marks them failed automatically.', 'product-qrcode-barcode-generator' ) ),
+			'stale_held'       => array( __( 'Interrupted basket sales', 'product-qrcode-barcode-generator' ), __( 'Items of a basket sale still "in progress" after 15 minutes: the request stopped after lowering the stock but before the sale was recorded, so the stock is lower without a sale. The next sale, undo or void of the same item puts the stock back and marks them failed automatically.', 'product-qrcode-barcode-generator' ) ),
+			'partly_voided'    => array( __( 'Partly voided basket sales', 'product-qrcode-barcode-generator' ), __( 'Sales of several items where some items are voided and others are not, because an undo or void stopped part-way. Open the sale and use "Void whole sale" to finish it.', 'product-qrcode-barcode-generator' ) ),
+			'basket_db'        => array( __( 'Database supports basket sales', 'product-qrcode-barcode-generator' ), __( 'Selling several items as one sale needs a database server that can hold several locks at once (MySQL 5.7.5+ or MariaDB 10.0.2+). Otherwise baskets are turned off; single sales still work.', 'product-qrcode-barcode-generator' ) ),
 			'code_items'       => array( __( 'Codes on missing or unsuitable items', 'product-qrcode-barcode-generator' ), __( 'Active product codes whose item was deleted or can no longer have a code. Check the product; printed labels with these codes will not sell.', 'product-qrcode-barcode-generator' ) ),
 			'active_codes'     => array( __( 'One active code per item', 'product-qrcode-barcode-generator' ), __( 'Every item has at most one active code, and every code row is consistent. This should never find anything; if it does, keep a database backup and investigate before changing anything.', 'product-qrcode-barcode-generator' ) ),
 			'cost_meta'        => array( __( 'Cost prices', 'product-qrcode-barcode-generator' ), __( 'Stored cost prices that are not valid amounts, stored twice, or stored on something that is not a product. Re-enter the cost on the product screen or with Import cost prices.', 'product-qrcode-barcode-generator' ) ),
 			'code_items_trash' => array( __( 'Codes on trashed items', 'product-qrcode-barcode-generator' ), __( 'Codes stay active while an item is in the trash (so restoring it keeps its labels); they are retired when it is deleted permanently. For information.', 'product-qrcode-barcode-generator' ) ),
 			'sales_no_item'    => array( __( 'Sales of deleted items', 'product-qrcode-barcode-generator' ), __( 'Sales keep the product name, SKU and prices from the moment of sale, so deleting a product later is allowed; reports show these as deleted. For information.', 'product-qrcode-barcode-generator' ) ),
+			'open_baskets'     => array( __( 'Open baskets', 'product-qrcode-barcode-generator' ), __( 'Sellers who have items in a basket that is not sold yet. A basket counts as empty 2 hours after its last change. Nothing is reserved: stock is checked when the basket is sold. For information.', 'product-qrcode-barcode-generator' ) ),
 		);
 	}
 }

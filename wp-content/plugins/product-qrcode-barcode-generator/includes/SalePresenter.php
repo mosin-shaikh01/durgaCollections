@@ -35,6 +35,7 @@ final class SalePresenter {
 			SaleRepository::STATUS_VOIDED    => __( 'Voided', 'product-qrcode-barcode-generator' ),
 			SaleRepository::STATUS_FAILED    => __( 'Failed', 'product-qrcode-barcode-generator' ),
 			SaleRepository::STATUS_PENDING   => __( 'In progress', 'product-qrcode-barcode-generator' ),
+			SaleRepository::STATUS_HELD      => __( 'In progress', 'product-qrcode-barcode-generator' ), // Phase 17: a basket line not yet final.
 		);
 
 		return $labels[ $status ] ?? $status;

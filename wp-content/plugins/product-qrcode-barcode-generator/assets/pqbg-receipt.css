@@ -241,3 +241,9 @@
 		print-color-adjust: exact;
 	}
 }
+
+/* Phase 17: a basket line voided on its own (after a partly failed undo or void). */
+.pqbg-receipt__item--void .pqbg-receipt__item-name,
+.pqbg-receipt__item--void .pqbg-receipt__item-amount {
+	text-decoration: line-through;
+}

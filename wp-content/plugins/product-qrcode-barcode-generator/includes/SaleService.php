@@ -38,6 +38,12 @@
  * sale can still oversell, which is WooCommerce's own behaviour. Stock held
  * for unpaid checkouts is not counted (approved decision D2).
  *
+ * Phase 17 (basket): BasketService sells several items as one sale with the same
+ * primitives (check_item(), change_stock(), put_back()). Here that means only:
+ * held basket lines of a dead process are recovered under the holder's lock
+ * (recover_held(), from every sale, undo and void), and a basket line cannot be
+ * undone or voided on its own (pqbg_in_basket).
+ *
  * Side effects that compensation, undo or void cannot take back: e-mails or
  * other work done by hooks on the stock change or the product save (including
  * the low/no-stock notification sent after a completed sale), and the
@@ -277,6 +283,7 @@ final class SaleService {
 		}
 
 		SaleRepository::recover_stale( $holder_id );
+		self::recover_held( $holder_id ); // Phase 17: basket lines of a process that died.
 
 		// Fresh objects: the product, its parent and the holder may have changed while we waited.
 		self::forget( array( (int) $row['product_id'], $holder_id ) );
@@ -444,6 +451,11 @@ final class SaleService {
 			return $check( $sale );
 		}
 
+		// Phase 17: a basket is voided as a whole (BasketService::void()); per-line returns are a later phase.
+		if ( ! empty( $sale['basket_id'] ) ) {
+			return self::error( 'pqbg_in_basket', __( 'This item was sold with other items. Void the whole sale.', 'product-qrcode-barcode-generator' ) );
+		}
+
 		if ( ! $restock ) {
 			$done = SaleRepository::transition( (int) $sale['id'], SaleRepository::STATUS_COMPLETED, self::void_fields( $user_id, $reason, false ) );
 
@@ -498,6 +510,10 @@ final class SaleService {
 			return self::error( 'pqbg_sale_not_found', __( 'Sale not found.', 'product-qrcode-barcode-generator' ) );
 		}
 
+		if ( ! empty( $sale['basket_id'] ) ) {
+			return self::error( 'pqbg_in_basket', __( 'This item was sold with other items. Undo the whole sale from its sale page.', 'product-qrcode-barcode-generator' ) );
+		}
+
 		if ( (int) $sale['seller_id'] !== $user_id ) {
 			return self::error( 'pqbg_not_own_sale', __( 'You can only undo your own sale.', 'product-qrcode-barcode-generator' ) );
 		}
@@ -544,6 +560,8 @@ final class SaleService {
 		}
 
 		try {
+			self::recover_held( $holder_id ); // Phase 17: basket lines of a process that died.
+
 			$fresh = SaleRepository::find( (int) $sale['id'] );
 			$ok    = $recheck( $fresh );
 
@@ -631,6 +649,84 @@ final class SaleService {
 	}
 
 	/**
+	 * Phase 17: puts back the stock of every held basket line of a holder and marks it
+	 * failed ("interrupted"), one statement per line. Call only while holding the
+	 * holder's StockLock: a live basket holds the locks of all its holders until it is
+	 * final, so a held row seen then belongs to a process that died after lowering the
+	 * stock and before completing its basket.
+	 *
+	 * @param int $holder_id Stock holder ID.
+	 * @return int Lines recovered.
+	 */
+	public static function recover_held( int $holder_id ): int {
+		$done = 0;
+
+		foreach ( SaleRepository::held_rows( $holder_id ) as $row ) {
+			$ok = self::put_back(
+				$row,
+				SaleRepository::STATUS_HELD,
+				array(
+					'status'       => SaleRepository::STATUS_FAILED,
+					'failure_code' => SaleRepository::FAILURE_INTERRUPTED,
+				)
+			);
+
+			$done += $ok ? 1 : 0;
+			self::log( $ok ? 'pqbg_held_recovered' : 'pqbg_held_recovery_failed' );
+		}
+
+		return $done;
+	}
+
+	/**
+	 * Phase 17: returns a row's quantity to its recorded stock holder and moves the row
+	 * from $from to $set in the same statement (the compensate() sequence for any
+	 * status). The caller holds the holder's lock and has checked the holder.
+	 *
+	 * @internal For BasketService and recover_held(); not an API.
+	 *
+	 * @param array<string, string> $row  Sale row.
+	 * @param string                $from Status the row must still have.
+	 * @param array<string, mixed>  $set  Columns to set (status and friends).
+	 * @return bool Whether the row left $from with its stock put back.
+	 */
+	public static function put_back( array $row, string $from, array $set ): bool {
+		$holder_id = (int) $row['stock_holder_id'];
+		$quantity  = (int) $row['quantity'];
+
+		self::forget( array( $holder_id ) );
+		$holder = wc_get_product( $holder_id );
+
+		if ( $holder_id <= 0 || ! $holder instanceof WC_Product ) {
+			return false;
+		}
+
+		$before = SaleRepository::read_stock( $holder_id );
+		$change = self::change_stock( $holder, $quantity, 'increase', (int) $row['id'], $from, $set );
+		$fresh  = SaleRepository::find( (int) $row['id'] );
+
+		if ( null === $fresh ) {
+			return false;
+		}
+
+		if ( $from !== $fresh['status'] ) {
+			return true;
+		}
+
+		// Our statement did not run (the SQL was overridden or not issued). Decide from the stock itself.
+		$after = SaleRepository::read_stock( $holder_id );
+
+		if ( null !== $before && null !== $after && $after - $before >= $quantity && SaleRepository::transition( (int) $row['id'], $from, $set ) ) {
+			self::log( 'pqbg_stock_marker_missing' );
+			return true;
+		}
+
+		self::log( 'pqbg_put_back_failed', null !== $change['error'] ? get_class( $change['error'] ) : '' );
+
+		return false;
+	}
+
+	/**
 	 * Fallback when WooCommerce ran but the row is still pending (our statement
 	 * was not used, e.g. another plugin replaced the SQL, or WooCommerce threw
 	 * before its UPDATE). Decides from a fresh _stock read whether the decrement
@@ -683,8 +779,10 @@ final class SaleService {
 	 * @param string               $from     Row status required for the change.
 	 * @param array<string, mixed> $set      Row columns set in the same statement.
 	 * @return array{fired: bool, replaced: bool, shape: ?bool, error: ?\Throwable}
+	 *
+	 * @internal Public for BasketService (Phase 17); not an API.
 	 */
-	private static function change_stock( WC_Product $holder, int $quantity, string $op, int $sale_id, string $from, array $set ): array {
+	public static function change_stock( WC_Product $holder, int $quantity, string $op, int $sale_id, string $from, array $set ): array {
 		$holder_id = $holder->get_id();
 		$state     = array(
 			'fired'    => false,
@@ -776,8 +874,10 @@ final class SaleService {
 	 * @param string $reason  Reason.
 	 * @param bool   $restock Whether the quantity goes back to stock (schema v4, void_restock).
 	 * @return array<string, mixed>
+	 *
+	 * @internal Public for BasketService (Phase 17); not an API.
 	 */
-	private static function void_fields( int $user_id, string $reason, bool $restock ): array {
+	public static function void_fields( int $user_id, string $reason, bool $restock ): array {
 		return array(
 			'status'        => SaleRepository::STATUS_VOIDED,
 			'voided_by'     => $user_id,
@@ -792,8 +892,10 @@ final class SaleService {
 	 *
 	 * @param WC_Product $variation Variation.
 	 * @return array<string, string>
+	 *
+	 * @internal Public for BasketService (Phase 17); not an API.
 	 */
-	private static function attributes( WC_Product $variation ): array {
+	public static function attributes( WC_Product $variation ): array {
 		$out = array();
 
 		foreach ( $variation->get_attributes() as $name => $value ) {
@@ -814,8 +916,10 @@ final class SaleService {
 	 * The seller's display name for the snapshot (NULL when the user does not exist).
 	 *
 	 * @param int $seller User ID.
+	 *
+	 * @internal Public for BasketService (Phase 17); not an API.
 	 */
-	private static function seller_name( int $seller ): ?string {
+	public static function seller_name( int $seller ): ?string {
 		$user = get_userdata( $seller );
 
 		return $user ? mb_substr( (string) $user->display_name, 0, 250 ) : null;
@@ -826,8 +930,10 @@ final class SaleService {
 	 * WooCommerce sends these itself only for order-based stock changes.
 	 *
 	 * @param int $holder_id Stock holder ID.
+	 *
+	 * @internal Public for BasketService (Phase 17); not an API.
 	 */
-	private static function notify( int $holder_id ): void {
+	public static function notify( int $holder_id ): void {
 		try {
 			self::forget( array( $holder_id ) );
 			$holder = wc_get_product( $holder_id );
@@ -844,8 +950,10 @@ final class SaleService {
 	 * Drops cached copies of products so the next read comes from the database.
 	 *
 	 * @param int[] $ids Product IDs.
+	 *
+	 * @internal Public for BasketService (Phase 17); not an API.
 	 */
-	private static function forget( array $ids ): void {
+	public static function forget( array $ids ): void {
 		foreach ( array_unique( array_filter( $ids ) ) as $id ) {
 			clean_post_cache( $id );
 			wp_cache_delete( $id, 'post_meta' );
@@ -854,8 +962,10 @@ final class SaleService {
 
 	/**
 	 * Whether this database connection is inside an open transaction.
+	 *
+	 * @internal Public for BasketService (Phase 17); not an API.
 	 */
-	private static function in_transaction(): bool {
+	public static function in_transaction(): bool {
 		global $wpdb;
 
 		return '1' === (string) $wpdb->get_var( 'SELECT @@in_transaction' );
@@ -866,8 +976,10 @@ final class SaleService {
 	 *
 	 * @param string $code   Error code.
 	 * @param string $detail Optional short technical detail (an exception class, a branch).
+	 *
+	 * @internal Public for BasketService (Phase 17); not an API.
 	 */
-	private static function log( string $code, string $detail = '' ): void {
+	public static function log( string $code, string $detail = '' ): void {
 		if ( function_exists( 'wc_get_logger' ) ) {
 			wc_get_logger()->warning( 'Sale: ' . $code . ( '' !== $detail ? ' (' . $detail . ')' : '' ), array( 'source' => 'product-qrcode-barcode-generator' ) );
 		}

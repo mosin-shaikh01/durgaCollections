@@ -14,12 +14,21 @@
  *   stale_pending     warning  pending sales older than STALE_PENDING seconds (a process that died;
  *                              the next sale of the same stock holder marks them failed, see
  *                              SaleRepository::recover_stale())
+ *   stale_held        warning  Phase 17: basket lines "in progress" (held) older than STALE_PENDING: stock
+ *                              was lowered without a sale; the next sale, undo or void of the same stock
+ *                              holder puts it back (SaleService::recover_held())
+ *   partly_voided     warning  Phase 17: baskets with both completed and voided lines (an undo or void
+ *                              stopped part-way); a manager's "Void whole sale" finishes it
+ *   basket_db         error    Phase 17: the database server cannot hold several locks at once (MySQL
+ *                              before 5.7.5, MariaDB before 10.0.2), so basket sales are turned off
  *   code_items        error    active codes on items that are missing, not products, or ineligible
  *   active_codes      error    an item with more than one active code, or a code row that breaks the
  *                              active_product_id invariant (should be impossible)
  *   cost_meta         warning  cost meta that CostPrice::set() would never write (CostPrice::invalid_values())
  *   code_items_trash  info     active codes on trashed items (kept active by the Phase 5 rule)
  *   sales_no_item     info     sales whose product or variation no longer exists (allowed: sales keep snapshots)
+ *   open_baskets      info     Phase 17: sellers with an open basket, and how many of those are expired
+ *                              (older than BasketStore::TTL; they read as empty and are overwritten later)
  *
  * @package ProductQrBarcode
  */
@@ -67,6 +76,9 @@ final class HealthCheck {
 			'negative_stock'   => self::negative_stock(),
 			'stock_after_null' => self::stock_after_null(),
 			'stale_pending'    => self::stale_pending( $now ),
+			'stale_held'       => self::stale_held( $now ),
+			'partly_voided'    => self::partly_voided(),
+			'basket_db'        => self::basket_db(),
 			'code_items'       => $items['problems'],
 			'active_codes'     => self::active_codes(),
 			'cost_meta'        => self::cost_meta(),
@@ -75,6 +87,7 @@ final class HealthCheck {
 		if ( $with_info ) {
 			$out['code_items_trash'] = $items['trash'];
 			$out['sales_no_item']    = self::sales_no_item();
+			$out['open_baskets']     = self::open_baskets( $now );
 		}
 
 		return $out;
@@ -210,6 +223,84 @@ final class HealthCheck {
 	 */
 	private static function stale_pending( int $now ): array {
 		return self::sales_where( self::WARNING, "status = 'pending' AND created_at_gmt < %s", array( gmdate( 'Y-m-d H:i:s', $now - self::STALE_PENDING ) ) );
+	}
+
+	/**
+	 * Phase 17: held basket lines older than STALE_PENDING.
+	 *
+	 * @param int $now Unix time.
+	 */
+	private static function stale_held( int $now ): array {
+		return self::sales_where( self::WARNING, "status = 'held' AND created_at_gmt < %s", array( gmdate( 'Y-m-d H:i:s', $now - self::STALE_PENDING ) ) );
+	}
+
+	/**
+	 * Phase 17: baskets with both completed and voided lines, listed by basket number.
+	 */
+	private static function partly_voided(): array {
+		global $wpdb;
+
+		if ( ! self::$tables ) {
+			return self::result( self::WARNING, 0, array() );
+		}
+
+		$sales = Schema::sales_table();
+		$rows  = (array) $wpdb->get_results( "SELECT basket_id, MIN(created_at_gmt) AS created, MIN(product_name) AS name FROM {$sales} WHERE basket_id IS NOT NULL AND status IN ('completed', 'voided') GROUP BY basket_id HAVING SUM(status = 'completed') > 0 AND SUM(status = 'voided') > 0 ORDER BY basket_id DESC", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
+
+		return self::result(
+			self::WARNING,
+			count( $rows ),
+			array_map(
+				static fn( $r ) => array(
+					'sale'    => (int) $r['basket_id'],
+					'created' => (string) $r['created'],
+					'name'    => (string) $r['name'],
+				),
+				array_slice( $rows, 0, self::LIST_LIMIT )
+			)
+		);
+	}
+
+	/**
+	 * Phase 17: whether the database server supports basket sales (SELECT VERSION() only).
+	 */
+	private static function basket_db(): array {
+		return BasketService::db_supported()
+			? self::result( self::ERROR, 0, array() )
+			: self::result(
+				self::ERROR,
+				1,
+				array(
+					array(
+						'reason'  => 'basket_db',
+						'version' => BasketService::server_version(),
+					),
+				)
+			);
+	}
+
+	/**
+	 * Phase 17: sellers with an open basket, and how many of those baskets are expired.
+	 *
+	 * @param int $now Unix time.
+	 */
+	private static function open_baskets( int $now ): array {
+		global $wpdb;
+
+		$row  = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) AS n, COALESCE(SUM(CAST(meta_value AS UNSIGNED) < %d), 0) AS expired FROM {$wpdb->usermeta} WHERE meta_key = %s", $now - BasketStore::TTL, BasketStore::META_AT ), ARRAY_A );
+		$open = is_array( $row ) ? (int) $row['n'] : 0;
+
+		return self::result(
+			self::INFO,
+			$open,
+			0 === $open ? array() : array(
+				array(
+					'reason'  => 'open_baskets',
+					'open'    => $open,
+					'expired' => (int) $row['expired'],
+				),
+			)
+		);
 	}
 
 	/**

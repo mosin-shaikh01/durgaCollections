@@ -8,7 +8,13 @@
  *   completed  the stock was decremented and the sale stands
  *   voided     a completed sale that was undone or voided (stock restored unless voided without restock)
  *   failed     no sale: never decremented, or decremented and compensated (failure_code says why)
+ *   held       Phase 17: a basket line whose stock was decremented while its basket is not yet
+ *              final; never a sale. All held lines of a basket become completed in ONE statement
+ *              (complete_basket()), or are compensated to failed (BasketService). A held row seen
+ *              while holding its holder's lock belongs to a process that died: see
+ *              SaleService::recover_held().
  *
+ * Basket lines (Phase 17, schema v5) share basket_id = the ID of the basket's first line.
  * pending → completed and completed → failed/voided happen in the SAME statement
  * that changes the stock (a multi-table UPDATE of postmeta and this table, see
  * stock_sql()), so a crash can never leave a stock change without its record or
@@ -37,6 +43,7 @@ final class SaleRepository {
 	const STATUS_COMPLETED = 'completed';
 	const STATUS_VOIDED    = 'voided';
 	const STATUS_FAILED    = 'failed';
+	const STATUS_HELD      = 'held';
 
 	/** An online order took the stock between our read and our decrement; compensated. */
 	const FAILURE_SOLD_ONLINE = 'sold_online';
@@ -46,6 +53,9 @@ final class SaleRepository {
 
 	/** The process died before its stock statement ran; the stock never changed. */
 	const FAILURE_INTERRUPTED = 'interrupted';
+
+	/** Phase 17: another line of the same basket failed, so this line was taken back too. */
+	const FAILURE_BASKET = 'basket_rollback';
 
 	/**
 	 * Inserts the journal row for a sale that is about to change the stock.
@@ -231,13 +241,87 @@ final class SaleRepository {
 	}
 
 	/**
+	 * Sets basket_id on a basket's first line (its own ID) while the row is still pending (Phase 17).
+	 *
+	 * @param int $id Row ID.
+	 */
+	public static function set_basket_id( int $id ): bool {
+		return self::transition( $id, self::STATUS_PENDING, array( 'status' => self::STATUS_PENDING, 'basket_id' => $id ) );
+	}
+
+	/**
+	 * Every line of a basket, in the order they were recorded (Phase 17).
+	 *
+	 * @param int $basket_id Basket ID (the first line's ID).
+	 * @return array<int, array<string, string>>
+	 */
+	public static function basket_lines( int $basket_id ): array {
+		global $wpdb;
+
+		if ( $basket_id <= 0 ) {
+			return array();
+		}
+
+		$table = Schema::sales_table();
+
+		return (array) $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE basket_id = %d ORDER BY id", $basket_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
+	}
+
+	/**
+	 * Held rows of a stock holder (Phase 17; only meaningful under the holder's lock).
+	 *
+	 * @param int $holder_id Stock holder ID.
+	 * @return array<int, array<string, string>>
+	 */
+	public static function held_rows( int $holder_id ): array {
+		global $wpdb;
+
+		$table = Schema::sales_table();
+
+		return (array) $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE stock_holder_id = %d AND status = %s ORDER BY id", $holder_id, self::STATUS_HELD ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
+	}
+
+	/**
+	 * Moves every held line of a basket to completed in ONE statement (Phase 17), so
+	 * reports see all of the basket or none of it.
+	 *
+	 * @param int $basket_id Basket ID.
+	 * @return int Rows changed.
+	 */
+	public static function complete_basket( int $basket_id ): int {
+		global $wpdb;
+
+		$table = Schema::sales_table();
+
+		return (int) $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status = %s WHERE basket_id = %d AND status = %s", self::STATUS_COMPLETED, $basket_id, self::STATUS_HELD ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- fixed identifier.
+	}
+
+	/**
+	 * Voids every still-completed line of a basket in ONE statement, without touching
+	 * stock (Phase 17: a manager's void without restock).
+	 *
+	 * @param int                  $basket_id Basket ID.
+	 * @param array<string, mixed> $fields    status voided, voided_by, voided_at_gmt, void_reason, void_restock.
+	 * @return int Rows changed.
+	 */
+	public static function void_basket( int $basket_id, array $fields ): int {
+		global $wpdb;
+
+		$suppress = $wpdb->suppress_errors( true );
+		$updated  = $wpdb->update( Schema::sales_table(), $fields, array( 'basket_id' => $basket_id, 'status' => self::STATUS_COMPLETED ), self::formats( $fields ), array( '%d', '%s' ) );
+		$wpdb->suppress_errors( $suppress );
+
+		return false === $updated ? 0 : (int) $updated;
+	}
+
+	/**
 	 * $wpdb formats for a set of sale columns.
 	 *
 	 * @param array<string, mixed> $data Column values.
 	 * @return string[]
 	 */
 	private static function formats( array $data ): array {
-		$ints = array( 'code_id', 'unit_id', 'product_id', 'variation_id', 'order_id', 'seller_id', 'quantity', 'stock_before', 'stock_after', 'voided_by', 'stock_holder_id', 'void_restock' );
+		$ints = array( 'code_id', 'unit_id', 'product_id', 'variation_id', 'order_id', 'seller_id', 'quantity', 'stock_before', 'stock_after', 'voided_by', 'stock_holder_id', 'void_restock', 'basket_id' );
 
 		return array_map( static fn( $column ) => in_array( $column, $ints, true ) ? '%d' : '%s', array_keys( $data ) );
 	}

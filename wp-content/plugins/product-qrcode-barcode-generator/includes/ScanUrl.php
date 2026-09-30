@@ -49,6 +49,12 @@ final class ScanUrl {
 	const PAPER_ARG = 'paper';
 
 	/**
+	 * Phase 17: the open basket, /scan/basket/, and a sold basket, /scan/basket/{id}/. A code
+	 * can never be "basket" (the format needs PREFIX-XXXX-XXXX-XXXX).
+	 */
+	const BASKET = 'basket';
+
+	/**
 	 * The effective scan base URL (no trailing slash).
 	 */
 	public static function base(): string {
@@ -135,6 +141,49 @@ final class ScanUrl {
 	 */
 	public static function receipt_id( string $segment ): int {
 		return 1 === preg_match( '#^' . self::RECEIPT . '/([1-9][0-9]{0,18})$#D', $segment, $m ) ? (int) $m[1] : 0;
+	}
+
+	/**
+	 * The seller's open basket on this site (Phase 17), optionally with a result argument
+	 * after a change (added={code} or msg=updated|removed|cleared|failed).
+	 *
+	 * @param array<string, string> $args Query arguments.
+	 */
+	public static function basket_url( array $args = array() ): string {
+		$url = home_url( '/' . self::PATH . '/' . self::BASKET . '/' );
+
+		return array() === $args ? $url : add_query_arg( array_map( 'rawurlencode', $args ), $url );
+	}
+
+	/**
+	 * A sold basket's page (Phase 17): the lines, the receipt link and Undo.
+	 *
+	 * @param int $basket_id Basket ID (its first line's sale ID).
+	 */
+	public static function basket_sale_url( int $basket_id ): string {
+		return home_url( '/' . self::PATH . '/' . self::BASKET . '/' . max( 1, $basket_id ) . '/' );
+	}
+
+	/**
+	 * Whether a raw code segment is a basket path ("basket" or "basket/…").
+	 *
+	 * @param string|null $segment Raw code segment from the rewrite rule.
+	 */
+	public static function is_basket_segment( ?string $segment ): bool {
+		return null !== $segment && ( self::BASKET === $segment || str_starts_with( $segment, self::BASKET . '/' ) );
+	}
+
+	/**
+	 * The basket ID in a segment "basket/{id}", 0 for the open basket ("basket"), -1 when malformed.
+	 *
+	 * @param string $segment Raw code segment.
+	 */
+	public static function basket_id( string $segment ): int {
+		if ( self::BASKET === $segment ) {
+			return 0;
+		}
+
+		return 1 === preg_match( '#^' . self::BASKET . '/([1-9][0-9]{0,18})$#D', $segment, $m ) ? (int) $m[1] : -1;
 	}
 
 	/**

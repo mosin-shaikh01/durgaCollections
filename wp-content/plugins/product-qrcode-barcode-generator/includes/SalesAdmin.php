@@ -12,6 +12,11 @@
  *   POST admin-post.php?action=pqbg_void_sale        nonce pqbg_void_sale_{id}, pqbg_void_sale,
  *                                                    reason required; SaleService::void_sale(); 303
  *
+ * Phase 17 (D20): a basket line's detail lists the whole sale (every line) and offers
+ * "Void whole sale" (BasketService::void()); a basket line is never voided on its own
+ * (per-line returns are a later phase). The void screen and handler take any line of
+ * the basket and void every still-completed line.
+ *
  * Access: pqbg_view_all_sales (administrators and shop managers); voiding also
  * needs pqbg_void_sale; cost and profit only with pqbg_view_costs. Messages come
  * back as fixed codes in the URL (pqbg_msg), never as free text.
@@ -134,13 +139,18 @@ final class SalesAdmin {
 			self::redirect( AdminUrl::sale_void( $sale_id ), 'reason_long' );
 		}
 
-		$result = SaleService::void_sale( $sale_id, get_current_user_id(), $reason, $restock );
+		$row    = SaleRepository::find( $sale_id );
+		$basket = null !== $row && ! empty( $row['basket_id'] ) ? (int) $row['basket_id'] : 0;
+		$result = $basket > 0
+			? BasketService::void( $basket, get_current_user_id(), $reason, $restock )
+			: SaleService::void_sale( $sale_id, get_current_user_id(), $reason, $restock );
 
 		if ( ! is_wp_error( $result ) ) {
 			self::redirect( AdminUrl::sale( $sale_id ), $restock ? 'voided_restocked' : 'voided' );
 		}
 
 		$map = array(
+			'pqbg_partly_restored'  => array( AdminUrl::sale( $sale_id ), 'partly_voided' ),
 			'pqbg_not_voidable'     => array( AdminUrl::sale( $sale_id ), 'not_voidable' ),
 			'pqbg_busy'             => array( AdminUrl::sale_void( $sale_id ), 'busy' ),
 			'pqbg_undo_unavailable' => array( AdminUrl::sale_void( $sale_id ), 'restock_unavailable' ),
@@ -346,18 +356,25 @@ final class SalesAdmin {
 		/* translators: 1: sale number, 2: status. */
 		echo '<h1 class="wp-heading-inline">' . esc_html( sprintf( __( 'Sale #%1$s — %2$s', 'product-qrcode-barcode-generator' ), $id, SalePresenter::status( (string) $sale['status'] ) ) ) . '</h1> ';
 
-		if ( SaleRepository::STATUS_COMPLETED === $sale['status'] && Permissions::can_void_sale() ) {
-			echo '<a class="page-title-action" href="' . esc_url( AdminUrl::sale_void( $id ) ) . '">' . esc_html__( 'Void sale', 'product-qrcode-barcode-generator' ) . '</a> ';
+		$lines  = BasketService::transaction_of( $sale );
+		$basket = count( $lines ) > 1 || ! empty( $sale['basket_id'] );
+
+		if ( Permissions::can_void_sale() && in_array( SaleRepository::STATUS_COMPLETED, array_column( $lines, 'status' ), true ) ) {
+			echo '<a class="page-title-action" href="' . esc_url( AdminUrl::sale_void( $id ) ) . '">' . esc_html( $basket ? __( 'Void whole sale', 'product-qrcode-barcode-generator' ) : __( 'Void sale', 'product-qrcode-barcode-generator' ) ) . '</a> ';
 		}
 
 		// Phase 16: the front-end receipt page, in a new tab (it needs the scan route, so not with plain permalinks).
 		if ( Receipt::has_receipt( $sale ) && ScanRoute::is_available() ) {
-			echo '<a class="page-title-action" href="' . esc_url( ScanUrl::receipt_url( $id ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Receipt', 'product-qrcode-barcode-generator' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'product-qrcode-barcode-generator' ) . '</span></a> ';
+			echo '<a class="page-title-action" href="' . esc_url( ScanUrl::receipt_url( BasketService::number( $sale ) ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Receipt', 'product-qrcode-barcode-generator' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'product-qrcode-barcode-generator' ) . '</span></a> ';
 		}
 
 		echo '<a class="page-title-action" href="' . esc_url( AdminUrl::sales() ) . '">' . esc_html__( 'Back to In-store sales', 'product-qrcode-barcode-generator' ) . '</a>';
 		echo '<hr class="wp-header-end">';
 		self::render_message();
+
+		if ( $basket ) {
+			self::render_basket( $sale, $lines );
+		}
 
 		$rows[] = array( __( 'Product', 'product-qrcode-barcode-generator' ), SalePresenter::item( $sale ), self::product_link( (int) $sale['product_id'], $product ) );
 		$rows[] = array( __( 'SKU', 'product-qrcode-barcode-generator' ), (string) $sale['sku'], '' );
@@ -409,11 +426,48 @@ final class SalesAdmin {
 	}
 
 	/**
+	 * Phase 17: "Part of sale no. X": every line of the sale's basket, the line shown marked.
+	 *
+	 * @param array<string, mixed>              $sale  The line shown.
+	 * @param array<int, array<string, string>> $lines The basket's lines.
+	 */
+	private static function render_basket( array $sale, array $lines ): void {
+		$total = 0.0;
+
+		echo '<div class="notice notice-info inline"><p>' . esc_html(
+			sprintf(
+				/* translators: 1: sale (receipt) number, 2: number of lines. */
+				_n( 'Part of sale no. %1$s (%2$s line). Undo and void work on the whole sale.', 'Part of sale no. %1$s (%2$s lines). Undo and void work on the whole sale.', count( $lines ), 'product-qrcode-barcode-generator' ),
+				BasketService::number( $sale ),
+				number_format_i18n( count( $lines ) )
+			)
+		) . '</p></div>';
+
+		echo '<table class="widefat striped pqbg-sales__basket"><thead><tr><th scope="col">' . esc_html__( 'Sale #', 'product-qrcode-barcode-generator' ) . '</th><th scope="col">' . esc_html__( 'Product', 'product-qrcode-barcode-generator' ) . '</th><th scope="col">' . esc_html__( 'Qty', 'product-qrcode-barcode-generator' ) . '</th><th scope="col">' . esc_html__( 'Total', 'product-qrcode-barcode-generator' ) . '</th><th scope="col">' . esc_html__( 'Status', 'product-qrcode-barcode-generator' ) . '</th></tr></thead><tbody>';
+
+		foreach ( $lines as $line ) {
+			$total += (float) $line['line_total'];
+			$shown  = (int) $line['id'] === (int) $sale['id'];
+
+			echo '<tr><td>' . ( $shown ? '<strong>' . esc_html( (string) $line['id'] ) . '</strong>' : '<a href="' . esc_url( AdminUrl::sale( (int) $line['id'] ) ) . '">' . esc_html( (string) $line['id'] ) . '</a>' ) . '</td>';
+			echo '<td>' . esc_html( SalePresenter::item( $line ) ) . '</td><td>' . esc_html( number_format_i18n( (int) $line['quantity'] ) ) . '</td><td>' . esc_html( SalePresenter::money( $line['line_total'], (string) $line['currency'] ) ) . '</td><td>' . esc_html( SalePresenter::status( (string) $line['status'] ) ) . '</td></tr>';
+		}
+
+		echo '</tbody><tfoot><tr><th scope="row" colspan="3">' . esc_html__( 'Total', 'product-qrcode-barcode-generator' ) . '</th><td colspan="2">' . esc_html( SalePresenter::money( (string) $total, (string) $sale['currency'] ) ) . '</td></tr></tfoot></table>';
+		echo '<h2>' . esc_html__( 'This line', 'product-qrcode-barcode-generator' ) . '</h2>';
+	}
+
+	/**
 	 * The void confirmation screen.
 	 *
 	 * @param array<string, mixed> $sale Row.
 	 */
 	private static function render_void( array $sale ): void {
+		if ( ! empty( $sale['basket_id'] ) ) {
+			self::render_void_basket( $sale, BasketService::transaction_of( $sale ) );
+			return;
+		}
+
 		$id       = (int) $sale['id'];
 		$currency = (string) $sale['currency'];
 
@@ -455,6 +509,54 @@ final class SalesAdmin {
 	}
 
 	/**
+	 * Phase 17: the void confirmation for a whole basket (every still-completed line).
+	 *
+	 * @param array<string, mixed>              $sale  The line the screen was opened from.
+	 * @param array<int, array<string, string>> $lines The basket's lines.
+	 */
+	private static function render_void_basket( array $sale, array $lines ): void {
+		$id     = (int) $sale['id'];
+		$number = BasketService::number( $sale );
+		$todo   = array_values( array_filter( $lines, static fn( $l ) => SaleRepository::STATUS_COMPLETED === $l['status'] ) );
+
+		/* translators: %s: sale (receipt) number. */
+		echo '<h1>' . esc_html( sprintf( __( 'Void the whole sale no. %s?', 'product-qrcode-barcode-generator' ), $number ) ) . '</h1>';
+		self::render_message();
+
+		if ( array() === $todo ) {
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Only a completed sale can be voided.', 'product-qrcode-barcode-generator' ) . '</p></div>';
+			echo '<p><a class="button" href="' . esc_url( AdminUrl::sale( $id ) ) . '">' . esc_html__( 'Back to the sale', 'product-qrcode-barcode-generator' ) . '</a></p>';
+			return;
+		}
+
+		$total = 0.0;
+
+		echo '<ul class="ul-disc">';
+
+		foreach ( $todo as $line ) {
+			$total += (float) $line['line_total'];
+			/* translators: 1: item, 2: quantity, 3: unit price, 4: total. */
+			echo '<li>' . esc_html( sprintf( __( '%1$s · %2$s × %3$s = %4$s', 'product-qrcode-barcode-generator' ), SalePresenter::item( $line ), number_format_i18n( (int) $line['quantity'] ), SalePresenter::money( $line['unit_price'], (string) $line['currency'] ), SalePresenter::money( $line['line_total'], (string) $line['currency'] ) ) ) . '</li>';
+		}
+
+		echo '</ul>';
+		/* translators: 1: total, 2: payment method, 3: seller. */
+		echo '<p><strong>' . esc_html( sprintf( __( 'Total %1$s · %2$s · %3$s', 'product-qrcode-barcode-generator' ), SalePresenter::money( (string) $total, (string) $sale['currency'] ), PaymentMethods::label( $sale['payment_method'] ), SalePresenter::seller( $sale ) ) ) . '</strong></p>';
+
+		echo '<form method="post" action="' . esc_url( AdminUrl::admin_post() ) . '">';
+		echo '<input type="hidden" name="action" value="' . esc_attr( self::VOID_ACTION ) . '">';
+		echo '<input type="hidden" name="sale" value="' . esc_attr( (string) $id ) . '">';
+		echo '<input type="hidden" name="' . esc_attr( Permissions::NONCE_FIELD ) . '" value="' . esc_attr( wp_create_nonce( Permissions::nonce_action( 'void_sale_' . $id ) ) ) . '">';
+		echo '<p><label for="pqbg-void-reason"><strong>' . esc_html__( 'Reason (required)', 'product-qrcode-barcode-generator' ) . '</strong></label><br>';
+		echo '<textarea id="pqbg-void-reason" name="reason" rows="3" cols="60" maxlength="' . esc_attr( (string) self::REASON_MAX ) . '" required></textarea></p>';
+		echo '<p><label><input type="checkbox" name="restock" value="1" checked> ' . esc_html__( 'Return every item to stock', 'product-qrcode-barcode-generator' ) . '</label></p>';
+		echo '<p class="description">' . esc_html__( 'Every line of the sale stays in the history, marked as voided, with your name, the time and the reason. None of them counts in totals any more. Single items of a sale cannot be voided on their own.', 'product-qrcode-barcode-generator' ) . '</p>';
+		submit_button( __( 'Void whole sale', 'product-qrcode-barcode-generator' ), 'primary', 'submit', false );
+		echo ' <a class="button" href="' . esc_url( AdminUrl::sale( $id ) ) . '">' . esc_html__( 'Cancel', 'product-qrcode-barcode-generator' ) . '</a>';
+		echo '</form>';
+	}
+
+	/**
 	 * A result message from the fixed list, if the URL names one.
 	 */
 	private static function render_message(): void {
@@ -462,6 +564,7 @@ final class SalesAdmin {
 		$messages = array(
 			'voided_restocked'    => array( 'success', __( 'Sale voided. The quantity was returned to stock.', 'product-qrcode-barcode-generator' ) ),
 			'voided'              => array( 'success', __( 'Sale voided. Stock was not changed.', 'product-qrcode-barcode-generator' ) ),
+			'partly_voided'       => array( 'error', __( 'The sale was only partly voided: some items could not be returned to stock. Void it again to finish, or check the Health check.', 'product-qrcode-barcode-generator' ) ),
 			'not_voidable'        => array( 'warning', __( 'This sale was already voided or cannot be voided. Nothing was changed.', 'product-qrcode-barcode-generator' ) ),
 			'reason_required'     => array( 'error', __( 'Enter a reason for voiding this sale.', 'product-qrcode-barcode-generator' ) ),
 			/* translators: %d: maximum length. */

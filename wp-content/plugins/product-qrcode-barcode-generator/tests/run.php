@@ -47,6 +47,7 @@ $suites = array(
 	'phase14-manual.php',
 	'phase15-prefix.php',
 	'phase16-receipts.php',
+	'phase17-basket.php',
 );
 
 $filters = array_slice( $argv, 1 );

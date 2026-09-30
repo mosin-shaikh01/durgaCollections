@@ -97,8 +97,8 @@ echo esc_html( sprintf( __( 'Receipt no. %s', 'product-qrcode-barcode-generator'
 	</dl>
 	<ul class="pqbg-receipt__items">
 		<?php foreach ( $pqbg_data['lines'] as $pqbg_item ) : ?>
-			<li class="pqbg-receipt__item">
-				<span class="pqbg-receipt__item-name"><?php echo esc_html( $pqbg_item['name'] ); ?></span>
+			<li class="pqbg-receipt__item<?php echo empty( $pqbg_item['void'] ) ? '' : ' pqbg-receipt__item--void'; ?>">
+				<span class="pqbg-receipt__item-name"><?php echo esc_html( $pqbg_item['name'] ); ?><?php echo empty( $pqbg_item['void'] ) ? '' : ' (' . esc_html__( 'voided', 'product-qrcode-barcode-generator' ) . ')'; ?></span>
 				<?php if ( '' !== $pqbg_item['attributes'] ) : ?>
 					<span class="pqbg-receipt__item-variant"><?php echo esc_html( $pqbg_item['attributes'] ); ?></span>
 				<?php endif; ?>

@@ -60,6 +60,7 @@ final class SalesListTable extends \WP_List_Table {
 		$columns = array(
 			'date'    => __( 'Date', 'product-qrcode-barcode-generator' ),
 			'id'      => __( 'Sale #', 'product-qrcode-barcode-generator' ),
+			'sale_no' => __( 'Receipt no.', 'product-qrcode-barcode-generator' ),
 			'product' => __( 'Product', 'product-qrcode-barcode-generator' ),
 			'sku'     => __( 'SKU', 'product-qrcode-barcode-generator' ),
 			'qty'     => __( 'Qty', 'product-qrcode-barcode-generator' ),
@@ -145,7 +146,7 @@ final class SalesListTable extends \WP_List_Table {
 
 		return $this->row_actions(
 			array(
-				'receipt' => '<a href="' . esc_url( ScanUrl::receipt_url( (int) $item['id'] ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Receipt', 'product-qrcode-barcode-generator' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'product-qrcode-barcode-generator' ) . '</span></a>',
+				'receipt' => '<a href="' . esc_url( ScanUrl::receipt_url( BasketService::number( $item ) ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Receipt', 'product-qrcode-barcode-generator' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'product-qrcode-barcode-generator' ) . '</span></a>',
 			)
 		);
 	}
@@ -165,6 +166,15 @@ final class SalesListTable extends \WP_List_Table {
 				return '<a href="' . esc_url( AdminUrl::sale( (int) $item['id'] ) ) . '">' . esc_html( SalePresenter::datetime( $item['created_at_gmt'] ) ) . '</a>';
 			case 'id':
 				return '<a href="' . esc_url( AdminUrl::sale( (int) $item['id'] ) ) . '">' . esc_html( (string) $item['id'] ) . '</a>';
+			case 'sale_no':
+				// Phase 17: the sale as the customer sees it (a basket's number); a basket links to all its lines.
+				if ( empty( $item['basket_id'] ) ) {
+					return esc_html( (string) $item['id'] );
+				}
+
+				$day = wp_date( 'Y-m-d', SaleService::created_ts( $item ) );
+
+				return '<a href="' . esc_url( AdminUrl::sales( array( 'range' => 'custom', 'from' => $day, 'to' => $day, 'sale_no' => (string) $item['basket_id'] ) ) ) . '">' . esc_html( (string) $item['basket_id'] ) . '</a>';
 			case 'product':
 				return esc_html( SalePresenter::item( $item ) );
 			case 'sku':
